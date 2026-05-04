@@ -612,6 +612,24 @@ The `Clet.csproj` `Version` property is set at build time from the dispatch payl
 
 The user asked for thorough; this section is detailed accordingly. Eight test layers, each with a clear "what does this catch" purpose. All tests live in `gui-cs/clet/tests/`. `Markdown` View rendering quality is tested in TG core, not here (#5156).
 
+### 6.0 When each layer runs
+
+Two harnesses, two questions, two cost profiles. Keep them separate; don't merge.
+
+- **In-process (xUnit + TG `InputInjection`)** answers *"is the View logic right?"* — runs in milliseconds, asserts on internal `IValue<T>` state, no Node toolchain. Layers §6.1, §6.2, §6.4, §6.7.
+- **Process-level (TUIcast over PTY)** answers *"does the deployed binary behave right?"* — covers argument parsing, stdout JSON, exit codes, signal handling, AOT trim divergence. Slower (~1–2s per case). Layers §5.3, §6.3, §6.6.
+
+Tier matrix:
+
+| Trigger                       | Layers run                                                |
+|-------------------------------|-----------------------------------------------------------|
+| Inner loop (laptop)           | §6.1, §6.2                                                |
+| PR CI                         | §6.1, §6.2, §6.3 (subset: happy path per clet), §6.4, §6.7 |
+| Nightly                       | All of PR CI, plus full §6.3, §6.6, §6.8 dry-run          |
+| Pre-release / release gate    | Full §6.3, §6.6, §5.3 smoke gate, §6.5 manual matrix      |
+
+The legitimate worry that `InputInjection`-driven tests can drift from AOT behavior is addressed by §6.6 (AOT publish tests run the full §6.3 smoke matrix against the AOT binary). Don't double-pay it by routing §6.2 through TUIcast — the wall-clock cost is real and the marginal coverage is near zero.
+
 ### 6.1 Unit tests (`tests/Clet.UnitTests`)
 
 **What this catches:** Logic bugs in the registry, options, parsing, JSON serialization, exit code mapping.
@@ -660,6 +678,8 @@ The user asked for thorough; this section is detailed accordingly. Eight test la
 
 **Test harness:** `IApplication` instance per test, keystrokes synthesized via Terminal.Gui's `InputInjection` mechanism (the canonical TG-side hook for posting key/mouse events into a running loop), captured render output (snapshot to string). In-process injection is the right tool here — there is no subprocess to drive — and complements the process-level TUIcast harness used by §5.3 and §6.3.
 
+**Snapshot infrastructure: reuse TG's, don't roll our own.** TG already maintains snapshot-rendering helpers, and #5156 adds golden-file rendering for the `Markdown` View. Clet integration tests consume that same harness. If the harness is missing a hook clet needs, file against TG core; do not fork. Two parallel snapshot stacks would drift within a release.
+
 ### 6.3 Process/smoke tests (`tests/Clet.SmokeTests`)
 
 **What this catches:** Bugs that only appear when `clet` runs as a real process (argument parsing, stdout/stderr wiring, exit codes, signal handling).
@@ -667,6 +687,12 @@ The user asked for thorough; this section is detailed accordingly. Eight test la
 **Cases:** Identical to §5.3 release-pipeline smoke tests (every clet boots, returns valid JSON, exits with correct code). Run on every PR to `gui-cs/clet`, every TG-triggered release build, and nightly against the latest TG develop branch.
 
 **Tooling:** TUIcast in deterministic-script mode (same driver as §5.3). The xUnit fixture shells out to TUIcast with a per-clet keystroke script, captures the resulting JSON from the spawned `clet` process's stdout, and asserts on exit code + envelope shape. Using the same driver as the release gate means a green CI run is byte-equivalent evidence that the release gate will be green; we do not maintain two parallel smoke harnesses.
+
+**Scope guardrail.** §6.3 covers exactly one happy path per clet plus the cancellation case. Bug repros, option-matrix coverage, and behavior variants go in §6.2 (in-process, fast). Without this rule, every regression PR adds a TUIcast case, the release gate hits 30 minutes by v0.7, and the smoke layer becomes the integration layer at process-level cost.
+
+**Scripts as data, not code.** Per-clet keystroke scripts live as text files under `tests/Clet.SmokeTests/scripts/<alias>.txt` (one line per script, TUIcast comma-separated keystroke syntax). The xUnit fixture loads the file by alias; it does not embed scripts in C# string literals. A contributor can add a smoke case by editing data, and any script can be re-run locally with `npx tuicast --binary ./clet --script-file scripts/<alias>.txt` without rebuilding the test project.
+
+**Asciinema artifacts.** TUIcast captures every smoke run as a `.cast`. Successful runs discard the cast (artifact-store noise); failed runs upload it as a workflow artifact for forensic replay. Retention follows GitHub Actions' default (90 days). If we ever need longer for a specific incident, copy the artifact to the issue manually.
 
 ### 6.4 JSON contract tests (`tests/Clet.ContractTests`)
 
