@@ -93,7 +93,9 @@ Two items remain. Each is a general TG improvement, not a clet-specific one.
 
 ### 3.1 Cancellation token plumbing (P0) ; tracked as [#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)
 
-**Goal:** `IApplication.RunAsync(Toplevel, CancellationToken)` overload that cancels the run loop cleanly when the token is cancelled, returning whatever state the View has accumulated (so `IValue<T>.Value` is still readable for partial-result inspection if relevant).
+**Goal:** `IApplication.RunAsync(Toplevel, CancellationToken)` overload that cancels the run loop cleanly when the token is cancelled, returning whatever state the View has accumulated.
+
+Clet's wire contract does not depend on TG's decision about whether `IValue<T>.Value` is readable after cancel; see §4.3, where the cancel envelope is fixed at `{"schemaVersion":1,"status":"cancelled"}` regardless. Any partial-result behavior TG settles on is welcome but not load-bearing for clet.
 
 **Tasks:**
 - Add `Task RunAsync(Toplevel toplevel, CancellationToken cancellationToken)`.
@@ -303,21 +305,59 @@ internal sealed record CletOptionDescriptor (
   "properties": {
     "schemaVersion": { "const": 1 },
     "status": { "enum": ["ok", "cancelled", "error", "no-result"] },
-    "type":    { "type": "string" },
     "value":   { },
     "code":    { "type": "string" },
     "message": { "type": "string" }
   },
   "allOf": [
     { "if": { "properties": { "status": { "const": "ok"    } } },
-      "then": { "anyOf": [ { "required": ["type", "value"] }, { "not": { "required": ["type"] } } ] } },
+      "then": { "anyOf": [ { "required": ["value"] }, { "not": { "required": ["value"] } } ] } },
     { "if": { "properties": { "status": { "const": "error" } } },
       "then": { "required": ["code", "message"] } }
   ]
 }
 ```
 
+**Normative envelopes:**
+```json
+{ "schemaVersion": 1, "status": "ok", "value": <T> }                  // input clet success
+{ "schemaVersion": 1, "status": "ok" }                                // viewer clet dismiss
+{ "schemaVersion": 1, "status": "cancelled" }                         // cancel (any clet)
+{ "schemaVersion": 1, "status": "error", "code": "...", "message": "..." }
+{ "schemaVersion": 1, "status": "no-result" }
+```
+
+**No `type` field on the envelope.** The result type is advertised once, per-alias, in `clet list --json`. Agents that need it cache the registry; they do not branch on a per-call CLR type name. This keeps the wire format language-agnostic (no `System.String`-shaped values leak across the boundary).
+
+**Cancel is decoupled from TG.** On cancel, clet emits `{"schemaVersion":1,"status":"cancelled"}` and nothing else — no `value`, no `code`, no partial result — regardless of whether `IValue<T>.Value` is readable on the underlying View at the moment of cancellation. This is the contract clet promises to AI-agent consumers; TG's eventual answer to #5157's "disposition of `IValue<T>.Value` on cancellation" question is a TG-internal concern.
+
 Schema is published in this repo under `docs/json-schema.md` and pinned in `Json/SchemaV1.cs`. Contract tests (§6.4) validate every emitted line against this schema.
+
+### 4.3.1 Schema versioning policy
+
+`schemaVersion: 1` is the contract for the entire `clet 1.x` line. Changes within `1.x` are additive only — existing fields never change meaning, never become required, never change type. A `schemaVersion: 2` is permitted only at a `clet 2.0.0` boundary, and `clet 2.x` must accept `--schema-version 1` to emit the v1 envelope for at least one minor release of the 2.x line, giving consumers a parallel-period to migrate. Breakage notices land in `gui-cs/clet` release notes and in the footer of `clet --version` for the parallel period.
+
+### 4.3.2 Per-clet `value` shapes
+
+For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emit a scalar; the table below names the non-scalar cases explicitly so consumers can encode them once.
+
+| Alias                         | `value` shape                                                |
+|-------------------------------|--------------------------------------------------------------|
+| `text`                        | string                                                       |
+| `int`                         | integer                                                      |
+| `decimal`                     | number (JSON number; consumer decides float vs decimal)      |
+| `confirm`                     | boolean                                                      |
+| `select`                      | integer (zero-based index)                                   |
+| `multi-select`                | array of integers (zero-based indices, ascending)            |
+| `pick-file`                   | string (path)                                                |
+| `pick-file --multi`           | array of strings (paths, ascending sort)                     |
+| `pick-directory`              | string (path)                                                |
+| `date`                        | string, ISO-8601 date (`YYYY-MM-DD`)                         |
+| `time`                        | string, ISO-8601 time (`HH:MM:SS`)                           |
+| `duration`                    | string, ISO-8601 duration (`PT1H30M`)                        |
+| `color`                       | string, `#RRGGBB` (lowercase hex)                            |
+| `attribute-picker`            | object, `{"fg": "#RRGGBB", "bg": "#RRGGBB", "style": "..."}` |
+| `range`                       | object, `{"low": <T>, "high": <T>}` (`<T>` = scalar of type) |
 
 ### 4.4 Source-generated registration
 
@@ -520,13 +560,19 @@ jobs:
 
 ### 5.3 Smoke test gate (P0; release fails closed)
 
-Before any publish step, every built binary runs a smoke matrix:
+Before any publish step, every built binary runs a smoke matrix. The gate is process-level: it spawns the AOT'd binary as a real OS process, drives it from outside, and asserts on exit code + stdout JSON.
+
+**Driver:** [`gui-cs/TUIcast`](https://github.com/gui-cs/TUIcast) in deterministic-script mode. TUIcast spawns the target binary inside a PTY (`node-pty`), writes keystrokes directly to the PTY file descriptor (not stdin redirection — Terminal.Gui drivers don't read keystrokes from stdin the way bash heredocs assume), and captures the asciinema stream as a side effect. The deterministic mode takes a comma-separated keystroke script (`"wait:500,ArrowDown,Enter"`) — no AI in the loop, fully reproducible. TUIcast's `poc-uicatalog.yml` workflow already proves this stack works against a Terminal.Gui binary in GitHub Actions.
+
+**Cases:**
 
 1. `clet --version` returns the TG version.
 2. `clet list --json` validates against the schema.
-3. For each input clet: spawn with `--initial <stub> --json --timeout 1s`, send a fake "Enter" via stdin, verify exit 0 and JSON shape.
-4. For `md`: spawn against a fixture markdown file, send "q", verify exit 0 and JSON shape.
-5. Cancellation: spawn with `--timeout 100ms`, verify exit 130.
+3. For each input clet: TUIcast spawns with `--initial <stub> --json --timeout 1s` and a per-clet keystroke script that drives it to accept; verify exit 0 and JSON envelope.
+4. For `md`: TUIcast spawns against a fixture markdown file with `"wait:500,q"`; verify exit 0 and `{"schemaVersion":1,"status":"ok"}`.
+5. Cancellation: spawn with `--timeout 100ms`, no keystrokes; verify exit 130 and `{"schemaVersion":1,"status":"cancelled"}`.
+
+**Asciinema artifact.** TUIcast captures every smoke run as `.cast`; on failure, the cast is uploaded as a workflow artifact. Release-failure forensics get a replay, not just a stack trace.
 
 Any failure halts the publish workflow. The maintainer is paged via the release issue's auto-comment.
 
@@ -586,7 +632,7 @@ The user asked for thorough; this section is detailed accordingly. Eight test la
 - `CletJsonOutput`:
   - Round-trip every result variant.
   - Output matches `SchemaV1` byte-for-byte for canonical inputs (golden files).
-  - No properties leak (`type` absent on viewer clets).
+  - No properties leak: cancelled envelopes contain only `schemaVersion` and `status`; viewer success envelopes contain only `schemaVersion` and `status`; no envelope ever emits a wire-format `type` field (the field was dropped at v0.5; result types are advertised once via `clet list --json`, not on every result).
 - Exit code mapping:
   - Each `CletRunStatus` and error code maps to the documented exit.
 - Cancellation:
@@ -612,7 +658,7 @@ The user asked for thorough; this section is detailed accordingly. Eight test la
 - Theme override per invocation; verify View's effective scheme.
 - Inline vs alt-screen mode; verify driver state transitions.
 
-**Test harness:** `IApplication` instance per test, scripted input stream (a `TextReader` substitute for keyboard events), captured render output (snapshot to string).
+**Test harness:** `IApplication` instance per test, keystrokes synthesized via Terminal.Gui's `InputInjection` mechanism (the canonical TG-side hook for posting key/mouse events into a running loop), captured render output (snapshot to string). In-process injection is the right tool here — there is no subprocess to drive — and complements the process-level TUIcast harness used by §5.3 and §6.3.
 
 ### 6.3 Process/smoke tests (`tests/Clet.SmokeTests`)
 
@@ -620,7 +666,7 @@ The user asked for thorough; this section is detailed accordingly. Eight test la
 
 **Cases:** Identical to §5.3 release-pipeline smoke tests (every clet boots, returns valid JSON, exits with correct code). Run on every PR to `gui-cs/clet`, every TG-triggered release build, and nightly against the latest TG develop branch.
 
-**Tooling:** `Process.Start`, capture stdout/stderr, assert exit code.
+**Tooling:** TUIcast in deterministic-script mode (same driver as §5.3). The xUnit fixture shells out to TUIcast with a per-clet keystroke script, captures the resulting JSON from the spawned `clet` process's stdout, and asserts on exit code + envelope shape. Using the same driver as the release gate means a green CI run is byte-equivalent evidence that the release gate will be green; we do not maintain two parallel smoke harnesses.
 
 ### 6.4 JSON contract tests (`tests/Clet.ContractTests`)
 
@@ -699,9 +745,10 @@ Schedule follows TG releases, not a calendar; no dates here.
 |------|-----------:|-------:|------------|
 | AOT issue surfaces during `gui-cs/clet` build or smoke test | Medium | Medium | §6.6 catches before publish; file against TG core; if blocking on a release, fall back to self-contained single-file (~30MB) and document. |
 | `FileDialog` typed-result refactor (§3.2) breaks downstream callers | Low | Medium | Coordinate with TG core team; flag as breaking in release notes; fix in-tree callers as part of the PR. |
-| Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + §6.8 dry-runs catch most issues pre-publish; explicit on-call rotation for release weeks. |
+| Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + §6.8 dry-runs catch most issues pre-publish; `docs/runbooks/release-rollback.md` documents the response when a regression slips the gate and a published artifact must be withdrawn. |
 | Markdown View quality regression vs `glow` | Low | Medium | TG-side golden-file corpus (#5156); quarterly comparison run. |
 | Cancellation tokens in TG core have unforeseen complexity | Medium | Medium | §3.1 spike at v0.1; if hard, ship clet with polling-based cancellation as fallback. |
+| First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | §6.8 weekly dry-runs catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
 | Naming concerns about "clet" surfacing in support channels | Low | Low | Acknowledge in docs; outlast. |
 
 ---
@@ -711,9 +758,8 @@ Schedule follows TG releases, not a calendar; no dates here.
 1. **Telemetry.** The PR/FAQ mentions an opt-in usage ping. Spec deliberately does not include this in v1.0 scope; revisit at v1.1 with a privacy review.
 2. **Homebrew tap repo name.** `gui-cs/homebrew-tap` is assumed; confirm it exists or create.
 3. **Code signing certs.** Apple Developer ID and Authenticode certs are operational dependencies; confirm ownership/renewal process before v0.9.
-4. **`range` clet result type.** `(low, high)` tuple, named record, or two separate fields? Decide before locking the JSON schema at v0.5.
-5. **`md` content source.** File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both? Both is implied; confirm CLI shape.
-6. **PR/FAQ update.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly (Tig's quote, the strategic FAQ). Update issue body to match this spec before v0.5.
+4. **`md` content source.** File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both? Both is implied; confirm CLI shape.
+5. **PR/FAQ update upstream.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly (Tig's quote, the strategic FAQ). Update the issue body to match this spec before v0.5. (This repo's own README has been corrected to match.)
 
 ---
 

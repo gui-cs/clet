@@ -67,7 +67,7 @@ Each of those is good at one thing. `clet` is the unification, with a real UI to
 For a shell user who only needs `read`-with-validation, `gum` is fine. We are not competing for that user.
 
 **Q: What's the difference between an input clet and a viewer clet?**
-- **Input clets** prompt for a value (`text`, `pick-file`, `select`, etc.). They return a typed result on success: exit 0, `{"status":"ok","type":"...","value":...}`.
+- **Input clets** prompt for a value (`text`, `pick-file`, `select`, etc.). They return a typed result on success: exit 0, `{"schemaVersion":1,"status":"ok","value":...}`. The result type is advertised once per alias by `clet list --json`, not on every result envelope.
 - **Viewer clets** render content for the user to read or browse (`md`, and the family that follows). They return on dismiss: exit 0, `{"status":"ok"}`. There is no `value`; the contract is "did the human see it and acknowledge."
 
 Both share theming, keybindings, mouse, exit codes, and the JSON envelope.
@@ -77,7 +77,7 @@ Both share theming, keybindings, mouse, exit codes, and the JSON envelope.
 
 **Q: What does the JSON output look like?**
 ```json
-{ "schemaVersion": 1, "status": "ok",        "type": "System.String", "value": "prod" }   // input
+{ "schemaVersion": 1, "status": "ok",        "value": "prod" }                             // input
 { "schemaVersion": 1, "status": "ok" }                                                     // viewer dismiss
 { "schemaVersion": 1, "status": "cancelled" }
 { "schemaVersion": 1, "status": "error",     "code": "validation",   "message": "..." }
@@ -145,7 +145,7 @@ Naming locked; JSON schema locked; exit-code table locked; inline rendering prov
 ### Strategic
 
 **Q: Why does Terminal.Gui own this rather than a separate project?**
-The pitch ("every TG View is a CLI command") depends on the registry and the View ecosystem being the same ecosystem. Splitting it means fragmenting attention. `Terminal.Gui.Clets` lives in a separate assembly with its own NuGet and cadence so it can move without dragging the core. (The CLI binary, `gui-cs/clet`, lives in its own repo so its native-installer ops stay out of TG's hair.)
+The pitch ("every TG View is a CLI command") depends on the registry and the View ecosystem being the same ecosystem. Splitting it means fragmenting attention. `clet` ships as a single binary in its own repo (`gui-cs/clet`) so its native-installer ops stay out of TG's hair, while the View ecosystem it advertises is unchanged TG. In v1.0 the clet abstractions (`IClet`, `ICletRegistry`, `IViewerClet`) are internal to the binary; v2 may extract them into a published `Clet.Abstractions` NuGet once third-party plugin loading is in scope (today, NativeAOT precludes runtime `Assembly.LoadFrom` into the CLI). TG core changes only on the two narrow seams clet needs and any TG app benefits from (#5157, #5158).
 
 **Q: What does success look like 12 months after launch?**
 - 1k+ weekly active users (opt-in usage ping).
