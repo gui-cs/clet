@@ -15,7 +15,7 @@ Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a C
 ```sh
 brew install gui-cs/tap/clet      # macOS / Linux
 winget install gui-cs.clet        # Windows 10/11
-dotnet tool install -g clet       # any platform with .NET SDK
+dotnet tool install -g Terminal.Gui.clet  # any platform with .NET SDK
 ```
 
 ## What it replaces
@@ -118,7 +118,7 @@ Whatever theme is set in your TG `ConfigurationManager` applies to every clet au
 
 **Q: Do I need .NET installed?**
 **No** for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
-**Yes** for `dotnet tool install -g clet`.
+**Yes** for `dotnet tool install -g Terminal.Gui.clet`.
 
 ---
 

@@ -8,6 +8,20 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-019: Distribute clet as a single-project `dotnet tool` (mdv pattern) (Active)
+
+**Context.** Spec §5.4 originally hand-waved at "the `Clet.Tool` project (which references `Clet` and packages the build output as a global tool)" — but no such project exists in the repo, and there is no need for one. The sibling [`gui-cs/mdv`](https://github.com/gui-cs/mdv) viewer ships as a single-csproj global tool: `<PackAsTool>true</PackAsTool>` + `<ToolCommandName>mdv</ToolCommandName>` + `<PackageId>Terminal.Gui.mdv</PackageId>` directly on the executable's csproj. Install command is `dotnet tool install -g Terminal.Gui.mdv`. clet should adopt the same pattern: a single csproj that produces both the AOT single-file binary (for Homebrew/WinGet) and a `dotnet tool` package (for the cross-platform `dotnet tool install` path).
+
+**Decision.** Add `PackAsTool`, `ToolCommandName=clet`, and `PackageId=Terminal.Gui.clet` directly to `src/Clet/Clet.csproj`. Pack the README and LICENSE into the NuGet package via `<None Include="..." Pack="true" PackagePath="/" />`. No separate `Clet.Tool` project. The AOT binary continues to be produced by `dotnet publish -c Release` against the same csproj — `PackAsTool` only affects `dotnet pack` output, not `dotnet publish`. End users on any platform with the .NET SDK can install via `dotnet tool install -g Terminal.Gui.clet` and invoke `clet` from PATH. The package id is namespaced under `Terminal.Gui.` to match the mdv precedent and to make the gui-cs origin obvious in NuGet search.
+
+**Why:** mdv has already proven the single-csproj approach works for a Terminal.Gui-based tool, and a separate `Clet.Tool` project would add a layer of indirection (project reference, build orchestration, second csproj to keep in sync) that earns nothing. The spec's earlier "Clet.Tool project" phrasing was aspirational — never built.
+
+**How to apply:** §5.4 ".NET tool (NuGet)" describes this packaging in concrete terms (properties to set, exact `dotnet pack` / `dotnet tool install` commands). README install hint is updated to `dotnet tool install -g Terminal.Gui.clet`. v0.5 milestone exit criterion (§7) requires `dotnet pack` + local `dotnet tool install` to work end-to-end before the channels-live exit criteria for v1.0 GA.
+
+**Pointers.** Spec §5.4, §7 v0.5 row, §10 step 10. README "Install" section. The `mdv.csproj` reference: <https://github.com/gui-cs/mdv/blob/main/mdv.csproj>.
+
+---
+
 ## D-018: ASCII logo wired into `--help` banner and README hero section (Active)
 
 **Context.** [Issue #12 (branding)](https://github.com/gui-cs/clet/issues/12) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
