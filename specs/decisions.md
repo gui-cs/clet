@@ -8,15 +8,65 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
-## D-015: ASCII logo wired into `--help` banner and README hero section (Active)
+## D-018: ASCII logo wired into `--help` banner and README hero section (Active)
 
 **Context.** [Issue #12 (branding)](https://github.com/gui-cs/clet/issues/12) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
 
-**Decision.** The ASCII logo is prepended to the plain-text `--help` output (top of `CommandLineRoot.WriteRootHelp`), before the tagline/description and usage block. The README `## Press Release` heading is preceded by a full hero section: hero image, code-block logo, tagline, install commands, comparison table, and usage examples (human + AI agent). Spec §4.7 updated to document the `--help` banner format. The logo is also the canonical visual identity for all documentation.
+**Decision.** The ASCII logo is prepended to the Markdown-rendered `--help` output (embedded in `src/Clet/Help/overview.md`), before the tagline/description and usage block. The README `## Press Release` heading is preceded by a full hero section: hero image, code-block logo, tagline, install commands, comparison table, and usage examples (human + AI agent). Spec §4.7 updated to document the `--help` banner format. The logo is also the canonical visual identity for all documentation.
 
 **Status.** Active. Logo, tagline, and install commands are locked as of this PR. GIF/asciinema demo placeholder lands in the README; actual recording defers to v0.3 (issue #3).
 
-**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (`WriteRootHelp`), `README.md` (hero section), `specs/clet-spec.md` §4.7.
+**Pointers.** `src/Clet/Help/overview.md` (logo in Markdown template), `README.md` (hero section), `specs/clet-spec.md` §4.7.
+
+---
+
+## D-017: Link safety default is SurfaceOnly for `clet md` (Active)
+
+**Context.** Spec Appendix A defines a `SurfaceOnly` link policy: hyperlinks are displayed but never opened automatically. The mdv reference viewer already implements this pattern — `LinkClicked` shows the URL in the status bar and sets `e.Handled = true`. AI agents need predictable, safe behavior when running `clet md` on untrusted Markdown.
+
+**Decision.** Default link behavior is SurfaceOnly: clicking a link shows the URL in the status bar, nothing more. A future `--allow-link-open` clet option can opt in to opening links in the default browser. Not implemented at v0.5 — the safe default ships first.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Clets/Viewer/MarkdownClet.cs` (LinkClicked handler), spec Appendix A.
+
+---
+
+## D-016: Help rendering uses print mode, not interactive fullscreen (Active)
+
+**Context.** Spec §4.7 says help is "surfaced through the same dismissable, themed, scrollable viewer experience" as `clet md`. Taken literally, `clet --help` would open an interactive fullscreen TUI that blocks until the user presses `q`. This conflicts with CLI conventions: help must work in pipes (`clet --help | less`), must not block for user interaction, and AI agents read stdout non-interactively.
+
+**Decision.** `clet --help` and `clet help <alias>` render Markdown to ANSI escape sequences and write to stdout, then exit immediately. "Same code path" means the same `Markdown` rendering engine (Terminal.Gui's `Markdown` View with `TextMateSyntaxHighlighter`), not the same interactive fullscreen mode. The print-mode pipeline is adapted from mdv's `RenderMarkdown()`. Root help reads from an embedded `overview.md` resource; per-alias help is generated dynamically from `IClet` metadata.
+
+**Why:** CLI help must be non-interactive for pipes, redirection, and AI agent consumption.
+
+**How to apply:** Any future help-related changes should keep the print-mode pipeline. If interactive help browsing is desired, it should be a separate command (e.g., `clet browse-help`), not the default for `--help`.
+
+**Status.** Active. Spec §4.7 should be read as "same rendering engine" rather than "same interactive mode."
+
+**Pointers.** `src/Clet/Hosting/MarkdownHelpRenderer.cs`, `src/Clet/Hosting/CommandLineRoot.cs` (WriteRootHelp, WriteAliasHelp), `src/Clet/Help/overview.md`.
+
+---
+
+## D-015: `clet md` content source is file arguments + stdin at v0.5 (Active)
+
+**Context.** Spec §9 open question #4 asks whether `clet md` takes file arguments (`clet md README.md`), stdin (`cat README.md | clet md`), or both.
+
+**Decision.** Both, with the following precedence:
+1. File arguments in `options.Arguments` — treated as file paths or glob patterns, expanded and read.
+2. Inline content via `--initial` — rendered directly as Markdown text.
+3. Stdin if redirected (`Console.IsInputRedirected`) — read to end and render.
+4. If none, return `Error("io", "No file specified.")`.
+
+The file expansion logic (glob support, file-not-found warnings) is adapted from mdv's `ExpandFiles()`. Multi-file support uses a `DropDownList` in the status bar, also adapted from mdv.
+
+**Why:** Both input methods are expected by shell users and AI agents. File args are the primary use case; stdin enables piping.
+
+**How to apply:** This resolves spec §9 question #4. The content resolution precedence order is fixed for v1.0.
+
+**Status.** Active. Resolves spec §9 open question #4.
+
+**Pointers.** `src/Clet/Clets/Viewer/MarkdownClet.cs` (content resolution logic).
 
 ---
 

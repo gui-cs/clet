@@ -13,4 +13,8 @@
     <PackageReference Include="Terminal.Gui" Version="2.0.2-develop.24" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Help\*.md" />
+  </ItemGroup>
+
 </Project>

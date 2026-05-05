@@ -9,7 +9,7 @@ namespace Clet;
 internal sealed class PickFileClet : IClet<JsonNode?>
 {
     public string PrimaryAlias => "pick-file";
-    public IReadOnlyList<string> Aliases => ["pick-file"];
+    public IReadOnlyList<string> Aliases => ["pick-file", "file"];
     public string Description => "Opens a file picker dialog and returns the selected file path(s).";
     public CletKind Kind => CletKind.Input;
     public Type ResultType => typeof (JsonNode);

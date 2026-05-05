@@ -181,28 +181,8 @@ internal sealed class CommandLineRoot
             return ExitCodes.UsageError;
         }
 
-        StringBuilder sb = new ();
-        sb.Append ("clet ").AppendLine (clet.PrimaryAlias);
-        sb.AppendLine ();
-        sb.AppendLine (clet.Description);
-        sb.AppendLine ();
-        sb.AppendLine ("Kind: " + (clet.Kind == CletKind.Input ? "input" : "viewer"));
-        sb.AppendLine ("Result type: " + ResultTypeName (clet.ResultType));
-
-        if (clet.Options.Count > 0)
-        {
-            sb.AppendLine ();
-            sb.AppendLine ("Options:");
-
-            foreach (CletOptionDescriptor opt in clet.Options)
-            {
-                string required = opt.Required ? " (required)" : string.Empty;
-                string defaultPart = opt.DefaultValue is null ? string.Empty : $" [default: {opt.DefaultValue}]";
-                sb.AppendLine ($"  --{opt.Name}{(opt.ShortName is null ? string.Empty : ", -" + opt.ShortName)}  {opt.Description}{required}{defaultPart}");
-            }
-        }
-
-        stdout.Write (sb.ToString ());
+        string markdown = MarkdownHelpRenderer.BuildAliasHelpMarkdown (clet);
+        MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
 
         return ExitCodes.Ok;
     }
@@ -343,28 +323,26 @@ internal sealed class CommandLineRoot
 
     private void WriteRootHelp (TextWriter stdout)
     {
-        stdout.WriteLine ("  ╔═╗╦  ╔═╗╔╦╗");
-        stdout.WriteLine ("  ║  ║  ╠═  ║");
-        stdout.WriteLine ("  ╚═╝╩═╝╚═╝ ╩");
-        stdout.WriteLine ();
-        stdout.WriteLine ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents");
-        stdout.WriteLine ();
-        stdout.WriteLine ("Usage:");
-        stdout.WriteLine ("  clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout <duration>] [--fullscreen] [--<opt> <value>]...");
-        stdout.WriteLine ("  clet list [--json]");
-        stdout.WriteLine ("  clet help <alias>");
-        stdout.WriteLine ("  clet --help");
-        stdout.WriteLine ("  clet --version");
-        stdout.WriteLine ();
-        stdout.WriteLine ("Available clets:");
+        string? markdown = MarkdownHelpRenderer.ReadEmbeddedHelp ("overview.md");
 
-        foreach (IClet clet in _registry.All)
+        if (markdown is null)
         {
-            stdout.WriteLine ($"  {clet.PrimaryAlias,-18}{clet.Description}");
+            // Fallback to plain text if resource not found
+            stdout.WriteLine ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents");
+            stdout.WriteLine ();
+            stdout.WriteLine ("Usage: clet <alias> [options]");
+            stdout.WriteLine ("       clet list [--json]");
+            stdout.WriteLine ("       clet help <alias>");
+
+            return;
         }
 
-        stdout.WriteLine ();
-        stdout.WriteLine ("Markdown-rendered help: v0.5.");
+        // Inject dynamic content into the template
+        string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
+        markdown = markdown.Replace ("{{CLET_TABLE}}", cletTable);
+        markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()}");
+
+        MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
     }
 
     private static string GetVersion ()

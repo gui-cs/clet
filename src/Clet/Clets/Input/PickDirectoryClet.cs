@@ -8,7 +8,7 @@ namespace Clet;
 internal sealed class PickDirectoryClet : IClet<string?>
 {
     public string PrimaryAlias => "pick-directory";
-    public IReadOnlyList<string> Aliases => ["pick-directory"];
+    public IReadOnlyList<string> Aliases => ["pick-directory", "dir"];
     public string Description => "Opens a directory picker dialog and returns the selected directory path.";
     public CletKind Kind => CletKind.Input;
     public Type ResultType => typeof (string);
