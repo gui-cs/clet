@@ -155,12 +155,15 @@ public class MarkdownCletIntegrationTests
         try
         {
             // Write a file just over 8 MiB
+            const int oneMebibyte = 1024 * 1024;
+            const int mebibytesToWrite = 9;
+
             using (FileStream fs = File.OpenWrite (tempFile))
             {
-                byte[] buffer = new byte [1024 * 1024]; // 1 MiB
+                byte[] buffer = new byte [oneMebibyte];
                 Array.Fill (buffer, (byte)'x');
 
-                for (int i = 0; i < 9; i++)
+                for (int i = 0; i < mebibytesToWrite; i++)
                 {
                     fs.Write (buffer);
                 }
