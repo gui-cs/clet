@@ -564,7 +564,7 @@ Before any publish step, every built binary runs a smoke matrix. The gate is pro
 
 **Cases:**
 
-1. `clet --version` returns the TG version.
+1. `clet --version` returns the clet version and the Terminal.Gui version (one per line: `clet <ver>` then `Terminal.Gui <ver>`). The TG version line is the smoke gate's authoritative source for which TG build the binary was linked against.
 2. `clet list --json` validates against the schema.
 3. For each input clet: TUIcast spawns with `--initial <stub> --json --timeout 1s` and a per-clet keystroke script that drives it to accept; verify exit 0 and JSON envelope.
 4. For `md`: TUIcast spawns against a fixture markdown file with `"wait:500,q"`; verify exit 0 and `{"schemaVersion":1,"status":"ok"}`.

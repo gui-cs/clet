@@ -21,7 +21,8 @@ public class CletSmokeTests
 
         Assert.Equal (0, exit);
         Assert.Empty (stderr);
-        Assert.Matches (@"^\d+\.\d+\.\d+\s*$", stdout);
+        Assert.Matches (@"(?m)^clet \d+\.\d+\.\d+\s*$", stdout);
+        Assert.Matches (@"(?m)^Terminal\.Gui \S+\s*$", stdout);
     }
 
     [Fact]
