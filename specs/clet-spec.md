@@ -788,6 +788,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 3. **Code signing certs.** Apple Developer ID and Authenticode certs are operational dependencies; confirm ownership/renewal process before v0.9.
 4. **`md` content source.** ~~File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both?~~ **Resolved (D-015).** Both file arguments and stdin, with precedence: file args → `--initial` inline content → stdin → error.
 5. **PR/FAQ update upstream.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly (Tig's quote, the strategic FAQ). Update the issue body to match this spec before v0.5. (This repo's own README has been corrected to match.)
+6. **"Any-View ambition" / auto-discovered clets.** The original PR/FAQ pitched clet as making *any* `IValue<T>` View "just work" as a CLI. v1.0 ships 15 hand-written clets instead. Whether to pursue full auto-discovery — and what TG would have to expose to make it work — is laid out in §11. Decision deferred past v1.0.
 
 ## 10. Implementation Order
 
@@ -813,6 +814,94 @@ A suggested sequence (linear, not parallelizable until v0.3 except where noted):
 12. **v0.5 gate:** four-terminal matrix run + threat model + locked schema + #5156 Markdown rendering tests landed in TG.
 13. **v0.75 alpha — friends-and-family testing.** Point the README at the Issues tracker for alpha feedback (no Discussions), recruit ≥5 external testers, dogfood for ≥2 weeks, run an AI agent harness against `--json`. P0 bugs resolved or explicitly deferred. Surface area is what was locked in v0.5 — don't add features here. ([#33](https://github.com/gui-cs/clet/issues/33))
 14. RC and GA.
+
+## 11. Future: auto-discovered clets ("any IValue<T> View just works")
+
+The original PR/FAQ pitched clet as a way to expose **any** Terminal.Gui View with an `IValue<T>` to the shell — just point clet at the View and the alias, parsing, JSON output, and exit codes fall out for free. v1.0 ships 15 hand-written clets instead. This section captures what we learned from building those, what would be needed to deliver on the original ambition, and why the recommendation for v1.x is to stay with hand-written clets and revisit at v2.
+
+### 11.1 What v1.0 actually ships
+
+15 clets, each ~50–150 lines of C# under `src/Clet/Clets/{Input,Viewer}/`. Each clet declares, by hand:
+
+- `PrimaryAlias` and `Aliases` (the CLI surface)
+- `Description` (one-line purpose for `clet list` and `clet help`)
+- `Kind` (`Input` / `Viewer`)
+- `ResultType` (CLR type, used by `clet list --json` advertising)
+- `Options` (per-clet `CletOptionDescriptor[]` — name, short name, value type, description, required, default)
+- A `RunAsync` method that constructs the View, applies `--initial`, runs it, extracts the result, and maps to a `CletRunResult<TValue>`.
+
+`BuiltInClets.RegisterAll` is hand-written; the `Clet.SourceGen` project exists as a placeholder per [D-004](decisions.md). The spec sketch in §4.5 still shows a `[Clet("alias", typeof(TResult))]` attribute — that attribute does not exist in the shipped code, and the §4.5 sketch should be read as illustrative, not normative.
+
+### 11.2 What we learned that informs the question
+
+- **Most per-clet code is metadata, not behavior.** `TextClet` is 65 lines; the unique behavior is two of them (`Text = initial`, `ResultExtractor = t => t.Text`). The rest is alias/description/options declaration plus boilerplate for cancel handling.
+- **Cross-cutting concerns pull *out* of clets, not into them.** `--title` ([D-014](decisions.md)), scheme application ([D-013](decisions.md)), link safety ([D-017](decisions.md)), exit-code mapping, and JSON envelope shape all live above the per-clet layer. Auto-discovery wouldn't change that — those stay where they are.
+- **The wire format isn't fully derivable from `IValue<T>`.** SelectClet's `IValue<int?>` (an index into the labels array) becomes a `string` on the wire (the selected label). PickFile's `IValue<IReadOnlyList<string>?>` becomes either a `string` or `array<string>` depending on `--multi`. The §4.3.2 per-clet shape table is hand-curated for review at schema-lock; auto-derivation would need to declare the wire shape explicitly per View.
+- **Initial-value parsing is per-clet, not generic.** `IntClet` parses `"42"` as `int`. `SelectClet` parses `"staging"` as a label-to-index lookup. `PickFileClet` doesn't take an initial. There is no single "string → T" function that covers all the cases.
+- **The source generator never earned its keep at this surface size.** [D-004](decisions.md) is `Pending`; with 15 clets, hand-registration has not been the bottleneck.
+
+### 11.3 What full auto-discovery would actually require
+
+For "any TG View with `IValue<T>` becomes a clet automatically," the work splits across both repos.
+
+#### TG-side asks (the harder half)
+
+A. **Discovery contract.** Either a `[Shellable]` attribute (e.g. `[Shellable(alias: "select", description: "Pick from a list of options.")]`) or an `IShellable` marker interface on the View type. **Closed by default** — only Views that explicitly opt in are discoverable, both for security (no surprise CLI surface from arbitrary Views) and to keep the catalog curated.
+
+B. **Display metadata.** Alias(es), one-line description, recommended init shape (size, border, key bindings). Either as attribute properties or a static factory the View exposes.
+
+C. **Wire-format declaration.** The View (or its `[Shellable]` attribute) declares its JSON shape, separate from the View's internal `IValue<T>`. Concretely: a `[ShellableWireFormat(typeof(string))]` or a `static T ToWire(IValue<T> value)` hook, so SelectClet's index-to-label mapping and PickFile's list-or-string mapping are part of the declared contract, not buried in clet's hand-written `RunAsync`.
+
+D. **Initial-value parser.** Static `bool TryParseInitial(string raw, out T parsed)` on the View, or attribute-pointed parser type. Required so clet can apply `--initial` without per-clet code.
+
+E. **Per-View option surface.** Each option (e.g. `select --options "a,b,c"`, `multi-select --multi`) declared as metadata on the View. Same shape as today's `CletOptionDescriptor`. The View's runtime would consume the parsed options through a generic dispatch path.
+
+#### clet-side mechanism
+
+F. **Real source generator.** Scan referenced TG assemblies at compile time for `[Shellable]` types, emit `BuiltInClets.RegisterAll` plus per-View dispatch glue. AOT-friendly. Replaces today's hand-written registration. This is what `Clet.SourceGen` was always meant to be.
+
+G. **Or runtime reflection scan** — explicitly *not* the right answer. Fights AOT trim, can't be locked down at build time, and conflicts with the §A "no plugin loading" stance.
+
+#### Cross-cutting
+
+H. **Schema-lock coupling.** Today's §4.3.2 wire-format table is hand-curated and reviewed at v0.5 schema-lock. Auto-discovery means a TG-side attribute change to a `[Shellable]` View becomes a clet wire-format change. This needs a guard rail — golden-file contract tests that fail loudly when a Shellable View's wire shape changes without an explicit `schemaVersion` bump (per [§4.3.1](#431-schema-versioning-policy)).
+
+I. **Plugin-loading exclusion still applies.** Even with auto-discovery, runtime `LoadFrom` of third-party assemblies remains excluded ([Appendix A](#appendix-a-threat-model-summary)). "Any View" really means "any `[Shellable]` View in a TG assembly the clet binary was *compiled* against." Third-party Views require a v2 plugin model, also out of scope today.
+
+J. **TG-core willingness.** A `[Shellable]` attribute and `ToWire`/`TryParseInitial` hooks are clet-shaped opinions sitting in TG core. The original §2 architecture decision said "nothing in TG core knows about clets" — full auto-discovery softens that. Whether TG core would accept these primitives, or whether they belong in a `Terminal.Gui.Shellable` companion package, is a co-design question, not a clet-only one.
+
+### 11.4 Cost vs. leverage
+
+15 clets at ~50–150 lines each is roughly 1500 LOC of mostly-metadata. That's not free, but it's not the bottleneck for v1.0. The leverage of full auto-discovery only kicks in if we expect:
+
+- A long tail of new TG Views landing post-v1.0 that should be exposed automatically without clet-side changes, **or**
+- Third-party Views (community packages, `Terminal.Gui.Extensions.*`, etc.) wanting shell exposure.
+
+Both are post-v1.0 stories. v1.0 already defers third-party plugin loading to v2 ([§1 Out of scope](#out-of-scope-deferred-to-v2-or-later)). And the v1.0 input list is locked at v0.5 — adding a 16th clet between v0.5 and v1.0 is a deliberate reopen of schema-lock, not a routine event auto-discovery would smooth.
+
+### 11.5 Recommendation (subject to revision)
+
+**Don't pursue full auto-discovery in v1.x.** Specifically:
+
+- Keep [D-004](decisions.md) deferred. Hand-write `BuiltInClets.RegisterAll` through v1.0.
+- Keep `Clet.SourceGen` as a placeholder. Don't delete it — it stays as a parking spot for the v2 reopen.
+- Treat the `[Clet("alias", typeof(TResult))]` attribute sketched in §4.5 as illustrative only; the shipped code uses plain `IClet<TValue>` interface implementation.
+- **At v2, if and when third-party clets become a goal**, the TG-side asks (A–E above) become a co-design topic with TG core. Use this section as the starting checklist; don't restart from blank.
+
+**What this rules in for v1.x:** small mechanical refinements that keep moving toward the auto-discovered shape without committing to it. Examples worth considering:
+
+- Audit whether `Options` declarations could share a small builder helper to cut duplication across the 15 clets without changing the contract.
+- Make the §4.3.2 wire-format table generated from `IClet.ResultType` plus a small per-clet override list, so the table can't drift from code.
+- Ship a contract test that asserts every registered clet's wire format matches §4.3.2 exactly, so a clet-side change to a `RunAsync` is caught at PR review even today.
+
+These pay down the boilerplate without locking us into a TG-side metadata commitment we haven't asked for yet.
+
+### 11.6 Open questions specific to this section
+
+- **Q11.1** Is the v2 third-party-clets story still wanted, or has it been quietly dropped? If dropped, even the v2 reopen of D-004 may not pay off.
+- **Q11.2** If TG core is unwilling to host `[Shellable]` and friends, would a `Terminal.Gui.Shellable` companion package (clet-team-owned, depended on by both TG and clet) be acceptable to TG core? That changes the integration shape significantly.
+- **Q11.3** Wire-format auto-derivation: is there a path where `IValue<T>` plus a small set of conventions covers 90% of clets, with the remaining 10% (Select's index-to-label, PickFile's list-or-string) overriding via `ToWire`? Worth a prototype before committing to the full A–E ask.
+- **Q11.4** Schema-lock policy under auto-discovery: does adding a new `[Shellable]` View on TG develop trigger a clet wire-format change? If so, that's a TG → clet coupling that didn't exist before. Probably handled by golden-file tests, but the policy needs writing down.
 
 ## Appendix A: Threat Model Summary
 
