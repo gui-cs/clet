@@ -6,8 +6,16 @@ Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a C
 
 ## Install
 
+### Pre-Release
+
 ```sh
-brew install gui-cs/tap/clet      # macOS / Linux
+dotnet tool install -g Terminal.Gui.clet --prerelease   # track TG develop builds
+```
+
+### Release
+
+```
+(brew install gui-cs/tap/clet      # macOS / Linux
 winget install gui-cs.clet        # Windows 10/11
 dotnet tool install -g Terminal.Gui.clet  # any platform with .NET SDK
 ```
