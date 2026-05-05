@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Clet;
 
 internal static class OutputFormatter
@@ -16,7 +18,24 @@ internal static class OutputFormatter
             case CletRunStatus.Ok:
                 if (result.Value is not null)
                 {
-                    stdout.WriteLine (result.Value);
+                    switch (result.Value)
+                    {
+                        case JsonArray arr:
+                            foreach (JsonNode? item in arr)
+                            {
+                                stdout.WriteLine (item?.ToString ());
+                            }
+
+                            break;
+                        case JsonNode node:
+                            stdout.WriteLine (node.ToJsonString ());
+
+                            break;
+                        default:
+                            stdout.WriteLine (result.Value);
+
+                            break;
+                    }
                 }
 
                 break;
