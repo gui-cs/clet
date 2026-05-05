@@ -20,12 +20,14 @@ dotnet tool install -g clet       # any platform with .NET SDK
 
 ## What it replaces
 
+> Clets marked **v0.3** ship at [milestone v0.3](https://github.com/gui-cs/clet/issues/3); only `select` ships today.
+
 | Task | Before `clet` | With `clet` |
 |---|---|---|
 | Prompt for a choice | `select` / `gum choose` / `fzf` | `clet select "prod" "staging" "dev"` |
-| Pick a file | `gum file` (fuzzy filter) | `clet pick-file` (real tree dialog) |
-| Confirm an action | `read -p "Sure? [y/N]"` | `clet confirm "Deploy to prod?"` |
-| Render Markdown | `glow` / `bat` / `mdcat` | `clet md ./CHANGELOG.md` |
+| Pick a file *(v0.3)* | `gum file` (fuzzy filter) | `clet pick-file` (real tree dialog) |
+| Confirm an action *(v0.3)* | `read -p "Sure? [y/N]"` | `clet confirm "Deploy to prod?"` |
+| Render Markdown *(v0.3)* | `glow` / `bat` / `mdcat` | `clet md ./CHANGELOG.md` |
 | Multiple tools, mismatched exit codes | `read` + `dialog` + `fzf` + `glow` | `clet` — one tool, one contract |
 
 ## Usage
@@ -33,16 +35,16 @@ dotnet tool install -g clet       # any platform with .NET SDK
 ### Human usage
 
 ```sh
-# Pick from a list
+# Pick from a list (available now)
 clet select "prod" "staging" "dev"
 
-# Pick a file from a tree dialog
+# Pick a file from a tree dialog (v0.3)
 clet pick-file --root ./src --title "Choose a source file"
 
-# Confirm before a destructive action
+# Confirm before a destructive action (v0.3)
 clet confirm "This will delete 40k rows. Continue?"
 
-# Render a Markdown file (full-screen, dismiss with q / Esc)
+# Render a Markdown file — full-screen, dismiss with q / Esc (v0.3)
 clet md ./CHANGELOG.md
 
 # See all available clets
@@ -52,13 +54,15 @@ clet list
 ### AI agent usage (`--json`)
 
 ```sh
-# Structured elicitation — agent gets a typed result, not raw text
+# Structured elicitation — agent gets a typed result, not raw text (available now)
 clet select --json "prod" "staging" "dev"
 # → {"schemaVersion":1,"status":"ok","value":"staging"}
 
+# Pick a file with a timeout (v0.3)
 clet pick-file --json --root ./src --timeout 30s
 # → {"schemaVersion":1,"status":"ok","value":"src/User.ts"}
 
+# Confirm an action (v0.3)
 clet confirm --json "Apply this patch?"
 # → {"schemaVersion":1,"status":"cancelled"}   (exit 130)
 

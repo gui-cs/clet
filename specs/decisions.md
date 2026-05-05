@@ -10,7 +10,7 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ## D-015: ASCII logo wired into `--help` banner and README hero section (Active)
 
-**Context.** Issue #12 (branding) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
+**Context.** [Issue #12 (branding)](https://github.com/gui-cs/clet/issues/12) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
 
 **Decision.** The ASCII logo is prepended to the plain-text `--help` output (top of `CommandLineRoot.WriteRootHelp`), before the tagline/description and usage block. The README `## Press Release` heading is preceded by a full hero section: hero image, code-block logo, tagline, install commands, comparison table, and usage examples (human + AI agent). Spec §4.7 updated to document the `--help` banner format. The logo is also the canonical visual identity for all documentation.
 
