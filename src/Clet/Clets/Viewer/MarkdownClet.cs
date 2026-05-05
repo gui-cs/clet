@@ -17,7 +17,12 @@ internal sealed class MarkdownClet : IViewerClet
     public CletKind Kind => CletKind.Viewer;
     public Type ResultType => typeof (void);
 
-    public IReadOnlyList<CletOptionDescriptor> Options => [];
+    public IReadOnlyList<CletOptionDescriptor> Options =>
+    [
+        new ("theme", "t", typeof (string),
+            $"Syntax-highlighting theme. Available: {string.Join (", ", Enum.GetNames<ThemeName> ())}",
+            false, nameof (ThemeName.DarkPlus)),
+    ];
 
     public async Task<CletRunResult> RunAsync (
         IApplication app,
@@ -60,6 +65,15 @@ internal sealed class MarkdownClet : IViewerClet
             return new () { Status = CletRunStatus.Error, ErrorCode = "io", ErrorMessage = "No file specified. Usage: clet md <file.md>" };
         }
 
+        // Parse --theme option
+        ThemeName syntaxTheme = ThemeName.DarkPlus;
+
+        if (options.CletOptions?.TryGetValue ("theme", out string? themeStr) == true
+            && Enum.TryParse (themeStr, ignoreCase: true, out ThemeName parsed))
+        {
+            syntaxTheme = parsed;
+        }
+
         Runnable window = new ()
         {
             Title = options.Title ?? "Markdown Viewer",
@@ -71,7 +85,7 @@ internal sealed class MarkdownClet : IViewerClet
         {
             Width = Dim.Fill (),
             Height = Dim.Fill (1), // leave room for StatusBar
-            SyntaxHighlighter = new TextMateSyntaxHighlighter (ThemeName.DarkPlus),
+            SyntaxHighlighter = new TextMateSyntaxHighlighter (syntaxTheme),
         };
 
         markdownView.ViewportSettings |= ViewportSettingsFlags.HasHorizontalScrollBar;
@@ -103,7 +117,7 @@ internal sealed class MarkdownClet : IViewerClet
         ];
 
         // Theme selector
-        DropDownList<ThemeName> themeDropDown = new () { Value = ThemeName.DarkPlus, CanFocus = false };
+        DropDownList<ThemeName> themeDropDown = new () { Value = syntaxTheme, CanFocus = false };
 
         themeDropDown.ValueChanged += (_, e) =>
         {
