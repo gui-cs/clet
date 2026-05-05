@@ -69,15 +69,16 @@ The repo intentionally splits "design intent" from "current code" from "queued c
 
 Before a PR can be merged, the docs above must reflect what the PR changes. This isn't a stylistic preference — it's how the three-document split (intent / decisions / backlog) stays trustworthy. **A PR that ships behavior without updating the right doc is incomplete, even if all tests pass.**
 
-Use this checklist on every PR:
+Use this checklist on every PR. **The spec and the decisions log must agree on every claim** — if you touch one, audit the other in the same PR.
 
-- **Did the PR change CLI surface, exit codes, JSON envelope, or any user-visible behavior the spec describes?** → Update `specs/clet-spec.md` in the same PR. If the change *contradicts* something in the spec, also add a decisions-log entry explaining why.
-- **Did the PR make a non-obvious choice a future reader might want to "fix"?** (workarounds against upstream bugs, deliberate divergence from the spec, hand-rolled where a library exists, deferred mechanism, load-bearing handler that looks redundant) → Append a new entry to `specs/decisions.md` with `## D-NNN: <title> (Active)`. Append, don't edit; supersede with a new entry if a prior decision is reversed.
+- **Did the PR change CLI surface, exit codes, JSON envelope, or any user-visible behavior the spec describes?** → Update `specs/clet-spec.md` in the same PR. If the change *contradicts* something in the spec (rather than refining it), also add a decisions-log entry explaining why.
+- **Did the PR add or update a `D-NNN` entry in `specs/decisions.md`?** → **Audit the spec and the README for anything that now disagrees with the new entry, and update them in the same PR**, pointing the affected section at the `D-NNN` entry. The decisions log captures *why* a deviation exists; the spec/README must still describe *what currently ships*. A `D-NNN` that says "we return text not indices" while §4.3.2 still says "integer (zero-based index)" is a worse failure than no decision entry at all — it makes the spec actively misleading. Concrete trigger list: any new/updated entry whose Context or Decision section quotes the spec, references a press-release claim, or names a section like "§4.3", "§4.7", "§5.4", "Appendix A".
+- **Did the PR make a non-obvious choice a future reader might want to "fix"?** (workarounds against upstream bugs, deliberate divergence from the spec, hand-rolled where a library exists, deferred mechanism, load-bearing handler that looks redundant) → Append a new entry to `specs/decisions.md` with `## D-NNN: <title> (Active)`. Append, don't edit; supersede with a new entry if a prior decision is reversed. Then re-run the bullet above — adding a `D-NNN` is itself a trigger for the spec/README audit.
 - **Did the PR resolve or invalidate an item on bar-raise issue #11?** → Tick the checkbox or add a follow-up note on the issue.
 - **Did the PR complete a checkbox on a milestone tracking issue (#2/#9/#3/#4/#5/#6)?** → Tick the box on the issue itself, not just locally.
 - **Did the PR change release/operational steps?** → Update `docs/runbooks/release-rollback.md` (or add a new runbook under `docs/runbooks/`).
 
-If none of the above apply, say so explicitly in the PR description ("no spec/decisions/runbook impact") rather than leaving it implicit. Reviewers should reject PRs that ship surface-level changes without the corresponding doc update.
+If none of the above apply, say so explicitly in the PR description ("no spec/decisions/runbook impact") rather than leaving it implicit. Reviewers should reject PRs that ship surface-level changes without the corresponding doc update — and reject PRs that add a `D-NNN` entry without the matching spec/README sync, since that strands the spec in a misleading state.
 
 ### Milestones
 
