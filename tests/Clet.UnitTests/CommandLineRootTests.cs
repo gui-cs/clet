@@ -1,0 +1,150 @@
+using Xunit;
+
+namespace Clet.UnitTests;
+
+public class CommandLineRootTests
+{
+    private static (CommandLineRoot root, StringWriter stdout, StringWriter stderr) Build ()
+    {
+        ICletRegistry registry = new CletRegistry ();
+        BuiltInClets.RegisterAll (registry);
+
+        return (new (registry), new (), new ());
+    }
+
+    [Fact]
+    public async Task NoArgs_PrintsRootHelpAndExitsOk ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync ([], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Contains ("clet", stdout.ToString ());
+        Assert.Empty (stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Help_PrintsRootHelp ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["--help"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Contains ("Usage:", stdout.ToString ());
+    }
+
+    [Fact]
+    public async Task Version_PrintsAssemblyVersion ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["--version"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Matches (@"^\d+\.\d+\.\d+\s*$", stdout.ToString ());
+    }
+
+    [Fact]
+    public async Task HelpAlias_KnownAlias_PrintsAliasHelp ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["help", "select"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Contains ("select", stdout.ToString ());
+        Assert.Contains ("--options", stdout.ToString ());
+    }
+
+    [Fact]
+    public async Task HelpAlias_UnknownAlias_WritesStderrAndExits2 ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["help", "nope"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("unknown alias", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task List_DefaultText_ListsRegisteredClets ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["list"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Contains ("select", stdout.ToString ());
+    }
+
+    [Fact]
+    public async Task List_Json_EmitsSchemaVersion1 ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["list", "--json"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        string output = stdout.ToString ().TrimEnd ();
+        Assert.Contains ("\"schemaVersion\":1", output);
+        Assert.Contains ("\"alias\":\"select\"", output);
+        Assert.Contains ("\"kind\":\"input\"", output);
+        Assert.Contains ("\"resultType\":\"string\"", output);
+    }
+
+    [Theory]
+    [InlineData ("100ms", 100)]
+    [InlineData ("1s", 1000)]
+    [InlineData ("2m", 120_000)]
+    public void TryParseTimeout_ValidInput_Parses (string input, int expectedMs)
+    {
+        Assert.True (CommandLineRoot.TryParseTimeout (input, out TimeSpan result));
+        Assert.Equal (expectedMs, (int)result.TotalMilliseconds);
+    }
+
+    [Theory]
+    [InlineData ("")]
+    [InlineData ("abc")]
+    [InlineData ("0s")]
+    [InlineData ("-5s")]
+    [InlineData ("5x")]
+    public void TryParseTimeout_InvalidInput_ReturnsFalse (string input)
+    {
+        Assert.False (CommandLineRoot.TryParseTimeout (input, out _));
+    }
+
+    [Fact]
+    public async Task UnknownAlias_WritesStderrAndExits2 ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["nope"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("unknown alias", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_TimeoutMissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "--timeout"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--timeout", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_TimeoutInvalidValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "--timeout", "wat"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+    }
+}
