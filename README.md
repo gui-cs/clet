@@ -6,11 +6,20 @@ Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a C
 
 ## Install
 
+### Release
+
 ```sh
-brew install gui-cs/tap/clet                            # macOS / Linux (stable)
-winget install gui-cs.clet                              # Windows 10/11 (stable)
-dotnet tool install -g Terminal.Gui.clet                # any platform with .NET SDK (stable)
-dotnet tool install -g Terminal.Gui.clet --prerelease   # track TG develop builds
+brew install gui-cs/tap/clet              # macOS / Linux
+winget install gui-cs.clet                # Windows 10/11
+dotnet tool install -g Terminal.Gui.clet  # any platform with .NET SDK
+```
+
+### Pre-Release
+
+Tracks Terminal.Gui's `develop` channel — a new clet prerelease lands on NuGet for every TG develop publish. See [D-020](specs/decisions.md#d-020).
+
+```sh
+dotnet tool install -g Terminal.Gui.clet --prerelease
 ```
 
 ## What it replaces

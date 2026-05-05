@@ -24,9 +24,6 @@ env:
 
 jobs:
   build:
-    # Develop channel skips osx-x64 — the macos-13 runner is slow and develop builds run frequently.
-    # Release channel still produces all RIDs.
-    if: ${{ matrix.rid != 'osx-x64' || !contains(github.event.client_payload.tg_version || github.event.inputs.tg_version, '-') }}
     strategy:
       # One bad RID shouldn't kill the others — surface all failures in one run.
       fail-fast: false
@@ -34,8 +31,6 @@ jobs:
         include:
           - rid: osx-arm64
             runner: macos-14
-          - rid: osx-x64
-            runner: macos-13
           - rid: linux-x64
             runner: ubuntu-22.04
           - rid: win-x64
