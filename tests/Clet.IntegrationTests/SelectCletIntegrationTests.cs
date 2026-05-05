@@ -23,7 +23,7 @@ public class SelectCletIntegrationTests
         using CancellationTokenSource cts = new ();
         cts.Cancel ();
 
-        CletRunResult<int?> result = await clet.RunAsync (app, null, options, cts.Token);
+        CletRunResult<string?> result = await clet.RunAsync (app, null, options, cts.Token);
 
         Assert.Equal (CletRunStatus.Cancelled, result.Status);
         Assert.Null (result.Value);
@@ -45,7 +45,7 @@ public class SelectCletIntegrationTests
 
         using CancellationTokenSource cts = new ();
 
-        CletRunResult<int?> result = await clet.RunAsync (app, null, options, cts.Token);
+        CletRunResult<string?> result = await clet.RunAsync (app, null, options, cts.Token);
 
         // Run returns after one iteration — result is Ok (value may be null since no input)
         Assert.Equal (CletRunStatus.Ok, result.Status);
@@ -67,7 +67,7 @@ public class SelectCletIntegrationTests
 
         using CancellationTokenSource cts = new ();
 
-        CletRunResult<int?> result = await clet.RunAsync (app, "2", options, cts.Token);
+        CletRunResult<string?> result = await clet.RunAsync (app, "Y", options, cts.Token);
 
         // Should complete without error
         Assert.Equal (CletRunStatus.Ok, result.Status);

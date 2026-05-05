@@ -62,6 +62,7 @@ internal sealed class CommandLineRoot
         bool fullscreen = false;
         TimeSpan? timeout = null;
         Dictionary<string, string> cletOptions = new (StringComparer.OrdinalIgnoreCase);
+        List<string> positionalArgs = [];
 
         for (int i = 1; i < args.Length; i++)
         {
@@ -130,16 +131,7 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
-            if (initial is null)
-            {
-                initial = arg;
-
-                continue;
-            }
-
-            stderr.WriteLine ($"error: unexpected positional argument '{arg}'.");
-
-            return ExitCodes.UsageError;
+            positionalArgs.Add (arg);
         }
 
         CletRunOptions options = new ()
@@ -148,6 +140,7 @@ internal sealed class CommandLineRoot
             Fullscreen = fullscreen,
             Timeout = timeout,
             CletOptions = cletOptions,
+            Arguments = positionalArgs.Count > 0 ? positionalArgs : null,
         };
 
         return await _dispatcher.DispatchAsync (alias, initial, options, cancellationToken, stdout, stderr);

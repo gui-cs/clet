@@ -92,7 +92,7 @@ public class CommandLineRootTests
         Assert.Contains ("\"schemaVersion\":1", output);
         Assert.Contains ("\"alias\":\"select\"", output);
         Assert.Contains ("\"kind\":\"input\"", output);
-        Assert.Contains ("\"resultType\":\"int\"", output);
+        Assert.Contains ("\"resultType\":\"string\"", output);
     }
 
     [Theory]

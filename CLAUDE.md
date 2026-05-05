@@ -25,7 +25,7 @@ There is no separate lint step. CI runs on ubuntu-latest with `dotnet-quality: p
 
 Four projects in two repos (this repo only contains the `clet` side):
 
-- **`src/Clet/`** — The CLI executable (net10.0). Depends on `Terminal.Gui` v2 (preview NuGet, currently `2.0.2-develop.21` — pin tracked in `src/Clet/Clet.csproj`, must be replaced with a release tag before v0.5 schema-lock per spec §8 risks). All abstractions are `internal` (not published until v2 plugin system).
+- **`src/Clet/`** — The CLI executable (net10.0). Depends on `Terminal.Gui` v2 (preview NuGet, currently `2.0.2-develop.24` — pin tracked in `src/Clet/Clet.csproj`, must be replaced with a release tag before v0.5 schema-lock per spec §8 risks). All abstractions are `internal` (not published until v2 plugin system).
 - **`src/Clet.SourceGen/`** — Roslyn source generator for static clet registration (planned `[Clet]` attribute). Currently a placeholder; `BuiltInClets.RegisterAll` is hand-written until the generator earns its keep — see `specs/decisions.md` D-004.
 - **`tests/Clet.UnitTests/`** — Registry, JSON schema, host pipeline (CommandLineRoot, OutputFormatter, ExitCodes, BuiltInClets) tests.
 - **`tests/Clet.IntegrationTests/`** — In-process tests that init Terminal.Gui (`Application.Create()`, `app.Init("ansi")`).

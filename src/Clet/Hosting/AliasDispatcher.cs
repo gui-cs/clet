@@ -1,4 +1,5 @@
 using Terminal.Gui.App;
+using Terminal.Gui.Configuration;
 
 namespace Clet;
 
@@ -32,20 +33,27 @@ internal sealed class AliasDispatcher
 
         BoxedCletResult result;
 
-        using IApplication app = Application.Create ();
-        app.Init ("ansi");
+        {
+            ConfigurationManager.Enable (ConfigLocations.All);
 
-        try
-        {
-            result = await clet.RunBoxedAsync (app, initial, options, linkedSource.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            result = new (CletRunStatus.Cancelled, null, null, null);
-        }
-        catch (Exception ex)
-        {
-            result = new (CletRunStatus.Error, null, "io", ex.Message);
+            bool useFullscreen = options.Fullscreen || clet.Kind == CletKind.Viewer;
+            Application.AppModel = useFullscreen ? AppModel.FullScreen : AppModel.Inline;
+
+            using IApplication app = Application.Create ();
+            app.Init ();
+
+            try
+            {
+                result = await clet.RunBoxedAsync (app, initial, options, linkedSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                result = new (CletRunStatus.Cancelled, null, null, null);
+            }
+            catch (Exception ex)
+            {
+                result = new (CletRunStatus.Error, null, "io", ex.Message);
+            }
         }
 
         OutputFormatter.Write (result, options.JsonOutput, stdout, stderr);
