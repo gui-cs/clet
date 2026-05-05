@@ -21,7 +21,9 @@ env:
 jobs:
   build:
     strategy:
-      fail-fast: true
+      # One bad RID shouldn't kill the others — we'd rather see all the failures
+      # in one run than chase one at a time.
+      fail-fast: false
       matrix:
         include:
           - rid: osx-arm64
@@ -30,12 +32,12 @@ jobs:
             runner: macos-13
           - rid: linux-x64
             runner: ubuntu-22.04
-          - rid: linux-arm64
-            runner: ubuntu-22.04
           - rid: win-x64
             runner: windows-2022
-          - rid: win-arm64
-            runner: windows-2022
+          # linux-arm64 and win-arm64 need GitHub's native ARM runners
+          # (ubuntu-22.04-arm, windows-11-arm); cross-compile from x64 fails at
+          # link time. Re-enable when wiring native ARM runners (tracked for
+          # v0.9 RC milestone, not blocking v0.5 dry-runs).
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
