@@ -73,15 +73,19 @@ internal static class CletProcess
         // alongside the test assembly when a test runs. Resolving via reflection avoids hard-coded
         // configuration/RID paths.
         string testDir = Path.GetDirectoryName (typeof (CletProcess).Assembly.Location)!;
-        string candidate = Path.Combine (testDir, "Clet.dll");
 
-        if (File.Exists (candidate))
+        foreach (string name in new [] { "clet.dll", "Clet.dll" })
         {
-            return candidate;
+            string candidate = Path.Combine (testDir, name);
+
+            if (File.Exists (candidate))
+            {
+                return candidate;
+            }
         }
 
         throw new FileNotFoundException (
-            $"Clet.dll not found next to smoke test assembly at '{testDir}'. " +
-            "Ensure the project reference is wired and the build copied Clet.dll.");
+            $"clet.dll not found next to smoke test assembly at '{testDir}'. " +
+            "Ensure the project reference is wired and the build copied clet.dll.");
     }
 }
