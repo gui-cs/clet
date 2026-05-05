@@ -6,8 +6,6 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
----
-
 ## D-020: Continuous-release loop on TG develop + release; channel from version suffix (Active)
 
 **Context.** Spec §5.1 originally fired clet's release workflow on a single trigger: `repository_dispatch type=tg-released` from a TG release tag. That left the §8 develop-pin risk wide open — clet had to hand-pin `Terminal.Gui Version="2.0.2-develop.NN"` and bump manually whenever TG develop changed. It also left clet silent during the long stretches between TG releases, even when develop carries shippable improvements. We want clet to track TG continuously (every develop NuGet publish drives a clet prerelease) **and** still produce stable artifacts on TG release tags (Homebrew, WinGet, NuGet "latest"). See [issue #30](https://github.com/gui-cs/clet/issues/30) for the kicked-off plan.
@@ -28,8 +26,6 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Pointers.** Spec §5.1, §5.4, §5.5, §5.6, §7, §8. `src/Clet/Clet.csproj` (`<TerminalGuiVersion>` + variable PackageReference). `.github/workflows/release-on-tg-release.yml` (renamed to `release-on-tg.yml`).
 
----
-
 ## D-019: Distribute clet as a single-project `dotnet tool` (mdv pattern) (Active)
 
 **Context.** Spec §5.4 originally hand-waved at "the `Clet.Tool` project (which references `Clet` and packages the build output as a global tool)" — but no such project exists in the repo, and there is no need for one. The sibling [`gui-cs/mdv`](https://github.com/gui-cs/mdv) viewer ships as a single-csproj global tool: `<PackAsTool>true</PackAsTool>` + `<ToolCommandName>mdv</ToolCommandName>` + `<PackageId>Terminal.Gui.mdv</PackageId>` directly on the executable's csproj. Install command is `dotnet tool install -g Terminal.Gui.mdv`. clet should adopt the same pattern: a single csproj that produces both the AOT single-file binary (for Homebrew/WinGet) and a `dotnet tool` package (for the cross-platform `dotnet tool install` path).
@@ -42,8 +38,6 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Pointers.** Spec §5.4, §7 v0.5 row, §10 step 10. README "Install" section. The `mdv.csproj` reference: <https://github.com/gui-cs/mdv/blob/main/mdv.csproj>.
 
----
-
 ## D-018: ASCII logo wired into `--help` banner and README hero section (Active)
 
 **Context.** [Issue #12 (branding)](https://github.com/gui-cs/clet/issues/12) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
@@ -54,8 +48,6 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Pointers.** `src/Clet/Help/overview.md` (logo in Markdown template), `README.md` (hero section), `specs/clet-spec.md` §4.7.
 
----
-
 ## D-017: Link safety default is SurfaceOnly for `clet md` (Active)
 
 **Context.** Spec Appendix A defines a `SurfaceOnly` link policy: hyperlinks are displayed but never opened automatically. The mdv reference viewer already implements this pattern — `LinkClicked` shows the URL in the status bar and sets `e.Handled = true`. AI agents need predictable, safe behavior when running `clet md` on untrusted Markdown.
@@ -65,8 +57,6 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 **Status.** Active.
 
 **Pointers.** `src/Clet/Clets/Viewer/MarkdownClet.cs` (LinkClicked handler), spec Appendix A.
-
----
 
 ## D-016: Help rendering uses print mode, not interactive fullscreen (Active)
 
@@ -81,8 +71,6 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 **Status.** Active. Spec §4.7 should be read as "same rendering engine" rather than "same interactive mode."
 
 **Pointers.** `src/Clet/Hosting/MarkdownHelpRenderer.cs`, `src/Clet/Hosting/CommandLineRoot.cs` (WriteRootHelp, WriteAliasHelp), `src/Clet/Help/overview.md`.
-
----
 
 ## D-015: `clet md` content source is file arguments + stdin at v0.5 (Active)
 
@@ -104,8 +92,6 @@ The file expansion logic (glob support, file-not-found warnings) is adapted from
 
 **Pointers.** `src/Clet/Clets/Viewer/MarkdownClet.cs` (content resolution logic).
 
----
-
 ## D-014: `--title` is a built-in CLI flag, not a per-clet option (Active)
 
 **Context.** Every input clet renders its `RunnableWrapper`/`OpenDialog` with a `Title` and falls back to a per-clet default ("Select an option…", "Enter a number…", etc.). All 14 clets honor `CletRunOptions.Title` if set. The CLI parser, however, had no way to populate it — `--title` was being routed into the per-clet `--<opt>` bucket where most clets ignored it.
@@ -116,8 +102,6 @@ The file expansion logic (glob support, file-not-found warnings) is adapted from
 
 **Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (`DispatchAlias` parsing + `WriteRootHelp`), `src/Clet/Abstractions/CletRunOptions.cs` (Title property), each clet's `Title = options.Title ?? "default"` line.
 
----
-
 ## D-013: All clet wrappers/dialogs render with `Schemes.Base` (Active)
 
 **Context.** By default a `RunnableWrapper` inherits the surrounding scheme; an `OpenDialog` calls `FileDialog.SetStyle()` which forces `SchemeName` to `Schemes.Dialog` once the dialog enters its running state — even if we set `Schemes.Base` in the object initializer. Without intervention, file/directory pickers render with a different palette than the other 12 inline clets.
@@ -127,8 +111,6 @@ The file expansion logic (glob support, file-not-found warnings) is adapted from
 **Status.** Active. Revisit when Terminal.Gui exposes a way to opt out of `FileDialog.SetStyle()`'s scheme rewrite, at which point the handler can be replaced with the simpler initializer-only form.
 
 **Pointers.** `src/Clet/Hosting/CletStyling.cs`, `src/Clet/Clets/Input/PickFileClet.cs` (IsRunningChanged handler), `src/Clet/Clets/Input/PickDirectoryClet.cs` (same).
-
----
 
 ## D-012: Code signing deferred post-1.0 (Active)
 
@@ -146,8 +128,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Pointers.** Spec §5.2 (build matrix signing steps), §5.4 (publish steps). `gui-cs/homebrew-tap` repo (must be created before v0.5).
 
----
-
 ## D-011: `range` is integer-only at v0.3 (Active)
 
 **Context.** Spec §4.3.2 defines the `range` value shape as `{"low": <T>, "high": <T>}` where `<T>` is the scalar of the underlying numeric/date/time type.
@@ -157,8 +137,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 **Status.** Active. Revisit if users request decimal or date ranges before v0.5 schema-lock.
 
 **Pointers.** `src/Clet/Clets/Input/RangeClet.cs`, `src/Clet/Clets/Input/RangeView.cs`.
-
----
 
 ## D-010: `pick-file`/`pick-directory` run inline, not fullscreen (Active)
 
@@ -170,8 +148,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Pointers.** `src/Clet/Clets/Input/PickFileClet.cs`, `src/Clet/Clets/Input/PickDirectoryClet.cs`, `src/Clet/Hosting/AliasDispatcher.cs` (line 39 already checks `options.Fullscreen`).
 
----
-
 ## D-009: `multi-select` returns array of strings, not indices (Active)
 
 **Context.** Spec §4.3.2 says `multi-select` value shape is `array of integers (zero-based indices, ascending)`.
@@ -181,8 +157,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 **Status.** Active. Locked at v0.5 schema-lock.
 
 **Pointers.** `src/Clet/Clets/Input/MultiSelectClet.cs`.
-
----
 
 ## D-008: `select` returns text, not zero-based index (Active)
 
@@ -194,8 +168,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Pointers.** `src/Clet/Clets/Input/SelectClet.cs`.
 
----
-
 ## D-007: TUIcast keystroke smoke deferred from v0.11 to v0.3 (Active)
 
 **Context.** Spec §5.3 / §6.3 specify TUIcast (PTY-based, deterministic-script keystroke driver) as the process-level smoke harness. Issue #9 (v0.11) initially listed all six smoke cases including a `clet select --json` happy-path that requires an `Enter` keystroke through a PTY.
@@ -205,8 +177,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 **Status.** Active. `tests/Clet.SmokeTests/scripts/select.txt` placeholder is in place so the v0.3 wire-up is a content edit, not a layout change. Spec §5.3 / §6.3 still describe the full TUIcast harness — that's the v0.3 target, not v0.11 reality.
 
 **Pointers.** [Issue #9](https://github.com/gui-cs/clet/issues/9), `tests/Clet.SmokeTests/CletSmokeTests.cs` (the deliberately `[Fact(Skip=...)]` test).
-
----
 
 ## D-006: Hand-rolled CLI parser at v0.11 instead of System.CommandLine (Active)
 
@@ -218,8 +188,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Pointers.** `src/Clet/Hosting/CommandLineRoot.cs`. Spec §4.6 still names SCL — that's intent, not current code.
 
----
-
 ## D-005: Non-generic `IClet.RunBoxedAsync` via default interface methods (Active)
 
 **Context.** The host needs to dispatch any clet without knowing its `TValue` at compile time, but reflection-based generic dispatch isn't AOT-clean (and AOT lands at v0.3).
@@ -229,8 +197,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 **Status.** Active. `BoxedCletResult` is `(CletRunStatus, object? Value, string? ErrorCode, string? ErrorMessage)`.
 
 **Pointers.** `src/Clet/Abstractions/IClet.cs`, `src/Clet/Abstractions/BoxedCletResult.cs`, `src/Clet/Abstractions/IViewerClet.cs`.
-
----
 
 ## D-004: Source generator deferred — `BuiltInClets.RegisterAll` hand-written (Pending)
 
@@ -242,8 +208,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Pointers.** `src/Clet/Registry/BuiltInClets.cs`, `src/Clet.SourceGen/Placeholder.cs`. Bar-raise [#BR-11 in the bar-raise backlog issue](https://github.com/gui-cs/clet/issues/11) tracks the "is this generator worth it?" question.
 
----
-
 ## D-003: `range` clet emits `{"low": <T>, "high": <T>}` (Active)
 
 **Context.** Spec §9 originally listed the `range` `value` shape as an open question (tuple vs object vs separate fields).
@@ -254,8 +218,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Pointers.** `specs/clet-spec.md` §4.3.2.
 
----
-
 ## D-002: Cancel envelope is `{"schemaVersion":1,"status":"cancelled"}` regardless of TG behavior (Active)
 
 **Context.** TG #5157 (now landed on develop) leaves "disposition of `IValue<T>.Value` after cancel" as a TG-internal decision. Clet's wire contract was at risk of being coupled to that decision.
@@ -265,8 +227,6 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 **Status.** Active. Locked in spec §3.1 and §4.3.
 
 **Pointers.** `specs/clet-spec.md` §3.1, §4.3. `src/Clet/Json/SchemaV1.cs` `Cancelled()` factory.
-
----
 
 ## D-001: No `type` field on the JSON wire envelope (Active)
 

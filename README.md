@@ -24,14 +24,12 @@ dotnet tool install -g Terminal.Gui.clet --prerelease
 
 ## What it replaces
 
-> Clets marked **v0.3** ship at [milestone v0.3](https://github.com/gui-cs/clet/issues/3); only `select` ships today.
-
 | Task | Before `clet` | With `clet` |
 |---|---|---|
 | Prompt for a choice | `select` / `gum choose` / `fzf` | `clet select "prod" "staging" "dev"` |
-| Pick a file *(v0.3)* | `gum file` (fuzzy filter) | `clet pick-file` (real tree dialog) |
-| Confirm an action *(v0.3)* | `read -p "Sure? [y/N]"` | `clet confirm "Deploy to prod?"` |
-| Render Markdown *(v0.3)* | `glow` / `bat` / `mdcat` | `clet md ./CHANGELOG.md` |
+| Pick a file | `gum file` (fuzzy filter) | `clet pick-file` (real tree dialog) |
+| Confirm an action | `read -p "Sure? [y/N]"` | `clet confirm "Deploy to prod?"` |
+| Render Markdown | `glow` / `bat` / `mdcat` | `clet md ./CHANGELOG.md` |
 | Multiple tools, mismatched exit codes | `read` + `dialog` + `fzf` + `glow` | `clet` — one tool, one contract |
 
 ## Usage
@@ -39,16 +37,16 @@ dotnet tool install -g Terminal.Gui.clet --prerelease
 ### Human usage
 
 ```sh
-# Pick from a list (available now)
+# Pick from a list
 clet select "prod" "staging" "dev"
 
-# Pick a file from a tree dialog (v0.3)
+# Pick a file from a tree dialog
 clet pick-file --root ./src --title "Choose a source file"
 
-# Confirm before a destructive action (v0.3)
+# Confirm before a destructive action
 clet confirm "This will delete 40k rows. Continue?"
 
-# Render a Markdown file — full-screen, dismiss with q / Esc (v0.3)
+# Render a Markdown file — full-screen, dismiss with q / Esc
 clet md ./CHANGELOG.md
 
 # See all available clets
@@ -58,15 +56,15 @@ clet list
 ### AI agent usage (`--json`)
 
 ```sh
-# Structured elicitation — agent gets a typed result, not raw text (available now)
+# Structured elicitation — agent gets a typed result, not raw text
 clet select --json "prod" "staging" "dev"
 # → {"schemaVersion":1,"status":"ok","value":"staging"}
 
-# Pick a file with a timeout (v0.3)
+# Pick a file with a timeout
 clet pick-file --json --root ./src --timeout 30s
 # → {"schemaVersion":1,"status":"ok","value":"src/User.ts"}
 
-# Confirm an action (v0.3)
+# Confirm an action
 clet confirm --json "Apply this patch?"
 # → {"schemaVersion":1,"status":"cancelled"}   (exit 130)
 
@@ -79,24 +77,35 @@ Exit codes: `0` success · `2` usage error · `130` cancelled (SIGINT convention
 
 ### Demo
 
-> 🎬 *Recording coming in v0.3 — [track progress on issue #3](https://github.com/gui-cs/clet/issues/3)*
+> 🎬 *Recording coming soon.*
 
----
+## Alpha feedback
+
+clet is in **friends-and-family alpha** ([milestone tracker](https://github.com/gui-cs/clet/issues/33)). If something doesn't work, looks wrong, or is just confusing, **[file an issue](https://github.com/gui-cs/clet/issues/new)**. Include:
+
+- `clet --version` output (the `clet` line and the `Terminal.Gui` line).
+- Your terminal + OS (e.g. "Windows Terminal on Windows 11", "iTerm2 on macOS 15").
+- What you ran, what you expected, what happened.
+
+No Discussions, no separate forum — Issues is the only feedback channel during alpha. The faster the loop, the better the v1.0.
 
 ## FAQ
 
 **Q: Why not just use `gum` (or `glow`, or `bat`, or `dialog`)?**
+
 Each of those is good at one thing. `clet` is the unification, with a real UI toolkit underneath. Every clet has full mouse support, configurable keybindings, themed colors, and one consistent navigation model. `clet pick-file` is Terminal.Gui's `FileDialog` — a real tree with sortable columns, extension filters, and breadcrumbs, not a fuzzy-filter over `find` output. And because inputs and viewers live in one tool, you get the same keys and colors whether you're picking a file or reading a Markdown document.
 
 For a shell user who only needs `read`-with-validation, `gum` is fine. We are not competing for that user.
 
 **Q: What's the difference between an input clet and a viewer clet?**
+
 - **Input clets** (`select`, `text`, `pick-file`, …) prompt for a value and return a typed result: exit 0, `{"schemaVersion":1,"status":"ok","value":…}`.
 - **Viewer clets** (`md`) render content for the user to read and return on dismiss: exit 0, `{"schemaVersion":1,"status":"ok"}`.
 
 Both share theming, keybindings, mouse support, and the JSON envelope.
 
 **Q: What does the JSON output look like?**
+
 ```json
 { "schemaVersion": 1, "status": "ok",      "value": "prod" }   // input selected
 { "schemaVersion": 1, "status": "ok" }                         // viewer dismissed
@@ -105,12 +114,15 @@ Both share theming, keybindings, mouse support, and the JSON envelope.
 ```
 
 **Q: Exit codes?**
+
 `0` success · `1` no-result · `2` usage error · `130` cancelled (SIGINT convention).
 
 **Q: Cancellation and timeouts?**
+
 Esc and Ctrl-C cancel input clets; `q`, Esc, and Ctrl-C dismiss viewer clets. `--timeout <duration>` (e.g. `--timeout 30s`) cancels automatically — useful for AI agent scripts.
 
 **Q: Which clets ship in v1.0?**
+
 **Input (14):** `text`, `int`, `decimal`, `select`, `multi-select`, `confirm`, `pick-file`, `pick-directory`, `date`, `time`, `duration`, `color`, `attribute-picker`, `range`
 
 **Viewer (1):** `md` (Markdown via Terminal.Gui's built-in `Markdown` View)
@@ -118,16 +130,22 @@ Esc and Ctrl-C cancel input clets; `q`, Esc, and Ctrl-C dismiss viewer clets. `-
 Run `clet list` to see what's available in your installed version.
 
 **Q: Theming?**
+
 Whatever theme is set in your TG `ConfigurationManager` applies to every clet automatically.
 
 **Q: Do I need .NET installed?**
+
 **No** for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
+
 **Yes** for `dotnet tool install -g Terminal.Gui.clet`.
 
 **Q: What's the `--prerelease` channel?**
+
 Every Terminal.Gui develop NuGet publish triggers a matching `clet` prerelease push (versioned `2.x.y-develop.NN` to mirror TG's own develop versioning). Stable users see no churn — `dotnet tool install -g Terminal.Gui.clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship release builds. If you want the bleeding edge, pass `--prerelease`. See [D-020](specs/decisions.md#d-020) for the rationale.
 
----
+**Q: How do I report a bug or give feedback during alpha?**
+
+[File an issue](https://github.com/gui-cs/clet/issues/new). That's the only feedback channel — no Discussions, no forum. See the [Alpha feedback](#alpha-feedback) section above for what to include.
 
 ## Further reading
 
