@@ -16,8 +16,6 @@ internal sealed class DecimalClet : IClet<decimal?>
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
-        new ("min", null, typeof (decimal), "Minimum allowed value.", false, null),
-        new ("max", null, typeof (decimal), "Maximum allowed value.", false, null),
         new ("step", null, typeof (decimal), "Step increment.", false, "1"),
     ];
 
@@ -33,18 +31,6 @@ internal sealed class DecimalClet : IClet<decimal?>
         }
 
         NumericUpDown<decimal> spinner = new ();
-
-        if (options.CletOptions?.TryGetValue ("min", out string? minStr) == true
-            && decimal.TryParse (minStr, CultureInfo.InvariantCulture, out decimal min))
-        {
-            spinner.Minimum = min;
-        }
-
-        if (options.CletOptions?.TryGetValue ("max", out string? maxStr) == true
-            && decimal.TryParse (maxStr, CultureInfo.InvariantCulture, out decimal max))
-        {
-            spinner.Maximum = max;
-        }
 
         if (options.CletOptions?.TryGetValue ("step", out string? stepStr) == true
             && decimal.TryParse (stepStr, CultureInfo.InvariantCulture, out decimal step))

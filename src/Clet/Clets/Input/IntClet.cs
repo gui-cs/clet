@@ -16,8 +16,6 @@ internal sealed class IntClet : IClet<int?>
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
-        new ("min", null, typeof (int), "Minimum allowed value.", false, null),
-        new ("max", null, typeof (int), "Maximum allowed value.", false, null),
         new ("step", null, typeof (int), "Step increment.", false, "1"),
     ];
 
@@ -33,18 +31,6 @@ internal sealed class IntClet : IClet<int?>
         }
 
         NumericUpDown<int> spinner = new ();
-
-        if (options.CletOptions?.TryGetValue ("min", out string? minStr) == true
-            && int.TryParse (minStr, CultureInfo.InvariantCulture, out int min))
-        {
-            spinner.Minimum = min;
-        }
-
-        if (options.CletOptions?.TryGetValue ("max", out string? maxStr) == true
-            && int.TryParse (maxStr, CultureInfo.InvariantCulture, out int max))
-        {
-            spinner.Maximum = max;
-        }
 
         if (options.CletOptions?.TryGetValue ("step", out string? stepStr) == true
             && int.TryParse (stepStr, CultureInfo.InvariantCulture, out int step))

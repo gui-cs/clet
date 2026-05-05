@@ -63,7 +63,7 @@ internal sealed class PickFileClet : IClet<JsonNode?>
             return new () { Status = CletRunStatus.Cancelled };
         }
 
-        IReadOnlyList<string>? paths = dialog.Value;
+        IReadOnlyList<string>? paths = dialog.FilePaths;
 
         if (paths is null || paths.Count == 0)
         {

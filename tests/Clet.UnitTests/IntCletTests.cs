@@ -45,16 +45,12 @@ public class IntCletTests
     }
 
     [Fact]
-    public void Options_ContainsMinMaxStep ()
+    public void Options_ContainsStep ()
     {
         IntClet clet = new ();
 
-        Assert.Equal (3, clet.Options.Count);
-        Assert.Equal ("min", clet.Options [0].Name);
-        Assert.Equal ("max", clet.Options [1].Name);
-        Assert.Equal ("step", clet.Options [2].Name);
+        Assert.Single (clet.Options);
+        Assert.Equal ("step", clet.Options [0].Name);
         Assert.False (clet.Options [0].Required);
-        Assert.False (clet.Options [1].Required);
-        Assert.False (clet.Options [2].Required);
     }
 }

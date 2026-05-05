@@ -32,7 +32,7 @@ internal sealed class TimeClet : IClet<string?>
         if (initial is not null
             && TimeSpan.TryParse (initial, CultureInfo.InvariantCulture, out TimeSpan initialTime))
         {
-            editor.Time = initialTime;
+            editor.Value = initialTime;
         }
 
         RunnableWrapper<TimeEditor, TimeSpan?> wrapper = new (editor)

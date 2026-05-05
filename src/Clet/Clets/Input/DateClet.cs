@@ -32,7 +32,7 @@ internal sealed class DateClet : IClet<string?>
         if (initial is not null
             && DateTime.TryParse (initial, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime initialDate))
         {
-            picker.Date = initialDate;
+            picker.Value = initialDate;
         }
 
         RunnableWrapper<DatePicker, DateTime?> wrapper = new (picker)

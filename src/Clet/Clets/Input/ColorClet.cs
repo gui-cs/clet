@@ -28,7 +28,7 @@ internal sealed class ColorClet : IClet<string?>
 
         ColorPicker picker = new ();
 
-        if (initial is not null && Color.TryParse (initial, out Color parsed))
+        if (initial is not null && Color.TryParse (initial, null, out Color parsed))
         {
             picker.SelectedColor = parsed;
         }

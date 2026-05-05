@@ -3,6 +3,7 @@ using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using TgAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Clet;
 
@@ -29,7 +30,7 @@ internal sealed class AttributePickerClet : IClet<JsonObject?>
 
         AttributePicker picker = new ();
 
-        RunnableWrapper<AttributePicker, Attribute?> wrapper = new (picker)
+        RunnableWrapper<AttributePicker, TgAttribute?> wrapper = new (picker)
         {
             Title = options.Title ?? "Pick text attributes (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
@@ -51,7 +52,7 @@ internal sealed class AttributePickerClet : IClet<JsonObject?>
             return new () { Status = CletRunStatus.Cancelled };
         }
 
-        Attribute? result = wrapper.Result;
+        TgAttribute? result = wrapper.Result;
 
         if (result is not { } attr)
         {

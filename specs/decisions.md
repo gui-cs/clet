@@ -8,6 +8,24 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-012: Code signing deferred post-1.0 (Active)
+
+**Context.** Spec §5.2 calls for macOS (Developer ID + notarization) and Windows (Authenticode) code signing in the release pipeline. Apple Developer Program costs $99/yr; Azure Trusted Signing costs ~$10/mo. Homebrew bottles require signed binaries for Gatekeeper; unsigned binaries get quarantined.
+
+**Decision.** Defer all code signing until after v1.0, when adoption numbers justify the cost. At v0.5/v1.0:
+- Homebrew ships a **build-from-source formula** (no bottles, no signing needed; user's machine compiles via `dotnet publish`).
+- `dotnet tool install -g clet` works without signing (NuGet packages aren't gated by OS code signing).
+- WinGet can ship unsigned `.exe` with a SmartScreen warning; acceptable for early adopters.
+- Skip `scripts/sign-macos.sh` and `scripts/sign-windows.ps1` steps in release workflows.
+
+Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction, or when a corporate adopter requires signed binaries.
+
+**Status.** Active. Only three secrets needed at v0.5: `CLET_DISPATCH_PAT`, `NUGET_API_KEY`, `HOMEBREW_TAP_TOKEN`.
+
+**Pointers.** Spec §5.2 (build matrix signing steps), §5.4 (publish steps). `gui-cs/homebrew-tap` repo (must be created before v0.5).
+
+---
+
 ## D-011: `range` is integer-only at v0.3 (Active)
 
 **Context.** Spec §4.3.2 defines the `range` value shape as `{"low": <T>, "high": <T>}` where `<T>` is the scalar of the underlying numeric/date/time type.

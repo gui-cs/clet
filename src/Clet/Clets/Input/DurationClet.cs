@@ -35,13 +35,13 @@ internal sealed class DurationClet : IClet<string?>
             try
             {
                 TimeSpan parsed = XmlConvert.ToTimeSpan (initial);
-                editor.Time = parsed;
+                editor.Value = parsed;
             }
             catch (FormatException)
             {
                 if (TimeSpan.TryParse (initial, CultureInfo.InvariantCulture, out TimeSpan fallback))
                 {
-                    editor.Time = fallback;
+                    editor.Value = fallback;
                 }
             }
         }
