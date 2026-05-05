@@ -1,0 +1,150 @@
+name: Release on TG Release
+
+# Triggered by repository_dispatch from gui-cs/Terminal.Gui when a release is published.
+# Also supports manual trigger for rollback patches (§5.4, runbook §3).
+on:
+  repository_dispatch:
+    types: [tg-released]
+  workflow_dispatch:
+    inputs:
+      tg_version:
+        description: 'Terminal.Gui version (e.g. 2.0.3)'
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  TG_VERSION: ${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - rid: osx-arm64
+            runner: macos-14
+          - rid: osx-x64
+            runner: macos-13
+          - rid: linux-x64
+            runner: ubuntu-22.04
+          - rid: linux-arm64
+            runner: ubuntu-22.04
+          - rid: win-x64
+            runner: windows-2022
+          - rid: win-arm64
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Set version
+        run: echo "CLET_VERSION=${{ env.TG_VERSION }}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Unit Tests
+        run: dotnet run --project tests/Clet.UnitTests --no-build -c Release
+
+      - name: Integration Tests
+        run: dotnet run --project tests/Clet.IntegrationTests --no-build -c Release
+
+      - name: Publish AOT
+        run: >
+          dotnet publish src/Clet -c Release
+          -r ${{ matrix.rid }}
+          --self-contained
+          -p:PublishAot=true
+          -p:Version=${{ env.TG_VERSION }}
+          -o publish/${{ matrix.rid }}
+
+      - name: Smoke Tests
+        run: dotnet run --project tests/Clet.SmokeTests --no-build -c Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clet-${{ matrix.rid }}
+          path: publish/${{ matrix.rid }}/
+          retention-days: 30
+
+  publish-nuget:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ env.TG_VERSION != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Pack
+        run: >
+          dotnet pack src/Clet -c Release
+          -p:PackAsTool=true
+          -p:ToolCommandName=clet
+          -p:Version=${{ env.TG_VERSION }}
+          -o packages/
+
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push packages/*.nupkg
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+  publish-homebrew:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ env.TG_VERSION != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: gui-cs/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: clet-osx-*
+          path: artifacts/
+
+      - name: Generate formula
+        run: |
+          echo "# Homebrew formula generation placeholder"
+          echo "# TODO: Generate clet.rb from template with version=${{ env.TG_VERSION }}"
+          echo "# and SHA256s from the downloaded artifacts."
+          echo "# For now, Homebrew ships as build-from-source (D-012)."
+
+  notify-failure:
+    needs: [build, publish-nuget, publish-homebrew]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Release v${process.env.TG_VERSION} failed`,
+              body: `The release workflow for TG version \`${process.env.TG_VERSION}\` failed.\n\nSee [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.\n\nRefer to \`docs/runbooks/release-rollback.md\` for rollback procedures.`,
+              labels: ['incident']
+            });

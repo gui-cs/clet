@@ -37,7 +37,8 @@ internal sealed class CommandLineRoot
                 return ExitCodes.Ok;
 
             case "--version":
-                stdout.WriteLine (GetVersion ());
+                stdout.WriteLine ($"clet {GetVersion ()}");
+                stdout.WriteLine ($"Terminal.Gui {GetTerminalGuiVersion ()}");
 
                 return ExitCodes.Ok;
 
@@ -340,7 +341,7 @@ internal sealed class CommandLineRoot
         // Inject dynamic content into the template
         string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
         markdown = markdown.Replace ("{{CLET_TABLE}}", cletTable);
-        markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()}");
+        markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
 
         MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
     }
@@ -350,6 +351,25 @@ internal sealed class CommandLineRoot
         Version? version = typeof (Program).Assembly.GetName ().Version;
 
         return version?.ToString (3) ?? "0.0.0";
+    }
+
+    private static string GetTerminalGuiVersion ()
+    {
+        System.Reflection.Assembly tg = typeof (Terminal.Gui.App.Application).Assembly;
+        string? informational = tg
+            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
+            .FirstOrDefault ()
+            ?.InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace (informational))
+        {
+            int plus = informational.IndexOf ('+');
+
+            return plus >= 0 ? informational [..plus] : informational;
+        }
+
+        return tg.GetName ().Version?.ToString (3) ?? "unknown";
     }
 
     private static string ResultTypeName (Type type)
