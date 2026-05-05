@@ -32,3 +32,9 @@ jobs:
 
       - name: Integration Tests
         run: dotnet run --project tests/Clet.IntegrationTests --no-build
+
+      - name: Smoke Tests
+        run: dotnet run --project tests/Clet.SmokeTests --no-build
+
+      - name: clet --help (process smoke)
+        run: dotnet run --project src/Clet --no-build -- --help

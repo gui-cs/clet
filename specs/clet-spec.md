@@ -89,35 +89,21 @@ Most of what an early draft of this spec assumed would need to change in TG is a
 - **`Markdown` View** is vetted for the read-only, dismissable, themed shape clet needs.
 - **Terminal-driver inline-capable detection** is already in place.
 
-Two items remain. Each is a general TG improvement, not a clet-specific one.
+The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`** and are not yet on a TG release tag. Until TG cuts a tag, `gui-cs/clet` builds against a TG `develop` preview NuGet (today: `Terminal.Gui` `2.0.2-develop.21`); the pin is removed once TG tags. See §8 for the risk row tracking that pin.
 
-### 3.1 Cancellation token plumbing (P0) ; tracked as [#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)
+### 3.1 Cancellation token plumbing (LANDED on `develop`) ; was [#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)
 
-**Goal:** `IApplication.RunAsync(Toplevel, CancellationToken)` overload that cancels the run loop cleanly when the token is cancelled, returning whatever state the View has accumulated.
+`IApplication.RunAsync(Toplevel, CancellationToken)` is on TG `develop`. Clet binds to it directly; no fallback path needed.
 
-Clet's wire contract does not depend on TG's decision about whether `IValue<T>.Value` is readable after cancel; see §4.3, where the cancel envelope is fixed at `{"schemaVersion":1,"status":"cancelled"}` regardless. Any partial-result behavior TG settles on is welcome but not load-bearing for clet.
+Clet's wire contract does not depend on TG's decision about whether `IValue<T>.Value` is readable after cancel; the cancel envelope is fixed at `{"schemaVersion":1,"status":"cancelled"}` regardless (§4.3). Any partial-result behavior TG settles on is welcome but not load-bearing for clet.
 
-**Tasks:**
-- Add `Task RunAsync(Toplevel toplevel, CancellationToken cancellationToken)`.
-- Wire `CancellationToken.Register` to post a "stop" message into the run loop.
-- Ensure idempotent shutdown if both Ctrl-C and the token fire.
-- Tests in `UnitTestsParallelizable` (no `Application.Init`, just `IApplication`).
+### 3.2 FileDialog: typed result refactor (LANDED on `develop`) ; was [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)
 
-**Why TG, not clet:** Cancellation must work for any TG app, not just clets. The hook belongs in core.
+`FileDialog` now inherits from `Dialog<IReadOnlyList<string>?>`. A non-null list represents accept; `null` represents cancel. Read-only is the right shape for a typed result — callers do not mutate the dialog's selection after Run returns.
 
-### 3.2 FileDialog: typed result refactor (P1) ; tracked as [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)
+The `pick-file` and `pick-directory` clets bind to `IValue<IReadOnlyList<string>?>` directly, with no per-clet glue code. The §4.3.2 per-clet `value` shape table already specifies the resulting JSON wire format (string for single-select, array of strings for `--multi`), independent of TG's collection type.
 
-**Background:** `FileDialog` currently inherits from `Dialog`, which inherits from `Dialog<int>`. The `int` result is an OK/Cancel sentinel; the actual selected paths are read off the dialog instance after the run completes. That shape doesn't compose with `IValue<T>` cleanly for clet's typed-result contract.
-
-**Goal:** Refactor `FileDialog` to inherit from `Dialog<List<string>?>` (or equivalent; TG core team's call on the exact result type), so the typed result *is* the selection, with `null` representing cancel. This unblocks `pick-file` and `pick-directory` clets without per-clet glue code, and improves `FileDialog` for any TG app.
-
-**Tasks:**
-- Change the base type. Resulting `IValue<List<string>?>` (or `IValue<FileInfo?>` for single-select; team's call) is what clets bind to.
-- Audit all in-tree callers of `FileDialog` for the result-shape change. Update callers (UICatalog scenarios, examples, tests).
-- Migration notes for downstream users; this is a public API change, breaking for any v2 caller relying on the old `int` shape.
-- Tests: existing `FileDialog` tests updated to consume the typed result.
-
-**Why TG, not clet:** This is a TG public-API improvement that benefits any app using `FileDialog`. Forking the dialog just for clet would be wrong.
+This change is breaking for any TG v2 caller that was reading the old `int` OK/Cancel sentinel; that breakage was accepted by the TG team because v2.1 already carries one breaking change.
 
 ---
 
@@ -413,7 +399,7 @@ internal sealed class SelectClet : IClet<int?>
 **Pattern observations:**
 - The clet does not own the run loop or the application lifecycle; the host (`Program.Main`) does.
 - `RunnableWrapper<TView, TResult>` is the existing TG primitive that bridges Views to typed results. Clet does not invent a new wrapper.
-- `await app.RunAsync(wrapper, ct)` requires §3.1 (#5157); without it, clet falls back to a `Task.Run` polling loop until the overload lands.
+- `await app.RunAsync(wrapper, ct)` is the `IApplication.RunAsync(Toplevel, CancellationToken)` overload that landed on TG `develop` (§3.1); clet binds to it directly.
 - Viewer clets follow the same shape but use a Markdown-shaped View (or other read-only View) and return `CletRunResult` (no `T`).
 
 **Initial-value parsing.** When a clet's `TResult` implements `System.IParsable<TResult>` (or `System.ISpanParsable<TResult>`) from .NET 7+, the `--initial <string>` flag parses for free with no reflection:
@@ -755,13 +741,14 @@ Run before every minor release (v1.0, v1.1, ...). Captured in a release checklis
 
 Schedule follows TG releases, not a calendar; no dates here.
 
-| Milestone | Exit criteria |
-|-----------|---------------|
-| **v0.1 alpha** | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. |
-| **v0.3 alpha** | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. |
-| **v0.5 beta** | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. |
-| **v0.9 RC** | All §6 test layers passing in CI. One real release cycle exercised end-to-end. |
-| **v1.0 GA** | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
+| Milestone | Tracking | Exit criteria |
+|-----------|----------|---------------|
+| **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
+| **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
+| **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. TUIcast keystroke harness wired up. |
+| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. **TG dependency on a release tag, not `*-develop.*`** (see §8 risks). |
+| **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. |
+| **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
 
 ---
 
@@ -773,7 +760,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 | `FileDialog` typed-result refactor (§3.2) breaks downstream callers | Low | Medium | Coordinate with TG core team; flag as breaking in release notes; fix in-tree callers as part of the PR. |
 | Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + §6.8 dry-runs catch most issues pre-publish; `docs/runbooks/release-rollback.md` documents the response when a regression slips the gate and a published artifact must be withdrawn. |
 | Markdown View quality regression vs `glow` | Low | Medium | TG-side golden-file corpus (#5156); quarterly comparison run. |
-| Cancellation tokens in TG core have unforeseen complexity | Medium | Medium | §3.1 spike at v0.1; if hard, ship clet with polling-based cancellation as fallback. |
+| TG `develop` carries #5157/#5158 but no release tag yet; clet pins to a `Terminal.Gui` `*-develop.*` preview NuGet | High (in-flight) | Low | Pin tracked in `src/Clet/Clet.csproj`; CI builds against the pinned preview. Pin is removed and replaced with the released TG version once TG cuts a tag. v0.5 schema-lock requires the pin to be gone; if it isn't, v0.5 is gated on TG releasing. |
 | First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | §6.8 weekly dry-runs catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
 | Naming concerns about "clet" surfacing in support channels | Low | Low | Acknowledge in docs; outlast. |
 
@@ -793,19 +780,19 @@ Schedule follows TG releases, not a calendar; no dates here.
 
 A suggested sequence (linear, not parallelizable until v0.3 except where noted):
 
-1. **File the TG-side prerequisite issues.** Done as part of the v0.4 spec drop:
-   - #5156 `Markdown` View golden-file rendering tests (covers what was previously §6.8 of this spec).
-   - #5157 `Application.RunAsync(Toplevel, CancellationToken)` overload (§3.1).
-   - #5158 `FileDialog` typed-result refactor (§3.2).
+1. **TG-side prerequisites — status:**
+   - **#5157 `Application.RunAsync(Toplevel, CancellationToken)`** — **landed on `develop`**. Clet binds directly via the pinned `Terminal.Gui` `*-develop.*` preview NuGet (see §3 preamble, §8 risks).
+   - **#5158 `FileDialog` typed-result refactor** — **landed on `develop`** as `Dialog<IReadOnlyList<string>?>`. Wave 4 (`pick-file`/`pick-directory`) is unblocked.
+   - **#5156 `Markdown` View golden-file rendering tests** — outstanding; independent quality work, prerequisite for the v0.5 `clet md` link-safety verification but not for any earlier milestone.
 
-   Track each through normal TG review. Land #5157 before clet's first integration test (it's the cancellation hook); #5158 before `pick-file`/`pick-directory`; #5156 anytime (independent quality work).
+   The `*-develop.*` NuGet pin must be replaced with a released TG version before v0.5 schema-lock; that's tracked as a §8 risk row.
 
 2. **`gui-cs/clet` repo bootstrapped:** solution layout, abstractions, registry, JSON, source generator. CI on push (build, unit tests).
 3. **First clet: `select`.** A direct port of `Examples/InlineSelect/Program.cs` to a `SelectClet : IClet<int?>` using `RunnableWrapper<OptionSelector, int?>`. End-to-end through unit + integration tests + a manual run from a real shell. This proves the entire pipeline (registry, alias dispatch, output formatter, exit codes, JSON schema) on the simplest non-trivial clet shape.
 4. **CLI host.** Program.Main, System.CommandLine, alias dispatch, output formatter. Smoke test harness (§6.3) running on a single RID.
 5. **Second wave of clets:** `text`, `confirm`, `int`, `decimal`. These exercise `IParsable<T>`-based initial-value parsing across the most common scalar types.
 6. **Third wave:** `multi-select`, `range`, `date`, `time`, `duration`, `color`, `attribute-picker`. Covers more `IValue<T>` shapes and the more complex Views.
-7. **Fourth wave:** `pick-directory`, `pick-file`. Depends on #5158 (FileDialog refactor) landing in TG.
+7. **Fourth wave:** `pick-directory`, `pick-file`. #5158 has landed on TG `develop` (§3.2); `FileDialog` typed result is `IReadOnlyList<string>?` (string for single-select wire format, array of strings for `--multi`, per §4.3.2).
 8. **`md` viewer clet.** First viewer clet; exercises the `IViewerClet` contract and the help-rendering pipeline (§4.7).
 9. **Release pipeline:** build matrix, signing, smoke gate.
 10. **Publish channels:** Homebrew first (lowest ops friction), then WinGet, then NuGet tool.

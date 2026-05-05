@@ -25,7 +25,7 @@ public class SelectCletTests
     {
         SelectClet clet = new ();
 
-        Assert.Equal (typeof (int?), clet.ResultType);
+        Assert.Equal (typeof (string), clet.ResultType);
     }
 
     [Fact]
