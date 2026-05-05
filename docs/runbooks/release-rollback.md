@@ -11,8 +11,6 @@
 
 When the §5.3 smoke gate fails, the workflow halts and nothing reaches users — that case is an *aborted* release, not a *bad* release, and is out of scope for this runbook. This runbook covers the case where the gate let something through (a regression it didn't cover, a manifest bug, a signing failure mid-publish) and one or more channels carry a broken `clet`. **§2.4 covers the develop channel, which has different blast radius and SLAs.**
 
----
-
 ## 1. Triage (≤5 minutes)
 
 Answer in order:
@@ -25,8 +23,6 @@ Answer in order:
    - **Rollback** when the bug is severe (data loss, hang, crash on first run), the fix is non-trivial, or a meaningful population has already pulled the bad version. Withdraw published artifacts per §2 below, then forward-fix on a slower clock.
 
 If you are not sure, rollback. Re-publishing later is cheap; pulling back a bad binary that's been on a thousand laptops for six hours is not.
-
----
 
 ## 2. Per-channel withdrawal procedures
 
@@ -85,8 +81,6 @@ If you are not sure, rollback. Re-publishing later is cheap; pulling back a bad 
 
 **What `--prerelease` consumers should expect:** the same risk profile as TG develop. We don't add a separate stability gate; we mirror what TG ships.
 
----
-
 ## 3. Cut a fast-follow patch
 
 Once channels are withdrawn (or while the WinGet PR is pending):
@@ -97,8 +91,6 @@ Once channels are withdrawn (or while the WinGet PR is pending):
 4. Push the tag. The normal `release-on-tg-release.yml` workflow does **not** trigger (it listens for `repository_dispatch` from TG, not for tags here). Manually trigger the workflow with the new version, or — better — add a manual-dispatch (`workflow_dispatch`) entry point to the workflow that takes a version input. (This is itself a follow-up improvement.)
 5. The §5.3 smoke gate gates the fix the same way it gates a normal release. If the gate fails, **do not bypass it.** Fix the smoke test or fix the binary, then re-run.
 
----
-
 ## 4. Post-incident
 
 Within 48 hours of stabilization:
@@ -107,8 +99,6 @@ Within 48 hours of stabilization:
 2. Add the failure mode as a new case to `tests/Clet.SmokeTests` (so a future regression of the same shape is caught) and to the §6.8 release-pipeline dry-run cases (so a future pipeline regression of the same shape is caught).
 3. If a runbook step here was wrong or missing, **edit this file** in the same PR. The runbook must end the incident better than it started it.
 
----
-
 ## 5. What we will not do
 
 - **No `git push --force` to the tap repo.** Audit trail is the priority; reverts are forward-only.
@@ -116,8 +106,6 @@ Within 48 hours of stabilization:
 - **No auto-revert.** The `release-on-tg-release.yml` workflow does not auto-roll-back on smoke failure; it halts and pages. Humans decide.
 - **No bypassing the smoke gate** during a rollback re-publish, however urgent. The gate is the only thing that kept the bad release from being a worse release.
 - **No skipping signing/notarization** to ship a fast fix. An unsigned macOS binary is a *different* kind of broken release.
-
----
 
 ## Open questions (resolve before v0.9)
 

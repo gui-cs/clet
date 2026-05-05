@@ -79,8 +79,6 @@ Exit codes: `0` success · `2` usage error · `130` cancelled (SIGINT convention
 
 > 🎬 *Recording coming soon.*
 
----
-
 ## Alpha feedback
 
 clet is in **friends-and-family alpha** ([milestone tracker](https://github.com/gui-cs/clet/issues/33)). If something doesn't work, looks wrong, or is just confusing, **[file an issue](https://github.com/gui-cs/clet/issues/new)**. Include:
@@ -90,8 +88,6 @@ clet is in **friends-and-family alpha** ([milestone tracker](https://github.com/
 - What you ran, what you expected, what happened.
 
 No Discussions, no separate forum — Issues is the only feedback channel during alpha. The faster the loop, the better the v1.0.
-
----
 
 ## FAQ
 
@@ -150,8 +146,6 @@ Every Terminal.Gui develop NuGet publish triggers a matching `clet` prerelease p
 **Q: How do I report a bug or give feedback during alpha?**
 
 [File an issue](https://github.com/gui-cs/clet/issues/new). That's the only feedback channel — no Discussions, no forum. See the [Alpha feedback](#alpha-feedback) section above for what to include.
-
----
 
 ## Further reading
 
