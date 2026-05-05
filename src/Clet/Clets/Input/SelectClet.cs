@@ -18,7 +18,7 @@ internal sealed class SelectClet : IClet<int?>
         new ("options", "o", typeof (string), "Comma-separated list of options to display.", true, null),
     ];
 
-    public Task<CletRunResult<int?>> RunAsync (
+    public async Task<CletRunResult<int?>> RunAsync (
         IApplication app,
         string? initial,
         CletRunOptions options,
@@ -26,7 +26,7 @@ internal sealed class SelectClet : IClet<int?>
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return Task.FromResult (new CletRunResult<int?> { Status = CletRunStatus.Cancelled });
+            return new () { Status = CletRunStatus.Cancelled };
         }
 
         string[] labels = options.CletOptions?.TryGetValue ("options", out string? optionsValue) == true
@@ -51,10 +51,17 @@ internal sealed class SelectClet : IClet<int?>
             BorderStyle = LineStyle.Rounded,
         };
 
-        app.Run (wrapper);
+        try
+        {
+            await app.RunAsync (wrapper, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return new () { Status = CletRunStatus.Cancelled };
+        }
 
-        return Task.FromResult (cancellationToken.IsCancellationRequested
-            ? new CletRunResult<int?> { Status = CletRunStatus.Cancelled }
-            : new CletRunResult<int?> { Status = CletRunStatus.Ok, Value = wrapper.Result });
+        return cancellationToken.IsCancellationRequested
+            ? new () { Status = CletRunStatus.Cancelled }
+            : new () { Status = CletRunStatus.Ok, Value = wrapper.Result };
     }
 }
