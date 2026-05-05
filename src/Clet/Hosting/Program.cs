@@ -1,9 +1,13 @@
+using System.Text;
+
 namespace Clet;
 
 internal static class Program
 {
     public static async Task<int> Main (string[] args)
     {
+        Console.OutputEncoding = Encoding.UTF8;
+
         using CancellationTokenSource cts = new ();
         Console.CancelKeyPress += (_, e) =>
         {
