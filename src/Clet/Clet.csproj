@@ -7,6 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Clet</RootNamespace>
     <AssemblyName>clet</AssemblyName>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <StackTraceSupport>true</StackTraceSupport>
+    <DebuggerSupport>false</DebuggerSupport>
+    <EventSourceSupport>false</EventSourceSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
   </PropertyGroup>
 
   <ItemGroup>
