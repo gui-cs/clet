@@ -343,6 +343,10 @@ internal sealed class CommandLineRoot
 
     private void WriteRootHelp (TextWriter stdout)
     {
+        stdout.WriteLine ("  ╔═╗╦  ╔═╗╔╦╗");
+        stdout.WriteLine ("  ║  ║  ╠═  ║");
+        stdout.WriteLine ("  ╚═╝╩═╝╚═╝ ╩");
+        stdout.WriteLine ();
         stdout.WriteLine ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents");
         stdout.WriteLine ();
         stdout.WriteLine ("Usage:");

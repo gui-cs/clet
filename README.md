@@ -1,4 +1,80 @@
-## Press Release
+![clet hero](https://github.com/user-attachments/assets/d12630e7-8303-42c0-a1f7-cee65e4c8f4b)
+
+```
+  ╔═╗╦  ╔═╗╔╦╗
+  ║  ║  ╠═  ║
+  ╚═╝╩═╝╚═╝ ╩
+```
+
+**One binary. Every prompt. JSON out. Go home.**
+
+Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a CLI command — typed inputs, a real file picker, a Markdown viewer — with consistent JSON output, predictable exit codes, and full keyboard/mouse support. Works for humans and AI agents alike.
+
+## Install
+
+```sh
+brew install gui-cs/tap/clet      # macOS / Linux
+winget install gui-cs.clet        # Windows 10/11
+dotnet tool install -g clet       # any platform with .NET SDK
+```
+
+## What it replaces
+
+| Task | Before `clet` | With `clet` |
+|---|---|---|
+| Prompt for a choice | `select` / `gum choose` / `fzf` | `clet select "prod" "staging" "dev"` |
+| Pick a file | `gum file` (fuzzy filter) | `clet pick-file` (real tree dialog) |
+| Confirm an action | `read -p "Sure? [y/N]"` | `clet confirm "Deploy to prod?"` |
+| Render Markdown | `glow` / `bat` / `mdcat` | `clet md ./CHANGELOG.md` |
+| Multiple tools, mismatched exit codes | `read` + `dialog` + `fzf` + `glow` | `clet` — one tool, one contract |
+
+## Usage
+
+### Human usage
+
+```sh
+# Pick from a list
+clet select "prod" "staging" "dev"
+
+# Pick a file from a tree dialog
+clet pick-file --root ./src --title "Choose a source file"
+
+# Confirm before a destructive action
+clet confirm "This will delete 40k rows. Continue?"
+
+# Render a Markdown file (full-screen, dismiss with q / Esc)
+clet md ./CHANGELOG.md
+
+# See all available clets
+clet list
+```
+
+### AI agent usage (`--json`)
+
+```sh
+# Structured elicitation — agent gets a typed result, not raw text
+clet select --json "prod" "staging" "dev"
+# → {"schemaVersion":1,"status":"ok","value":"staging"}
+
+clet pick-file --json --root ./src --timeout 30s
+# → {"schemaVersion":1,"status":"ok","value":"src/User.ts"}
+
+clet confirm --json "Apply this patch?"
+# → {"schemaVersion":1,"status":"cancelled"}   (exit 130)
+
+# Discover available clets once per session
+clet list --json
+# → {"schemaVersion":1,"clets":[{"alias":"select","kind":"input","resultType":"string",...},...]}
+```
+
+Exit codes: `0` success · `2` usage error · `130` cancelled (SIGINT convention).
+
+### Demo
+
+> 🎬 *Recording coming in v0.3 — [track progress on issue #3](https://github.com/gui-cs/clet/issues/3)*
+
+---
+
 
 ### Terminal.Gui launches `clet`: typed terminal prompts (and viewers) for shells, scripts, and AI agents
 

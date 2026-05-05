@@ -8,6 +8,18 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-015: ASCII logo wired into `--help` banner and README hero section (Active)
+
+**Context.** Issue #12 (branding) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
+
+**Decision.** The ASCII logo is prepended to the plain-text `--help` output (top of `CommandLineRoot.WriteRootHelp`), before the tagline/description and usage block. The README `## Press Release` heading is preceded by a full hero section: hero image, code-block logo, tagline, install commands, comparison table, and usage examples (human + AI agent). Spec §4.7 updated to document the `--help` banner format. The logo is also the canonical visual identity for all documentation.
+
+**Status.** Active. Logo, tagline, and install commands are locked as of this PR. GIF/asciinema demo placeholder lands in the README; actual recording defers to v0.3 (issue #3).
+
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (`WriteRootHelp`), `README.md` (hero section), `specs/clet-spec.md` §4.7.
+
+---
+
 ## D-014: `--title` is a built-in CLI flag, not a per-clet option (Active)
 
 **Context.** Every input clet renders its `RunnableWrapper`/`OpenDialog` with a `Title` and falls back to a per-clet default ("Select an option…", "Enter a number…", etc.). All 14 clets honor `CletRunOptions.Title` if set. The CLI parser, however, had no way to populate it — `--title` was being routed into the per-clet `--<opt>` bucket where most clets ignored it.
