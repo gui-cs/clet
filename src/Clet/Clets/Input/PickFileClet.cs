@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Terminal.Gui.App;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -35,6 +36,8 @@ internal sealed class PickFileClet : IClet<JsonNode?>
                      && string.Equals (multiStr, "true", StringComparison.OrdinalIgnoreCase);
 
         string? root = options.CletOptions?.TryGetValue ("root", out string? rootStr) == true ? rootStr : null;
+        string? filter = options.CletOptions?.TryGetValue ("filter", out string? filterStr) == true ? filterStr : null;
+        string? startPath = root ?? initial;
 
         OpenDialog dialog = new ()
         {
@@ -42,11 +45,22 @@ internal sealed class PickFileClet : IClet<JsonNode?>
             Width = Dim.Fill (),
             Height = 25,
             AllowsMultipleSelection = multi,
+            BorderStyle = LineStyle.Rounded,
+            ShadowStyle = ShadowStyles.None,
         };
+        dialog.Border.Thickness = new Thickness (0, 1, 0, 0);
 
-        if (root is not null)
+        if (startPath is not null)
         {
-            dialog.Path = root;
+            dialog.Path = startPath;
+        }
+
+        string[] extensions = FileFilterParser.ParseExtensions (filter);
+
+        if (extensions.Length > 0)
+        {
+            dialog.AllowedTypes.Add (new AllowedType (filter ?? "Filtered", extensions));
+            dialog.AllowedTypes.Add (new AllowedTypeAny ());
         }
 
         try

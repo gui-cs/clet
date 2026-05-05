@@ -1,4 +1,5 @@
 using Terminal.Gui.App;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -29,6 +30,7 @@ internal sealed class PickDirectoryClet : IClet<string?>
         }
 
         string? root = options.CletOptions?.TryGetValue ("root", out string? rootStr) == true ? rootStr : null;
+        string? startPath = root ?? initial;
 
         OpenDialog dialog = new ()
         {
@@ -36,11 +38,14 @@ internal sealed class PickDirectoryClet : IClet<string?>
             Width = Dim.Fill (),
             Height = 25,
             OpenMode = OpenMode.Directory,
+            BorderStyle = LineStyle.Rounded,
+            ShadowStyle = ShadowStyles.None,
         };
+        dialog.Border.Thickness = new Thickness (0, 1, 0, 0);
 
-        if (root is not null)
+        if (startPath is not null)
         {
-            dialog.Path = root;
+            dialog.Path = startPath;
         }
 
         try
