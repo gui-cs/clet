@@ -40,7 +40,7 @@ internal sealed class PickFileClet : IClet<JsonNode?>
         {
             Title = options.Title ?? "Select a file (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
-            Height = Dim.Fill (),
+            Height = 25,
             AllowsMultipleSelection = multi,
         };
 

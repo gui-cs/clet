@@ -30,6 +30,15 @@ internal sealed class AttributePickerClet : IClet<JsonObject?>
 
         AttributePicker picker = new ();
 
+        foreach (View sub in picker.SubViews)
+        {
+            if (sub is ColorPicker cp)
+            {
+                cp.Style.ShowColorName = true;
+                cp.ApplyStyleChanges ();
+            }
+        }
+
         RunnableWrapper<AttributePicker, TgAttribute?> wrapper = new (picker)
         {
             Title = options.Title ?? "Pick text attributes (Enter to accept, Esc to cancel)",

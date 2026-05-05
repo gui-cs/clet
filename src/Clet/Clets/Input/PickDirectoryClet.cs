@@ -34,7 +34,7 @@ internal sealed class PickDirectoryClet : IClet<string?>
         {
             Title = options.Title ?? "Select a directory (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
-            Height = Dim.Fill (),
+            Height = 25,
             OpenMode = OpenMode.Directory,
         };
 

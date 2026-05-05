@@ -31,14 +31,22 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
         }
 
         string[] labels = options.Arguments is { Count: > 0 }
-            ? options.Arguments.ToArray ()
+            ? LabelParser.Split (options.Arguments)
             : options.CletOptions?.TryGetValue ("options", out string? optionsValue) == true
-                ? optionsValue?.Split (',') ?? []
+                ? LabelParser.Split (optionsValue)
                 : [];
+
+        int[] values = new int [labels.Length];
+
+        for (int i = 0; i < labels.Length; i++)
+        {
+            values [i] = 1 << i;
+        }
 
         FlagSelector flagSelector = new ()
         {
             Labels = labels,
+            Values = values,
         };
 
         if (initial is not null)

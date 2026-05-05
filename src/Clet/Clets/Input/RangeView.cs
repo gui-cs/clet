@@ -10,10 +10,13 @@ internal sealed class RangeView : View
 
     public RangeView ()
     {
-        _low = new NumericUpDown<int> { X = 0, Width = Dim.Percent (45) };
-        _high = new NumericUpDown<int> { X = Pos.Right (_low) + 2, Width = Dim.Percent (45) };
+        Height = 1;
+        Width = Dim.Fill ();
 
-        Label separator = new () { X = Pos.Right (_low), Width = 2, Text = ".." };
+        _low = new NumericUpDown<int> { X = 0, Y = 0, Width = Dim.Percent (45), Height = 1 };
+        _high = new NumericUpDown<int> { X = Pos.Right (_low) + 2, Y = 0, Width = Dim.Percent (45), Height = 1 };
+
+        Label separator = new () { X = Pos.Right (_low), Y = 0, Width = 2, Height = 1, Text = ".." };
 
         Add (_low, separator, _high);
     }

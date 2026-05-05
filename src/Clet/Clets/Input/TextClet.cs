@@ -1,5 +1,6 @@
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -29,6 +30,7 @@ internal sealed class TextClet : IClet<string?>
         TextField textField = new ()
         {
             Text = initial ?? string.Empty,
+            Width = Dim.Fill (),
         };
 
         RunnableWrapper<TextField, string?> wrapper = new (textField)
@@ -36,8 +38,10 @@ internal sealed class TextClet : IClet<string?>
             Title = options.Title ?? "Enter text (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
+            ResultExtractor = t => t.Text,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
+        wrapper.KeyBindings.Add (Key.Enter, Command.Accept);
 
         try
         {

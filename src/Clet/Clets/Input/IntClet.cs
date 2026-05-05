@@ -1,6 +1,7 @@
 using System.Globalization;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -49,8 +50,10 @@ internal sealed class IntClet : IClet<int?>
             Title = options.Title ?? "Enter a number (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
+            ResultExtractor = s => s.Value,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
+        wrapper.KeyBindings.Add (Key.Enter, Command.Accept);
 
         try
         {

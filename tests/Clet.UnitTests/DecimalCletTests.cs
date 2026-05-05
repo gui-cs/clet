@@ -53,4 +53,12 @@ public class DecimalCletTests
         Assert.Equal ("step", clet.Options [0].Name);
         Assert.False (clet.Options [0].Required);
     }
+
+    [Fact]
+    public void Options_StepDefault_IsFractional ()
+    {
+        DecimalClet clet = new ();
+
+        Assert.Equal ("0.1", clet.Options [0].DefaultValue);
+    }
 }

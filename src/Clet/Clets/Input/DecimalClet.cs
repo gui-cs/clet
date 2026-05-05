@@ -1,6 +1,7 @@
 using System.Globalization;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -16,7 +17,7 @@ internal sealed class DecimalClet : IClet<decimal?>
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
-        new ("step", null, typeof (decimal), "Step increment.", false, "1"),
+        new ("step", null, typeof (decimal), "Step increment.", false, "0.1"),
     ];
 
     public async Task<CletRunResult<decimal?>> RunAsync (
@@ -30,7 +31,11 @@ internal sealed class DecimalClet : IClet<decimal?>
             return new () { Status = CletRunStatus.Cancelled };
         }
 
-        NumericUpDown<decimal> spinner = new ();
+        NumericUpDown<decimal> spinner = new ()
+        {
+            Increment = 0.1m,
+            Format = "{0:0.###}",
+        };
 
         if (options.CletOptions?.TryGetValue ("step", out string? stepStr) == true
             && decimal.TryParse (stepStr, CultureInfo.InvariantCulture, out decimal step))
@@ -49,8 +54,10 @@ internal sealed class DecimalClet : IClet<decimal?>
             Title = options.Title ?? "Enter a decimal (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
+            ResultExtractor = s => s.Value,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
+        wrapper.KeyBindings.Add (Key.Enter, Command.Accept);
 
         try
         {

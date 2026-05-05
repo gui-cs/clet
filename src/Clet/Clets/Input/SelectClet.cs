@@ -30,9 +30,9 @@ internal sealed class SelectClet : IClet<string?>
         }
 
         string[] labels = options.Arguments is { Count: > 0 }
-            ? options.Arguments.ToArray ()
+            ? LabelParser.Split (options.Arguments)
             : options.CletOptions?.TryGetValue ("options", out string? optionsValue) == true
-                ? optionsValue?.Split (',') ?? []
+                ? LabelParser.Split (optionsValue)
                 : [];
 
         OptionSelector selector = new ()
