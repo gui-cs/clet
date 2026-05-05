@@ -50,6 +50,8 @@ The trust boundary is between the shell/agent layer and the clet CLI host. Every
 
 **For plain-text output:** `OutputFormatter.Write` calls `stdout.WriteLine(value)` for the result value. If the value contains terminal escapes, they pass through to the terminal. This is acceptable because: (a) the value is the *result* of user interaction, not attacker-controlled input, and (b) `--json` mode is the recommended machine-readable path.
 
+**Verification (v0.9):** The Appendix A claim "all output to stdout/stderr passes through a terminal-escape filter" is refined here. clet does not implement a standalone C0/C1 stripping filter on output paths. Instead, sanitization is architectural: TG renders user strings through its cell model (never raw), and JSON mode uses RFC 8259 escaping. Plain-text mode passes through the interaction result as-is, which is acceptable per the rationale above. The Appendix A wording is updated to match this reality.
+
 ### `--title` sanitization
 
 **Threat:** `--title` sets the TG window/border title. If the string contained escape sequences that leaked to the terminal, it could set the terminal window title (OSC 0/2) or worse.
@@ -63,8 +65,9 @@ The trust boundary is between the shell/agent layer and the clet CLI host. Every
 **Mitigation:** Default link policy is `SurfaceOnly` (D-017):
 - `LinkClicked` event handler shows the URL in the status bar and sets `e.Handled = true`.
 - No link is ever opened automatically.
-- A future `--allow-link-open` option can opt in to opening links; it is off by default.
 - AI agents running `clet md` on untrusted content are safe by default.
+
+**Future opt-in (deferred):** A `--allow-link-open` clet option is planned to allow opening links in the default browser. It is not implemented in v1.0. The safe default ships first; the opt-in will be gated behind an explicit user flag when added.
 
 ### File access scope
 
@@ -74,7 +77,9 @@ The trust boundary is between the shell/agent layer and the clet CLI host. Every
 - File pickers use TG's `OpenDialog`, which honors OS-level file permissions and sandboxing.
 - `clet md` reads files via `File.ReadAllText()` — standard OS permission checks apply.
 - No privilege escalation: clet runs as the invoking user, never setuid/setgid.
-- The `--root` option on `pick-file`/`pick-directory` constrains the starting directory but does not prevent navigation outside it (that's the OS sandbox's job).
+- The `--root` option on `pick-file`/`pick-directory` constrains the starting directory but does not prevent navigation outside it (that's the OS sandbox's job). `--root` is a UX convenience, not a security boundary.
+
+**Verification (v0.9):** `pick-file` and `pick-directory` delegate entirely to TG's `OpenDialog`/`SaveDialog`. No custom path traversal logic exists in clet. Path values like `--root ../../../../etc` resolve via the OS filesystem — clet does not perform its own path validation beyond what TG and the OS provide. This is the intended design: clet trusts the OS permission model.
 
 ### Plugin loading exclusion
 
@@ -84,13 +89,15 @@ The trust boundary is between the shell/agent layer and the clet CLI host. Every
 
 NativeAOT publishing (`PublishAot=true`) further closes this surface: AOT binaries cannot load managed assemblies at runtime.
 
+**Verification (v0.9):** Confirmed — no calls to `Assembly.LoadFrom`, `Assembly.Load`, or related reflection-based assembly loading APIs exist in the `src/Clet/` codebase. This row is closed.
+
 ### Denial of service
 
 **Threat:** Large files passed to `clet md`, extremely long `--initial` values, or high-frequency invocations.
 
 **Mitigation:**
+- **Input-size caps (v0.9):** `--initial` is capped at 64 KiB. `clet md` caps stdin and file content at 8 MiB. Exceeding either cap exits with code 65 (`"input-too-large"`). This prevents an agent piping unbounded data from OOMing the process.
 - `--timeout` flag enables callers to set an upper bound on execution time.
-- `clet md` reads files with `File.ReadAllText()` — bounded by available memory, same as any CLI tool.
 - No network I/O, no database, no shared state between invocations. Each `clet` invocation is a short-lived process.
 
 ### JSON output integrity

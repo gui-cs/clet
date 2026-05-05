@@ -11,6 +11,9 @@ namespace Clet;
 
 internal sealed class MarkdownClet : IViewerClet
 {
+    /// <summary>Maximum stdin size for clet md: 8 MiB (8,388,608 bytes).</summary>
+    internal const int MaxStdinBytes = 8 * 1024 * 1024;
+
     public string PrimaryAlias => "md";
     public IReadOnlyList<string> Aliases => ["md", "markdown"];
     public string Description => "Renders Markdown files in a themed, scrollable viewer.";
@@ -46,10 +49,25 @@ internal sealed class MarkdownClet : IViewerClet
             {
                 return new () { Status = CletRunStatus.Error, ErrorCode = "io", ErrorMessage = "No matching files found." };
             }
+
+            // Check file sizes before loading
+            foreach (string file in files)
+            {
+                FileInfo fi = new (file);
+
+                if (fi.Length > MaxStdinBytes)
+                {
+                    return new () { Status = CletRunStatus.Error, ErrorCode = "input-too-large", ErrorMessage = $"File '{Path.GetFileName (file)}' exceeds 8 MiB limit." };
+                }
+            }
         }
         else if (!string.IsNullOrEmpty (content))
         {
             // Inline content via --initial; render directly
+            if (content.Length > MaxStdinBytes)
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "input-too-large", ErrorMessage = "Content exceeds 8 MiB limit." };
+            }
         }
         else if (Console.IsInputRedirected)
         {
@@ -58,6 +76,11 @@ internal sealed class MarkdownClet : IViewerClet
             if (string.IsNullOrEmpty (content))
             {
                 return new () { Status = CletRunStatus.Error, ErrorCode = "io", ErrorMessage = "No input received from stdin." };
+            }
+
+            if (content.Length > MaxStdinBytes)
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "input-too-large", ErrorMessage = "stdin exceeds 8 MiB limit." };
             }
         }
         else

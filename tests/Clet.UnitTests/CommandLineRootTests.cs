@@ -204,4 +204,31 @@ public class CommandLineRootTests
         Assert.Equal (ExitCodes.UsageError, exit);
         Assert.Contains ("--initial", stderr.ToString ());
     }
+
+    [Fact]
+    public async Task Alias_InitialExceeds64KiB_ExitsWithValidationError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string oversized = new ('x', CommandLineRoot.MaxInitialBytes + 1);
+
+        int exit = await root.InvokeAsync (["select", "--initial", oversized], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.ValidationError, exit);
+        Assert.Contains ("64 KiB", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_InitialExactly64KiB_DoesNotRejectOnSize ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string exact = new ('x', CommandLineRoot.MaxInitialBytes);
+
+        // Use a pre-cancelled token so TG never starts; we only check the parser doesn't reject on size.
+        using CancellationTokenSource cts = new ();
+        cts.Cancel ();
+
+        int exit = await root.InvokeAsync (["select", "--initial", exact], cts.Token, stdout, stderr);
+
+        Assert.DoesNotContain ("64 KiB", stderr.ToString ());
+    }
 }

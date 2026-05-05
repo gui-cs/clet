@@ -99,4 +99,15 @@ public class CletSmokeTests
         // the TUIcast harness from v0.3 to drive the binary in a controlled environment.
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task InitialExceeds64KiB_ExitsWithValidationError ()
+    {
+        // Threat model §BR-8: --initial capped at 64 KiB, exit 65 with "input-too-large".
+        string oversized = new ('x', 64 * 1024 + 1);
+        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (["select", "--initial", oversized]);
+
+        Assert.Equal (65, exit);
+        Assert.Contains ("64 KiB", stderr);
+    }
 }

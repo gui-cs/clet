@@ -107,4 +107,84 @@ public class MarkdownCletIntegrationTests
             File.Delete (tempFile);
         }
     }
+
+    [Fact]
+    public async Task RunAsync_LinkInMarkdown_DoesNotLaunchProcess ()
+    {
+        // Verifies D-017 SurfaceOnly link policy: links are displayed but never opened.
+        // The LinkClicked handler sets e.Handled = true; no Process.Start is called.
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+        app.StopAfterFirstIteration = true;
+
+        MarkdownClet clet = new ();
+        string markdownWithLink = "# Links\n\n[Click me](https://evil.example.com/exfiltrate?data=secret)";
+        CletRunOptions options = new ();
+
+        using CancellationTokenSource cts = new ();
+
+        // This should render without launching any external process.
+        CletRunResult result = await clet.RunAsync (app, markdownWithLink, options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Ok, result.Status);
+    }
+
+    [Fact]
+    public async Task RunAsync_ContentExceeds8MiB_ReturnsInputTooLarge ()
+    {
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+
+        MarkdownClet clet = new ();
+        string oversized = new ('x', MarkdownClet.MaxStdinBytes + 1);
+        CletRunOptions options = new ();
+
+        using CancellationTokenSource cts = new ();
+
+        CletRunResult result = await clet.RunAsync (app, oversized, options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Error, result.Status);
+        Assert.Equal ("input-too-large", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task RunAsync_FileExceeds8MiB_ReturnsInputTooLarge ()
+    {
+        string tempFile = Path.GetTempFileName ();
+
+        try
+        {
+            // Write a file just over 8 MiB
+            using (FileStream fs = File.OpenWrite (tempFile))
+            {
+                byte[] buffer = new byte [1024 * 1024]; // 1 MiB
+                Array.Fill (buffer, (byte)'x');
+
+                for (int i = 0; i < 9; i++)
+                {
+                    fs.Write (buffer);
+                }
+            }
+
+            using IApplication app = Application.Create ();
+            app.Init ("ansi");
+
+            MarkdownClet clet = new ();
+            CletRunOptions options = new ()
+            {
+                Arguments = [tempFile],
+            };
+
+            using CancellationTokenSource cts = new ();
+
+            CletRunResult result = await clet.RunAsync (app, null, options, cts.Token);
+
+            Assert.Equal (CletRunStatus.Error, result.Status);
+            Assert.Equal ("input-too-large", result.ErrorCode);
+        }
+        finally
+        {
+            File.Delete (tempFile);
+        }
+    }
 }

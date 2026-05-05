@@ -159,4 +159,42 @@ public class OutputFormatterTests
         Assert.Contains ("\"status\":\"ok\"", output);
         Assert.Contains ("\"fg\":\"#ff0000\"", output);
     }
+
+    [Fact]
+    public void Json_ValueWithAnsiEscapes_EscapedInOutput ()
+    {
+        // Simulates a result value containing ANSI escape sequences (e.g., from a malicious --title).
+        // JSON output must escape control characters per RFC 8259.
+        string malicious = "normal\x1b[31mRED\x1b[0m";
+        BoxedCletResult result = new (CletRunStatus.Ok, malicious, null, null);
+        StringWriter stdout = new ();
+        StringWriter stderr = new ();
+
+        OutputFormatter.Write (result, jsonOutput: true, stdout, stderr);
+
+        string output = stdout.ToString ().TrimEnd ();
+        // Verify the JSON is valid and the value round-trips correctly.
+        using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse (output);
+        string? roundTripped = doc.RootElement.GetProperty ("value").GetString ();
+        Assert.Equal (malicious, roundTripped);
+        // The raw JSON text must NOT contain the literal ESC byte — it should be escaped as \u001B.
+        Assert.Contains ("\\u001B", output);
+    }
+
+    [Fact]
+    public void Json_ErrorMessage_WithAnsiEscapes_EscapedInOutput ()
+    {
+        string malicious = "bad\x1b]0;pwned\x07input";
+        BoxedCletResult result = new (CletRunStatus.Error, null, "validation", malicious);
+        StringWriter stdout = new ();
+        StringWriter stderr = new ();
+
+        OutputFormatter.Write (result, jsonOutput: true, stdout, stderr);
+
+        string output = stdout.ToString ().TrimEnd ();
+        // Verify the JSON is valid and the message round-trips correctly.
+        using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse (output);
+        string? roundTripped = doc.RootElement.GetProperty ("message").GetString ();
+        Assert.Equal (malicious, roundTripped);
+    }
 }

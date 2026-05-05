@@ -816,13 +816,14 @@ A suggested sequence (linear, not parallelizable until v0.3 except where noted):
 
 ## Appendix A: Threat Model Summary
 
-(Full document published with v0.5; sketch only here.)
+(Full document: `docs/threat-model.md`, published with v0.5, reviewed for v0.9.)
 
 - **Untrusted inputs:** `--initial`, env vars, stdin content, fixture file paths, `--title`, clet-specific options.
-- **Sanitization:** All output to stdout/stderr passes through a terminal-escape filter (strip C0/C1 control sequences except those we generate). User-controlled display strings (`--title`, prompt labels) sanitized at the View boundary.
-- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` flag for the user to opt in; off by default for AI agent use.
-- **File access:** `pick-file` and `pick-directory` honor the OS sandbox/permission model; no privilege escalation.
-- **Plugin loading:** None in v1.0. (Closes the entire LoadFrom-based attack surface.)
+- **Input-size caps:** `--initial` capped at 64 KiB; `clet md` stdin/files capped at 8 MiB. Exceeds → exit 65, `code: "input-too-large"`.
+- **Sanitization:** User-controlled display strings (`--title`, prompt labels) sanitized at the TG View boundary (cell-by-cell rendering, no raw terminal writes). JSON output uses RFC 8259 escaping. Plain-text output passes interaction results as-is (acceptable: result of user interaction, not attacker input).
+- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` deferred; off by default for AI agent use.
+- **File access:** `pick-file` and `pick-directory` honor the OS sandbox/permission model; no privilege escalation. `--root` is UX convenience, not a security boundary.
+- **Plugin loading:** None in v1.0. Confirmed: no `Assembly.LoadFrom`/`Assembly.Load` calls in codebase. (Closed.)
 
 ## Appendix B: Cross-References
 

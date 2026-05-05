@@ -6,6 +6,9 @@ namespace Clet;
 
 internal sealed class CommandLineRoot
 {
+    /// <summary>Maximum size for --initial value: 64 KiB (65,536 bytes).</summary>
+    internal const int MaxInitialBytes = 64 * 1024;
+
     private readonly ICletRegistry _registry;
     private readonly AliasDispatcher _dispatcher;
 
@@ -116,6 +119,14 @@ internal sealed class CommandLineRoot
                 }
 
                 initial = args [++i];
+
+                // Cap --initial at 64 KiB to prevent DoS via oversized input.
+                if (initial.Length > MaxInitialBytes)
+                {
+                    stderr.WriteLine ("error: --initial value exceeds 64 KiB limit.");
+
+                    return ExitCodes.ValidationError;
+                }
 
                 continue;
             }

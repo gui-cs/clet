@@ -20,6 +20,7 @@ public class ExitCodesTests
     [InlineData ((int)CletRunStatus.Cancelled, null, 130)]
     [InlineData ((int)CletRunStatus.NoResult, null, 1)]
     [InlineData ((int)CletRunStatus.Error, "validation", 65)]
+    [InlineData ((int)CletRunStatus.Error, "input-too-large", 65)]
     [InlineData ((int)CletRunStatus.Error, "io", 74)]
     [InlineData ((int)CletRunStatus.Error, "anything-else", 2)]
     public void FromResult_MapsStatusToExit (int statusInt, string? errorCode, int expected)
