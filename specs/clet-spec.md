@@ -89,7 +89,7 @@ Most of what an early draft of this spec assumed would need to change in TG is a
 - **`Markdown` View** is vetted for the read-only, dismissable, themed shape clet needs.
 - **Terminal-driver inline-capable detection** is already in place.
 
-The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`** and are not yet on a TG release tag. Until TG cuts a tag, `gui-cs/clet` builds against a TG `develop` preview NuGet (today: `Terminal.Gui` `2.0.2-develop.21`); the pin is removed once TG tags. See §8 for the risk row tracking that pin.
+The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`** and are not yet on a TG release tag. Until TG cuts a tag, `gui-cs/clet` builds against a TG `develop` preview NuGet (today: `Terminal.Gui` `2.0.2-develop.24`); the pin is removed once TG tags. See §8 for the risk row tracking that pin.
 
 ### 3.1 Cancellation token plumbing (LANDED on `develop`) ; was [#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)
 
@@ -333,8 +333,8 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emi
 | `int`                         | integer                                                      |
 | `decimal`                     | number (JSON number; consumer decides float vs decimal)      |
 | `confirm`                     | boolean                                                      |
-| `select`                      | integer (zero-based index)                                   |
-| `multi-select`                | array of integers (zero-based indices, ascending)            |
+| `select`                      | string (label text of the selected item — see [D-008](decisions.md)) |
+| `multi-select`                | array of strings (label texts, in display order — see [D-009](decisions.md)) |
 | `pick-file`                   | string (path)                                                |
 | `pick-file --multi`           | array of strings (paths, ascending sort)                     |
 | `pick-directory`              | string (path)                                                |
@@ -343,7 +343,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emi
 | `duration`                    | string, ISO-8601 duration (`PT1H30M`)                        |
 | `color`                       | string, `#RRGGBB` (lowercase hex)                            |
 | `attribute-picker`            | object, `{"fg": "#RRGGBB", "bg": "#RRGGBB", "style": "..."}` |
-| `range`                       | object, `{"low": <T>, "high": <T>}` (`<T>` = scalar of type) |
+| `range`                       | object, `{"low": <T>, "high": <T>}` (`<T>` = scalar of type; `int` only at v0.3 — see [D-011](decisions.md)) |
 
 ### 4.4 Source-generated registration
 
@@ -441,18 +441,30 @@ internal static class Program
 ### 4.7 CLI surface
 
 ```
-clet <alias> [initial] [--json] [--timeout 30s] [--fullscreen] [clet-specific options]
+clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--<opt> <value>]...
 clet list [--json]
 clet help <alias>
 clet --help
 clet --version
 ```
 
+**`--help` banner.** `clet --help` (and `clet` with no arguments) prints the ASCII logo followed by a plain-text usage summary. The logo is the approved three-line box-drawing art:
+
+```
+  ╔═╗╦  ╔═╗╔╦╗
+  ║  ║  ╠═  ║
+  ╚═╝╩═╝╚═╝ ╩
+```
+
+Plain-text help renders at v0.11. Markdown-rendered help (Terminal.Gui `Markdown` View) defers to v0.5.
+
+**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`); other clets ignore them. See decisions log D-014 for why `--title` is a host flag rather than a per-clet option.
+
 **Defaults.** Input clets render inline. Viewer clets (`md`) render fullscreen. `--fullscreen` forces fullscreen for input clets; it's a no-op for viewers.
 
 **Theming.** No `--theme` flag. Theme selection goes through `ConfigurationManager`'s existing mechanisms (config files, env var, system theme); `clet` honors whatever it resolves.
 
-**Help rendering.** `clet --help` and `clet help <alias>` render their content via Terminal.Gui's `Markdown` View, the same code path `clet md` uses. Help content is authored as Markdown under `src/Clet/Help/` (one file per alias plus a top-level overview), embedded as resources, and surfaced through the same dismissable, themed, scrollable viewer experience as `mdv` and the help system in `Examples/UICatalog`. This means help is browsable with the keys the user already knows.
+**Help rendering.** `clet --help` and `clet help <alias>` render Markdown to ANSI escape sequences and write to stdout (print mode), then exit immediately — they do not open an interactive viewer (see D-016). "Same code path" means the same Terminal.Gui `Markdown` rendering engine with `TextMateSyntaxHighlighter`, not the same interactive fullscreen mode. Root help reads from an embedded `src/Clet/Help/overview.md` resource; per-alias help is generated dynamically from `IClet` metadata by `MarkdownHelpRenderer.BuildAliasHelpMarkdown()`. This keeps help pipeable (`clet --help | less`) and consumable by AI agents reading stdout.
 
 ### 4.8 Exit code mapping
 
@@ -771,7 +783,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 1. **Telemetry.** The PR/FAQ mentions an opt-in usage ping. Spec deliberately does not include this in v1.0 scope; revisit at v1.1 with a privacy review.
 2. **Homebrew tap repo name.** `gui-cs/homebrew-tap` is assumed; confirm it exists or create.
 3. **Code signing certs.** Apple Developer ID and Authenticode certs are operational dependencies; confirm ownership/renewal process before v0.9.
-4. **`md` content source.** File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both? Both is implied; confirm CLI shape.
+4. **`md` content source.** ~~File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both?~~ **Resolved (D-015).** Both file arguments and stdin, with precedence: file args → `--initial` inline content → stdin → error.
 5. **PR/FAQ update upstream.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly (Tig's quote, the strategic FAQ). Update the issue body to match this spec before v0.5. (This repo's own README has been corrected to match.)
 
 ---

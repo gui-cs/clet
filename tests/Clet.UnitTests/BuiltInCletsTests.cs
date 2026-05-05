@@ -16,4 +16,53 @@ public class BuiltInCletsTests
         Assert.Equal ("select", clet!.PrimaryAlias);
         Assert.Equal (CletKind.Input, clet.Kind);
     }
+
+    [Theory]
+    [InlineData ("select")]
+    [InlineData ("text")]
+    [InlineData ("int")]
+    [InlineData ("decimal")]
+    [InlineData ("confirm")]
+    [InlineData ("date")]
+    [InlineData ("time")]
+    [InlineData ("duration")]
+    [InlineData ("color")]
+    [InlineData ("multi-select")]
+    [InlineData ("attribute-picker")]
+    [InlineData ("pick-file")]
+    [InlineData ("file")]
+    [InlineData ("pick-directory")]
+    [InlineData ("dir")]
+    [InlineData ("range")]
+    public void RegisterAll_RegistersInputClet (string alias)
+    {
+        ICletRegistry registry = new CletRegistry ();
+        BuiltInClets.RegisterAll (registry);
+
+        Assert.True (registry.TryResolve (alias, out IClet? clet));
+        Assert.NotNull (clet);
+        Assert.Equal (CletKind.Input, clet!.Kind);
+    }
+
+    [Theory]
+    [InlineData ("md")]
+    [InlineData ("markdown")]
+    public void RegisterAll_RegistersViewerClet (string alias)
+    {
+        ICletRegistry registry = new CletRegistry ();
+        BuiltInClets.RegisterAll (registry);
+
+        Assert.True (registry.TryResolve (alias, out IClet? clet));
+        Assert.NotNull (clet);
+        Assert.Equal (CletKind.Viewer, clet!.Kind);
+    }
+
+    [Fact]
+    public void RegisterAll_Registers15Clets ()
+    {
+        CletRegistry registry = new ();
+        BuiltInClets.RegisterAll (registry);
+
+        Assert.Equal (15, registry.All.Count);
+    }
 }

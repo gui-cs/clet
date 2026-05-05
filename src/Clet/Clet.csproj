@@ -6,10 +6,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Clet</RootNamespace>
+    <AssemblyName>clet</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Terminal.Gui" Version="2.0.2-develop.24" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Help\*.md" />
   </ItemGroup>
 
 </Project>

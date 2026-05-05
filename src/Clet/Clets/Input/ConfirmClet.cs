@@ -5,20 +5,20 @@ using Terminal.Gui.Views;
 
 namespace Clet;
 
-internal sealed class SelectClet : IClet<string?>
+internal sealed class ConfirmClet : IClet<bool?>
 {
-    public string PrimaryAlias => "select";
-    public IReadOnlyList<string> Aliases => ["select"];
-    public string Description => "Presents a list of options and returns the text of the selected item.";
+    public string PrimaryAlias => "confirm";
+    public IReadOnlyList<string> Aliases => ["confirm"];
+    public string Description => "Prompts for a yes/no confirmation and returns a boolean.";
     public CletKind Kind => CletKind.Input;
-    public Type ResultType => typeof (string);
+    public Type ResultType => typeof (bool);
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
-        new ("options", "o", typeof (string), "Comma-separated list of options to display.", true, null),
+        new ("prompt", "p", typeof (string), "Custom prompt text displayed as the title.", false, null),
     ];
 
-    public async Task<CletRunResult<string?>> RunAsync (
+    public async Task<CletRunResult<bool?>> RunAsync (
         IApplication app,
         string? initial,
         CletRunOptions options,
@@ -29,31 +29,33 @@ internal sealed class SelectClet : IClet<string?>
             return new () { Status = CletRunStatus.Cancelled };
         }
 
-        string[] labels = options.Arguments is { Count: > 0 }
-            ? LabelParser.Split (options.Arguments)
-            : options.CletOptions?.TryGetValue ("options", out string? optionsValue) == true
-                ? LabelParser.Split (optionsValue)
-                : [];
-
         OptionSelector selector = new ()
         {
-            Labels = labels,
+            Labels = ["Yes", "No"],
             AssignHotKeys = true,
         };
 
         if (initial is not null)
         {
-            int initialIdx = Array.FindIndex (labels, l => string.Equals (l, initial, StringComparison.OrdinalIgnoreCase));
-
-            if (initialIdx >= 0)
+            if (string.Equals (initial, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals (initial, "yes", StringComparison.OrdinalIgnoreCase))
             {
-                selector.Value = initialIdx;
+                selector.Value = 0;
+            }
+            else if (string.Equals (initial, "false", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals (initial, "no", StringComparison.OrdinalIgnoreCase))
+            {
+                selector.Value = 1;
             }
         }
 
+        string title = options.CletOptions?.TryGetValue ("prompt", out string? promptValue) == true && promptValue is not null
+            ? promptValue
+            : options.Title ?? "Confirm (Enter to accept, Esc to cancel)";
+
         RunnableWrapper<OptionSelector, int?> wrapper = new (selector)
         {
-            Title = options.Title ?? "Select an option (Enter to accept, Esc to cancel)",
+            Title = title,
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
             SchemeName = CletStyling.BaseSchemeName,
@@ -75,10 +77,13 @@ internal sealed class SelectClet : IClet<string?>
         }
 
         int? selectedIndex = wrapper.Result;
-        string? selectedText = selectedIndex is >= 0 and var idx && idx < labels.Length
-            ? labels [idx]
-            : null;
+        bool? result = selectedIndex switch
+        {
+            0 => true,
+            1 => false,
+            _ => null,
+        };
 
-        return new () { Status = CletRunStatus.Ok, Value = selectedText };
+        return new () { Status = CletRunStatus.Ok, Value = result };
     }
 }
