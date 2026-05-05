@@ -879,11 +879,11 @@ J. **TG-core willingness.** A `[Shellable]` attribute and `ToWire`/`TryParseInit
 
 Both are post-v1.0 stories. v1.0 already defers third-party plugin loading to v2 ([§1 Out of scope](#out-of-scope-deferred-to-v2-or-later)). And the v1.0 input list is locked at v0.5 — adding a 16th clet between v0.5 and v1.0 is a deliberate reopen of schema-lock, not a routine event auto-discovery would smooth.
 
-### 11.5 Recommendation (subject to revision)
+### 11.5 Decision (recorded in [D-021](decisions.md))
 
-**Don't pursue full auto-discovery in v1.x.** Specifically:
+**Don't pursue full auto-discovery in v1.x.** [D-021](decisions.md) records this decision; D-004 is superseded by it. Specifically:
 
-- Keep [D-004](decisions.md) deferred. Hand-write `BuiltInClets.RegisterAll` through v1.0.
+- Hand-write `BuiltInClets.RegisterAll` through v1.0.
 - Keep `Clet.SourceGen` as a placeholder. Don't delete it — it stays as a parking spot for the v2 reopen.
 - Treat the `[Clet("alias", typeof(TResult))]` attribute sketched in §4.5 as illustrative only; the shipped code uses plain `IClet<TValue>` interface implementation.
 - **At v2, if and when third-party clets become a goal**, the TG-side asks (A–E above) become a co-design topic with TG core. Use this section as the starting checklist; don't restart from blank.
