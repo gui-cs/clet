@@ -71,14 +71,14 @@ internal sealed class CommandLineRoot
         {
             string arg = args [i];
 
-            if (arg == "--json")
+            if (arg is "--json" or "-j")
             {
                 jsonOutput = true;
 
                 continue;
             }
 
-            if (arg == "--fullscreen")
+            if (arg is "--fullscreen" or "-f")
             {
                 fullscreen = true;
 
@@ -106,7 +106,7 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
-            if (arg == "--initial")
+            if (arg is "--initial" or "-i")
             {
                 if (i + 1 >= args.Length)
                 {
@@ -120,7 +120,7 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
-            if (arg == "--title")
+            if (arg is "--title" or "-t")
             {
                 if (i + 1 >= args.Length)
                 {
@@ -190,7 +190,7 @@ internal sealed class CommandLineRoot
 
     private int WriteList (string[] args, TextWriter stdout)
     {
-        bool json = args.Length > 1 && args [1] == "--json";
+        bool json = args.Length > 1 && args [1] is "--json" or "-j";
 
         if (json)
         {

@@ -171,4 +171,37 @@ public class CommandLineRootTests
         Assert.Equal (ExitCodes.Ok, exit);
         Assert.Contains ("--title", stdout.ToString ());
     }
+
+    [Fact]
+    public async Task List_ShortJsonFlag_EmitsJson ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["list", "-j"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Contains ("\"schemaVersion\":1", stdout.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_ShortTitleFlag_MissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "-t"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--title", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_ShortInitialFlag_MissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "-i"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--initial", stderr.ToString ());
+    }
 }

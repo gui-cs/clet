@@ -12,11 +12,11 @@
 
 | Option | Description |
 |--------|-------------|
-| `--initial <value>` | Pre-populate the input with a value |
-| `--title <text>` | Custom title for the prompt window |
-| `--json` | Emit result as a JSON envelope |
-| `--timeout <duration>` | Auto-cancel after duration (e.g. `30s`, `1m`, `500ms`) |
-| `--fullscreen` | Force fullscreen rendering (default for viewers) |
+| `--initial`, `-i` `<value>` | Pre-populate the input with a value |
+| `--title`, `-t` `<text>` | Custom title for the prompt window |
+| `--json`, `-j` | Emit result as a JSON envelope |
+| `--timeout` `<duration>` | Auto-cancel after duration (e.g. `30s`, `1m`, `500ms`) |
+| `--fullscreen`, `-f` | Force fullscreen rendering (default for viewers) |
 
 ## JSON Output
 
