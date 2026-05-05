@@ -65,6 +65,20 @@ The repo intentionally splits "design intent" from "current code" from "queued c
 - **[Bar-raise backlog issue #11](https://github.com/gui-cs/clet/issues/11)** (label `bar-raise`) — critique that's been raised, considered, and *not yet* acted on. Before claiming a section is "done," check the backlog for queued items in that area. New design pushback goes there, not into a side conversation.
 - **`docs/runbooks/release-rollback.md`** — operational runbook for withdrawing a bad release across Homebrew/WinGet/NuGet. Draft until exercised at v0.9.
 
+### Doc-update gate for every PR
+
+Before a PR can be merged, the docs above must reflect what the PR changes. This isn't a stylistic preference — it's how the three-document split (intent / decisions / backlog) stays trustworthy. **A PR that ships behavior without updating the right doc is incomplete, even if all tests pass.**
+
+Use this checklist on every PR:
+
+- **Did the PR change CLI surface, exit codes, JSON envelope, or any user-visible behavior the spec describes?** → Update `specs/clet-spec.md` in the same PR. If the change *contradicts* something in the spec, also add a decisions-log entry explaining why.
+- **Did the PR make a non-obvious choice a future reader might want to "fix"?** (workarounds against upstream bugs, deliberate divergence from the spec, hand-rolled where a library exists, deferred mechanism, load-bearing handler that looks redundant) → Append a new entry to `specs/decisions.md` with `## D-NNN: <title> (Active)`. Append, don't edit; supersede with a new entry if a prior decision is reversed.
+- **Did the PR resolve or invalidate an item on bar-raise issue #11?** → Tick the checkbox or add a follow-up note on the issue.
+- **Did the PR complete a checkbox on a milestone tracking issue (#2/#9/#3/#4/#5/#6)?** → Tick the box on the issue itself, not just locally.
+- **Did the PR change release/operational steps?** → Update `docs/runbooks/release-rollback.md` (or add a new runbook under `docs/runbooks/`).
+
+If none of the above apply, say so explicitly in the PR description ("no spec/decisions/runbook impact") rather than leaving it implicit. Reviewers should reject PRs that ship surface-level changes without the corresponding doc update.
+
 ### Milestones
 
 Tracked as GitHub issues with `milestone` + `tracking` labels. Spec §7 cross-references each:

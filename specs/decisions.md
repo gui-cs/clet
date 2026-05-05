@@ -8,6 +8,30 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-014: `--title` is a built-in CLI flag, not a per-clet option (Active)
+
+**Context.** Every input clet renders its `RunnableWrapper`/`OpenDialog` with a `Title` and falls back to a per-clet default ("Select an option…", "Enter a number…", etc.). All 14 clets honor `CletRunOptions.Title` if set. The CLI parser, however, had no way to populate it — `--title` was being routed into the per-clet `--<opt>` bucket where most clets ignored it.
+
+**Decision.** `--title <text>` is parsed at the host level (`CommandLineRoot.DispatchAlias`) alongside `--initial`, `--json`, `--timeout`, `--fullscreen`, and stored as `CletRunOptions.Title`. Individual clets do **not** declare `title` in their `Options` list — adding it 14 times would be churn and the per-clet help would falsely imply each clet handles it differently.
+
+**Status.** Active. Listed in root help (§4.7).
+
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (`DispatchAlias` parsing + `WriteRootHelp`), `src/Clet/Abstractions/CletRunOptions.cs` (Title property), each clet's `Title = options.Title ?? "default"` line.
+
+---
+
+## D-013: All clet wrappers/dialogs render with `Schemes.Base` (Active)
+
+**Context.** By default a `RunnableWrapper` inherits the surrounding scheme; an `OpenDialog` calls `FileDialog.SetStyle()` which forces `SchemeName` to `Schemes.Dialog` once the dialog enters its running state — even if we set `Schemes.Base` in the object initializer. Without intervention, file/directory pickers render with a different palette than the other 12 inline clets.
+
+**Decision.** All clets set `SchemeName = CletStyling.BaseSchemeName` (resolves `SchemeManager.SchemesToSchemeName(Schemes.Base)`) on their wrapper/dialog. For `pick-file` and `pick-directory`, an `IsRunningChanged` handler re-applies `Schemes.Base` once the dialog has actually started running, working around `FileDialog.SetStyle()`'s `Base → Dialog` rewrite. The handler is **load-bearing** — deleting it silently regresses the file pickers to the dialog scheme.
+
+**Status.** Active. Revisit when Terminal.Gui exposes a way to opt out of `FileDialog.SetStyle()`'s scheme rewrite, at which point the handler can be replaced with the simpler initializer-only form.
+
+**Pointers.** `src/Clet/Hosting/CletStyling.cs`, `src/Clet/Clets/Input/PickFileClet.cs` (IsRunningChanged handler), `src/Clet/Clets/Input/PickDirectoryClet.cs` (same).
+
+---
+
 ## D-012: Code signing deferred post-1.0 (Active)
 
 **Context.** Spec §5.2 calls for macOS (Developer ID + notarization) and Windows (Authenticode) code signing in the release pipeline. Apple Developer Program costs $99/yr; Azure Trusted Signing costs ~$10/mo. Homebrew bottles require signed binaries for Gatekeeper; unsigned binaries get quarantined.
