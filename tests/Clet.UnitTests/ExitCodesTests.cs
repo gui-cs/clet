@@ -16,15 +16,15 @@ public class ExitCodesTests
     }
 
     [Theory]
-    [InlineData (CletRunStatus.Ok, null, 0)]
-    [InlineData (CletRunStatus.Cancelled, null, 130)]
-    [InlineData (CletRunStatus.NoResult, null, 1)]
-    [InlineData (CletRunStatus.Error, "validation", 65)]
-    [InlineData (CletRunStatus.Error, "io", 74)]
-    [InlineData (CletRunStatus.Error, "anything-else", 2)]
-    public void FromResult_MapsStatusToExit (CletRunStatus status, string? errorCode, int expected)
+    [InlineData ((int)CletRunStatus.Ok, null, 0)]
+    [InlineData ((int)CletRunStatus.Cancelled, null, 130)]
+    [InlineData ((int)CletRunStatus.NoResult, null, 1)]
+    [InlineData ((int)CletRunStatus.Error, "validation", 65)]
+    [InlineData ((int)CletRunStatus.Error, "io", 74)]
+    [InlineData ((int)CletRunStatus.Error, "anything-else", 2)]
+    public void FromResult_MapsStatusToExit (int statusInt, string? errorCode, int expected)
     {
-        BoxedCletResult result = new (status, null, errorCode, null);
+        BoxedCletResult result = new ((CletRunStatus)statusInt, null, errorCode, null);
 
         Assert.Equal (expected, ExitCodes.FromResult (result));
     }
