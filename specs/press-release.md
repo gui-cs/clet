@@ -33,8 +33,6 @@ winget install gui-cs.clet        # Windows 10/11
 dotnet tool install -g clet       # any platform with .NET SDK
 ```
 
----
-
 ## Customer voices
 
 **Maya Okonkwo, platform engineer (lives in the terminal).**
@@ -48,8 +46,6 @@ dotnet tool install -g clet       # any platform with .NET SDK
 
 **Tig Kindel, Terminal.Gui v2 maintainer.**
 > "My job is to say no to things that bloat the core. `clet` passed because it adds zero types to `Terminal.Gui.ViewBase`, doesn't touch `IValue<T>`, lives in its own assembly, and uses an instance `ICletRegistry` instead of static singletons. The thing that surprised me was how much it advertised the parts of TG v2 most users don't see: `ConfigurationManager` themes, key remapping, the FileDialog rewrite, and the Markdown View (which is, frankly, one of the best things we shipped in v2 and almost nobody knew about it). People install `clet` for the prompt, then ask whether they can build a whole app with that file dialog. Yes. We've been telling you for two years."
-
----
 
 ## FAQ
 

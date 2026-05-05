@@ -4,8 +4,6 @@
 
 This is the implementation spec. It assumes the PR/FAQ is broadly accepted and covers what to build, where it lives, what changes in Terminal.Gui to support it, how it ships, and how it's tested.
 
----
-
 ## 1. Scope and Non-Goals
 
 ### In scope (v1.0)
@@ -27,8 +25,6 @@ This is the implementation spec. It assumes the PR/FAQ is broadly accepted and c
 - Additional viewer clets (`json`, `log`, `diff`).
 - Telemetry beyond a one-shot opt-in install ping.
 - Embedded/inline-in-other-TG-app use of clets.
-
----
 
 ## 2. Architecture Overview
 
@@ -77,8 +73,6 @@ gui-cs/Terminal.Gui                           gui-cs/clet
 
 All of (3)+(4) is plain Terminal.Gui hosting against TG's public API. The clet itself is a Terminal.Gui View. Nothing in TG core knows about clets; nothing in clets requires private TG API.
 
----
-
 ## 3. Terminal.Gui Changes Required
 
 Most of what an early draft of this spec assumed would need to change in TG is already done or already tracked, including:
@@ -89,7 +83,7 @@ Most of what an early draft of this spec assumed would need to change in TG is a
 - **`Markdown` View** is vetted for the read-only, dismissable, themed shape clet needs.
 - **Terminal-driver inline-capable detection** is already in place.
 
-The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`** and are not yet on a TG release tag. Until TG cuts a tag, `gui-cs/clet` builds against a TG `develop` preview NuGet (today: `Terminal.Gui` `2.0.2-develop.24`); the pin is removed once TG tags. See §8 for the risk row tracking that pin.
+The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`**. clet builds against the TG version named by the dispatch payload via `<TerminalGuiVersion>` in `src/Clet/Clet.csproj`; the local-development default tracks a known-good develop build. There is no longer a "pin to remove" — see [D-020](decisions.md#d-020) for the continuous-release design.
 
 ### 3.1 Cancellation token plumbing (LANDED on `develop`) ; was [#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)
 
@@ -104,8 +98,6 @@ Clet's wire contract does not depend on TG's decision about whether `IValue<T>.V
 The `pick-file` and `pick-directory` clets bind to `IValue<IReadOnlyList<string>?>` directly, with no per-clet glue code. The §4.3.2 per-clet `value` shape table already specifies the resulting JSON wire format (string for single-select, array of strings for `--multi`), independent of TG's collection type.
 
 This change is breaking for any TG v2 caller that was reading the old `int` OK/Cancel sentinel; that breakage was accepted by the TG team because v2.1 already carries one breaking change.
-
----
 
 ## 4. `gui-cs/clet` Repo
 
@@ -491,8 +483,6 @@ In `Clet.csproj`:
 
 Target binary size: ~8MB. Cold-start budget: <100ms on Apple Silicon, <150ms on Windows x64.
 
----
-
 ## 5. Release and Update Pipeline
 
 ### 5.1 Trigger
@@ -622,8 +612,6 @@ If any publish step fails:
 clet's published version is the dispatch payload's `tg_version`, **verbatim including any prerelease suffix** (e.g. `2.0.2-develop.36` ⇒ clet `2.0.2-develop.36`; `2.1.0` ⇒ clet `2.1.0`). The workflow passes `-p:Version=${{ env.TG_VERSION }}` to both `dotnet pack` and `dotnet publish`. There is no version negotiation, no compatibility matrix, no "clet 1.5 supports TG 2.3+." The pair is locked.
 
 The csproj also declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between `tg_version` in the package label and what's actually linked. See [D-020](decisions.md#d-020).
-
----
 
 ## 6. Testing Plan
 
@@ -766,8 +754,6 @@ Run before every minor release (v1.0, v1.1, ...). Captured in a release checklis
 - Weekly cron: simulate a `repository_dispatch` with a fake version. Build, smoke-test, generate manifests, but stop short of publish.
 - Verify all template files render correctly, all artifact uploads succeed, all checksums match.
 
----
-
 ## 7. Milestones
 
 Schedule follows TG releases, not a calendar; no dates here.
@@ -777,11 +763,10 @@ Schedule follows TG releases, not a calendar; no dates here.
 | **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
 | **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
 | **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. TUIcast keystroke harness wired up. |
-| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; `dotnet tool install -g Terminal.Gui.clet` packs and installs locally (mdv pattern, see D-019); Homebrew tap and WinGet manifest in working draft form; **continuous-release loop wired up — every TG develop NuGet drives a clet prerelease push, every TG release tag drives a stable push** (D-020, supersedes the earlier "TG dep on a release tag" criterion); the gui-cs/clet release workflow proven against a real TG develop publish *and* a real TG release cut. |
-| **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. |
+| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; `dotnet tool install -g Terminal.Gui.clet` packs and installs locally (mdv pattern, see D-019); Homebrew tap and WinGet manifest in working draft form; **continuous-release loop wired up — every TG develop NuGet drives a clet prerelease push, every TG release tag drives a stable push** (D-020, supersedes the earlier "TG dep on a release tag" criterion); release workflow proven end-to-end against a real TG develop publish (`Terminal.Gui.clet 2.0.2-develop.35` shipped autonomously) — the release-tag half stays open until TG cuts an actual tag. |
+| **v0.75 alpha** | [#33](https://github.com/gui-cs/clet/issues/33) | Friends-and-family alpha. ≥5 external testers have installed via a published channel and run a non-trivial flow; ≥3 alpha-feedback Issues filed by non-maintainers (alpha feedback = GitHub Issues, no Discussions); README points testers at the Issues tracker; ≥2 of the 4 target terminals driven by someone other than the maintainer; both stable and `--prerelease` install paths exercised end-to-end; maintainer dogfooding `clet` (not `dotnet run`) in real workflows for ≥2 weeks; ≥1 AI agent harness consuming `clet --json` for a non-toy task; all P0 alpha bugs resolved or explicitly deferred to v0.9. **Not v0.9 RC** — the four-terminal matrix run, full smoke-gate coverage, and the rollback runbook exercise are still v0.9 gates. |
+| **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. Alpha-feedback (v0.75) P1/P2 bugs triaged; ones marked for v0.9 are resolved here. |
 | **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
-
----
 
 ## 8. Risks and Mitigations
 
@@ -796,8 +781,6 @@ Schedule follows TG releases, not a calendar; no dates here.
 | First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | §6.8 weekly dry-runs catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
 | Naming concerns about "clet" surfacing in support channels | Low | Low | Acknowledge in docs; outlast. |
 
----
-
 ## 9. Open Questions
 
 1. **Telemetry.** The PR/FAQ mentions an opt-in usage ping. Spec deliberately does not include this in v1.0 scope; revisit at v1.1 with a privacy review.
@@ -805,8 +788,6 @@ Schedule follows TG releases, not a calendar; no dates here.
 3. **Code signing certs.** Apple Developer ID and Authenticode certs are operational dependencies; confirm ownership/renewal process before v0.9.
 4. **`md` content source.** ~~File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both?~~ **Resolved (D-015).** Both file arguments and stdin, with precedence: file args → `--initial` inline content → stdin → error.
 5. **PR/FAQ update upstream.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly (Tig's quote, the strategic FAQ). Update the issue body to match this spec before v0.5. (This repo's own README has been corrected to match.)
-
----
 
 ## 10. Implementation Order
 
@@ -830,9 +811,8 @@ A suggested sequence (linear, not parallelizable until v0.3 except where noted):
 10. **`dotnet tool` packaging:** add `PackAsTool`/`ToolCommandName`/`PackageId=Terminal.Gui.clet` to `src/Clet/Clet.csproj` (mdv pattern, D-019). `dotnet pack -c Release` produces a global-tool `.nupkg`; `dotnet tool install -g --add-source ./bin/Release Terminal.Gui.clet` works locally end-to-end. This is the lowest-friction install path and the first publish channel exercised before Homebrew/WinGet.
 11. **Publish channels:** Homebrew (lowest ops friction for native AOT bottle), then WinGet, then NuGet tool push.
 12. **v0.5 gate:** four-terminal matrix run + threat model + locked schema + #5156 Markdown rendering tests landed in TG.
-13. RC and GA.
-
----
+13. **v0.75 alpha — friends-and-family testing.** Point the README at the Issues tracker for alpha feedback (no Discussions), recruit ≥5 external testers, dogfood for ≥2 weeks, run an AI agent harness against `--json`. P0 bugs resolved or explicitly deferred. Surface area is what was locked in v0.5 — don't add features here. ([#33](https://github.com/gui-cs/clet/issues/33))
+14. RC and GA.
 
 ## Appendix A: Threat Model Summary
 
