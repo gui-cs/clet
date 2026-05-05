@@ -2,6 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- Floor the runtimeconfig.json request at 10.0.0 so the default roll-forward
+         policy accepts any installed 10.0.x patch (e.g. 10.0.2) when the build SDK
+         is a later patch (e.g. 10.0.5). Without this, the SDK patch is baked in and
+         dotnet tool users on an older patch get a launch failure. -->
+    <RuntimeFrameworkVersion>10.0.0</RuntimeFrameworkVersion>
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
