@@ -8,6 +8,18 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-018: ASCII logo wired into `--help` banner and README hero section (Active)
+
+**Context.** [Issue #12 (branding)](https://github.com/gui-cs/clet/issues/12) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
+
+**Decision.** The ASCII logo is prepended to the Markdown-rendered `--help` output (embedded in `src/Clet/Help/overview.md`), before the tagline/description and usage block. The README `## Press Release` heading is preceded by a full hero section: hero image, code-block logo, tagline, install commands, comparison table, and usage examples (human + AI agent). Spec §4.7 updated to document the `--help` banner format. The logo is also the canonical visual identity for all documentation.
+
+**Status.** Active. Logo, tagline, and install commands are locked as of this PR. GIF/asciinema demo placeholder lands in the README; actual recording defers to v0.3 (issue #3).
+
+**Pointers.** `src/Clet/Help/overview.md` (logo in Markdown template), `README.md` (hero section), `specs/clet-spec.md` §4.7.
+
+---
+
 ## D-017: Link safety default is SurfaceOnly for `clet md` (Active)
 
 **Context.** Spec Appendix A defines a `SurfaceOnly` link policy: hyperlinks are displayed but never opened automatically. The mdv reference viewer already implements this pattern — `LinkClicked` shows the URL in the status bar and sets `e.Handled = true`. AI agents need predictable, safe behavior when running `clet md` on untrusted Markdown.

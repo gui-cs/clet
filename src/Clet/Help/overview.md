@@ -1,6 +1,10 @@
-# clet
+```
+  ╔═╗╦  ╔═╗╔╦╗
+  ║  ║  ╠═  ║
+  ╚═╝╩═╝╚═╝ ╩
+```
 
-Typed terminal prompts (and viewers) for shells, scripts, and AI agents.
+*One binary. Every prompt. JSON out. Go home.*
 
 {{CLET_TABLE}}
 
