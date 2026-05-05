@@ -131,7 +131,7 @@ Instance. A static convenience façade may exist for the CLI's own bootstrap; it
 `IParsable<TSelf>` from .NET 7. View authors whose result type already implements `IParsable<T>` get `--initial` parsing for free; others register a parser delegate.
 
 **Q: Code signing and notarization?**
-macOS builds Developer ID signed and notarized; Windows builds Authenticode signed.
+Deferred until adoption justifies the cost — see decisions log entry D-012 in `specs/decisions.md`. v1.0 ships unsigned: Homebrew installs build-from-source (no Gatekeeper friction since the user's machine compiles), `dotnet tool install -g clet` works without OS code signing, and WinGet ships an unsigned `.exe` (a one-time SmartScreen warning, acceptable for early adopters). We'll revisit when download numbers show users hitting friction or a corporate adopter requires signed binaries.
 
 **Q: Security model?**
 Inputs from `--initial`, env vars, and stdin are untrusted. Terminal-escape sanitization on stderr/stdout output paths we control. `--title` and other display strings sanitized. `clet md` uses the `Markdown` View's link policy (links are surfaced, not auto-opened). Threat model published with v0.5.

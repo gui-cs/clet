@@ -89,7 +89,7 @@ Most of what an early draft of this spec assumed would need to change in TG is a
 - **`Markdown` View** is vetted for the read-only, dismissable, themed shape clet needs.
 - **Terminal-driver inline-capable detection** is already in place.
 
-The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`** and are not yet on a TG release tag. Until TG cuts a tag, `gui-cs/clet` builds against a TG `develop` preview NuGet (today: `Terminal.Gui` `2.0.2-develop.21`); the pin is removed once TG tags. See §8 for the risk row tracking that pin.
+The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`** and are not yet on a TG release tag. Until TG cuts a tag, `gui-cs/clet` builds against a TG `develop` preview NuGet (today: `Terminal.Gui` `2.0.2-develop.24`); the pin is removed once TG tags. See §8 for the risk row tracking that pin.
 
 ### 3.1 Cancellation token plumbing (LANDED on `develop`) ; was [#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)
 
@@ -333,8 +333,8 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emi
 | `int`                         | integer                                                      |
 | `decimal`                     | number (JSON number; consumer decides float vs decimal)      |
 | `confirm`                     | boolean                                                      |
-| `select`                      | integer (zero-based index)                                   |
-| `multi-select`                | array of integers (zero-based indices, ascending)            |
+| `select`                      | string (label text of the selected item — see [D-008](decisions.md)) |
+| `multi-select`                | array of strings (label texts, in display order — see [D-009](decisions.md)) |
 | `pick-file`                   | string (path)                                                |
 | `pick-file --multi`           | array of strings (paths, ascending sort)                     |
 | `pick-directory`              | string (path)                                                |
@@ -343,7 +343,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emi
 | `duration`                    | string, ISO-8601 duration (`PT1H30M`)                        |
 | `color`                       | string, `#RRGGBB` (lowercase hex)                            |
 | `attribute-picker`            | object, `{"fg": "#RRGGBB", "bg": "#RRGGBB", "style": "..."}` |
-| `range`                       | object, `{"low": <T>, "high": <T>}` (`<T>` = scalar of type) |
+| `range`                       | object, `{"low": <T>, "high": <T>}` (`<T>` = scalar of type; `int` only at v0.3 — see [D-011](decisions.md)) |
 
 ### 4.4 Source-generated registration
 
