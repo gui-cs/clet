@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Nodes;
 
 namespace Clet;
 
@@ -390,6 +391,21 @@ internal sealed class CommandLineRoot
         if (underlying == typeof (TimeSpan))
         {
             return "duration";
+        }
+
+        if (underlying == typeof (JsonArray))
+        {
+            return "array";
+        }
+
+        if (underlying == typeof (JsonObject))
+        {
+            return "object";
+        }
+
+        if (underlying == typeof (JsonNode))
+        {
+            return "json";
         }
 
         return underlying.Name;

@@ -8,6 +8,54 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-011: `range` is integer-only at v0.3 (Active)
+
+**Context.** Spec §4.3.2 defines the `range` value shape as `{"low": <T>, "high": <T>}` where `<T>` is the scalar of the underlying numeric/date/time type.
+
+**Decision.** At v0.3, `T = int` only. The `RangeClet` uses two `NumericUpDown<int>` controls. Decimal range and date/time range are deferred until demand exists — adding them later is a new clet alias or a generic type parameter, not a breaking change to the existing wire format.
+
+**Status.** Active. Revisit if users request decimal or date ranges before v0.5 schema-lock.
+
+**Pointers.** `src/Clet/Clets/Input/RangeClet.cs`, `src/Clet/Clets/Input/RangeView.cs`.
+
+---
+
+## D-010: `pick-file`/`pick-directory` run inline, not fullscreen (Active)
+
+**Context.** Spec implies file dialogs need fullscreen because `OpenDialog` is a TG `Dialog`. Early draft plan proposed adding a `RequiresFullscreen` property to `IClet`.
+
+**Decision.** File picker clets render inline by default with `Width = Dim.Fill, Height = Dim.Fill`. Users who want fullscreen pass `--fullscreen` (already handled by `AliasDispatcher` via `options.Fullscreen`). No `RequiresFullscreen` property added to `IClet` — the existing `--fullscreen` flag is sufficient.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Clets/Input/PickFileClet.cs`, `src/Clet/Clets/Input/PickDirectoryClet.cs`, `src/Clet/Hosting/AliasDispatcher.cs` (line 39 already checks `options.Fullscreen`).
+
+---
+
+## D-009: `multi-select` returns array of strings, not indices (Active)
+
+**Context.** Spec §4.3.2 says `multi-select` value shape is `array of integers (zero-based indices, ascending)`.
+
+**Decision.** Return array of selected label texts as a `JsonArray` of strings, not indices. Same reasoning as D-008: shell scripts and AI agents almost always want the label, not the index. Consistent with `select` returning text.
+
+**Status.** Active. Locked at v0.5 schema-lock.
+
+**Pointers.** `src/Clet/Clets/Input/MultiSelectClet.cs`.
+
+---
+
+## D-008: `select` returns text, not zero-based index (Active)
+
+**Context.** Spec §4.3.2 says `select` value shape is `integer` (zero-based index of the selected item).
+
+**Decision.** The v0.1 implementation returns the selected label text (`string?`), not the index. Rationale: shell scripts and AI agents almost always want the label, not the index. The index is recoverable from the choices list if needed. This is the shipped behavior since v0.1.
+
+**Status.** Active. Locked at v0.5 schema-lock.
+
+**Pointers.** `src/Clet/Clets/Input/SelectClet.cs`.
+
+---
+
 ## D-007: TUIcast keystroke smoke deferred from v0.11 to v0.3 (Active)
 
 **Context.** Spec §5.3 / §6.3 specify TUIcast (PTY-based, deterministic-script keystroke driver) as the process-level smoke harness. Issue #9 (v0.11) initially listed all six smoke cases including a `clet select --json` happy-path that requires an `Enter` keystroke through a PTY.
