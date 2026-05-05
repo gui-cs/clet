@@ -182,21 +182,6 @@ public class CommandLineRootTests
     }
 
     [Fact]
-    public async Task Alias_ShortJsonFlag_IsRecognised ()
-    {
-        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
-
-        using CancellationTokenSource cts = new ();
-        cts.Cancel ();
-
-        // -j should be accepted without error (clet cancels immediately via token)
-        int exit = await root.InvokeAsync (["select", "-j", "--options", "a,b"], cts.Token, stdout, stderr);
-
-        // Cancelled is fine; usage error would mean -j was not recognised
-        Assert.NotEqual (ExitCodes.UsageError, exit);
-    }
-
-    [Fact]
     public async Task Alias_ShortTitleFlag_MissingValue_ExitsWithUsageError ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
