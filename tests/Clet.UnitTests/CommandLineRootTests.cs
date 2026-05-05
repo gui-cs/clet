@@ -36,14 +36,16 @@ public class CommandLineRootTests
     }
 
     [Fact]
-    public async Task Version_PrintsAssemblyVersion ()
+    public async Task Version_PrintsCletAndTerminalGuiVersions ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
 
         int exit = await root.InvokeAsync (["--version"], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.Ok, exit);
-        Assert.Matches (@"^\d+\.\d+\.\d+\s*$", stdout.ToString ());
+        string output = stdout.ToString ();
+        Assert.Matches (@"(?m)^clet \d+\.\d+\.\d+\s*$", output);
+        Assert.Matches (@"(?m)^Terminal\.Gui \S+\s*$", output);
     }
 
     [Fact]
