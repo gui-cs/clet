@@ -6,6 +6,20 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
+
+**Context.** The original PR/FAQ pitched clet as a way to expose any Terminal.Gui View with `IValue<T>` to the shell automatically. v1.0 ships 15 hand-written clets instead. Spec §11 lays out what we learned, what full auto-discovery would require on both the TG side (a `[Shellable]` attribute or marker, wire-format declaration, initial-value parser, per-View option surface) and the clet side (a real source generator), and the cross-cutting cost (TG core would need to host clet-shaped opinions, schema-lock would couple to TG's `[Shellable]` surface).
+
+**Decision.** Don't pursue full auto-discovery in v1.x. Hand-written `BuiltInClets.RegisterAll` continues through v1.0. `Clet.SourceGen` stays as a placeholder (don't delete — it's a parking spot for the v2 reopen). The `[Clet("alias", typeof(TResult))]` attribute sketched in spec §4.5 is illustrative only; shipped code uses plain `IClet<TValue>` interface implementation. Revisit at v2 if and when third-party clets become a goal — at which point the TG-side asks (§11.3 A–E) become a co-design topic with TG core, with §11 as the starting checklist.
+
+**Why:** 15 clets at ~50–150 lines each ≈ 1500 LOC of mostly-metadata is not the bottleneck. Cross-cutting concerns (`--title`, scheme, link safety, exit codes) already live above the per-clet layer; auto-discovery wouldn't change that. The leverage of full auto-discovery only kicks in if a long tail of new TG Views or third-party Views want shell exposure post-v1.0 — both are explicitly out of scope today (§1, plugin loading exclusion in Appendix A). And introducing a `[Shellable]` attribute on TG core softens the §2 "nothing in TG core knows about clets" decision; that's a TG-side opinion-shift we shouldn't ask for without the v2 third-party-clets driver behind it.
+
+**How to apply:** Spec §11 is the canonical exploration. D-004 (source generator deferred) is **superseded by this entry** — D-004's "Pending — revisit before v0.3 GA" is now closed: the answer is "don't bother in v1.x." Bar-raise [#BR-11](https://github.com/gui-cs/clet/issues/11) ticked. v1.x refinements that pay down clet boilerplate without locking in a TG-side commitment (Options-declaration builder helper, generated §4.3.2 wire-format table, contract test for wire-format conformance) are listed in §11.5 and remain candidates for separate PRs.
+
+**Status.** Active. Supersedes D-004.
+
+**Pointers.** Spec §11 (full exploration), §11.5 (recommendation + v1.x refinements), §11.6 (open questions for v2). `src/Clet.SourceGen/` retained as placeholder. `src/Clet/Registry/BuiltInClets.cs` continues as hand-written. Bar-raise issue [#11](https://github.com/gui-cs/clet/issues/11) #BR-11.
+
 ## D-020: Continuous-release loop on TG develop + release; channel from version suffix (Active)
 
 **Context.** Spec §5.1 originally fired clet's release workflow on a single trigger: `repository_dispatch type=tg-released` from a TG release tag. That left the §8 develop-pin risk wide open — clet had to hand-pin `Terminal.Gui Version="2.0.2-develop.NN"` and bump manually whenever TG develop changed. It also left clet silent during the long stretches between TG releases, even when develop carries shippable improvements. We want clet to track TG continuously (every develop NuGet publish drives a clet prerelease) **and** still produce stable artifacts on TG release tags (Homebrew, WinGet, NuGet "latest"). See [issue #30](https://github.com/gui-cs/clet/issues/30) for the kicked-off plan.
@@ -198,15 +212,15 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Pointers.** `src/Clet/Abstractions/IClet.cs`, `src/Clet/Abstractions/BoxedCletResult.cs`, `src/Clet/Abstractions/IViewerClet.cs`.
 
-## D-004: Source generator deferred — `BuiltInClets.RegisterAll` hand-written (Pending)
+## D-004: Source generator deferred — `BuiltInClets.RegisterAll` hand-written (Superseded by D-021)
 
 **Context.** Spec §4.4 specifies a Roslyn source generator (`src/Clet.SourceGen`) that emits `BuiltInClets.RegisterAll(ICletRegistry)` from `[Clet("alias", typeof(TResult))]` attributes. The generator project landed in v0.1 as a placeholder; the actual generator is not implemented.
 
 **Decision.** Hand-write `Registry/BuiltInClets.cs` for now. As clets are added (v0.3 wave), keep registering them manually until the generator earns its keep. Bar-raise critique #11 questioned whether the generator is worth its complexity at all.
 
-**Status.** Pending — revisit before v0.3 GA. If hand-written stays clean at 14 clets, the generator may not be worth shipping.
+**Status.** Superseded by [D-021](#d-021-auto-discovered-clets-any-ivaluet-view-just-works-deferred-to-v2-active). The "revisit before v0.3 GA" trigger fired with the answer: don't bother in v1.x. The auto-discovery question is broader than just the source generator; D-021 captures the full design exploration and the deferral to v2.
 
-**Pointers.** `src/Clet/Registry/BuiltInClets.cs`, `src/Clet.SourceGen/Placeholder.cs`. Bar-raise [#BR-11 in the bar-raise backlog issue](https://github.com/gui-cs/clet/issues/11) tracks the "is this generator worth it?" question.
+**Pointers.** `src/Clet/Registry/BuiltInClets.cs`, `src/Clet.SourceGen/Placeholder.cs`. Bar-raise [#BR-11 in the bar-raise backlog issue](https://github.com/gui-cs/clet/issues/11) ticked.
 
 ## D-003: `range` clet emits `{"low": <T>, "high": <T>}` (Active)
 
