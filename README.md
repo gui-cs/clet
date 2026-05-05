@@ -1,11 +1,5 @@
 ![clet hero](https://github.com/user-attachments/assets/947d37af-81e9-430c-8d96-364387e923f1)
 
-```
-  ╔═╗╦  ╔═╗╔╦╗
-  ║  ║  ╠═  ║
-  ╚═╝╩═╝╚═╝ ╩
-```
-
 **One binary. Every prompt. JSON out. Go home.**
 
 Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a CLI command — typed inputs, a real file picker, a Markdown viewer — with consistent JSON output, predictable exit codes, and full keyboard/mouse support. Works for humans and AI agents alike.
