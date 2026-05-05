@@ -588,9 +588,11 @@ After all matrix jobs and smoke tests pass:
 - Use `wingetcreate update` with the GitHub token.
 - Manifest PR is auto-merged by Microsoft's bot if validation passes (otherwise paged).
 
-**.NET tool** (NuGet):
-- `dotnet pack` the `Clet.Tool` project (which references `Clet` and packages the build output as a global tool).
-- `dotnet nuget push` to nuget.org with the API key.
+**.NET tool** (NuGet) — follows the [mdv](https://github.com/gui-cs/mdv) packaging pattern (single project, `PackAsTool`):
+- The `src/Clet/Clet.csproj` carries the tool metadata directly — no separate `Clet.Tool` project. Required properties: `<PackAsTool>true</PackAsTool>`, `<ToolCommandName>clet</ToolCommandName>`, `<PackageId>Terminal.Gui.clet</PackageId>`, plus standard NuGet metadata (`Description`, `PackageReadmeFile`, `PackageLicenseFile`, `PackageProjectUrl`, `RepositoryUrl`, `RepositoryType`, `PackageTags`). README and LICENSE are packed via `<None Include="..." Pack="true" PackagePath="/" />`.
+- `dotnet pack -c Release src/Clet/Clet.csproj` produces `Terminal.Gui.clet.<version>.nupkg`.
+- `dotnet nuget push Terminal.Gui.clet.<version>.nupkg --source https://api.nuget.org/v3/index.json --api-key <key>`.
+- End-user install: `dotnet tool install -g Terminal.Gui.clet`. The tool command is `clet` (independent of the package id, matching the `mdv` / `Terminal.Gui.mdv` pattern). The packed tool is the framework-dependent IL build; the AOT single-file binary is a separate artifact shipped through Homebrew/WinGet (see D-019).
 
 ### 5.5 Failure handling
 
@@ -718,7 +720,7 @@ The legitimate worry that `InputInjection`-driven tests can drift from AOT behav
 | Mouse click      |       ☐        |   ☐    |        ☐         |       ☐        |
 | Inline restore   |       ☐        |   ☐    |        ☐         |       ☐        |
 
-Run before every minor release (v1.0, v1.1, ...). Captured in a release checklist issue. This is the v0.5 milestone gate.
+Run before every minor release (v1.0, v1.1, ...). Captured in a release checklist issue ([#23](https://github.com/gui-cs/clet/issues/23) tracks the first pass for v0.5). This is the v0.5 milestone gate.
 
 ### 6.6 AOT publish tests
 
@@ -758,7 +760,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 | **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
 | **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
 | **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. TUIcast keystroke harness wired up. |
-| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. **TG dependency on a release tag, not `*-develop.*`** (see §8 risks). |
+| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; `dotnet tool install -g Terminal.Gui.clet` packs and installs locally (mdv pattern, see D-019); Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. **TG dependency on a release tag, not `*-develop.*`** (see §8 risks). |
 | **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. |
 | **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
 
@@ -807,9 +809,10 @@ A suggested sequence (linear, not parallelizable until v0.3 except where noted):
 7. **Fourth wave:** `pick-directory`, `pick-file`. #5158 has landed on TG `develop` (§3.2); `FileDialog` typed result is `IReadOnlyList<string>?` (string for single-select wire format, array of strings for `--multi`, per §4.3.2).
 8. **`md` viewer clet.** First viewer clet; exercises the `IViewerClet` contract and the help-rendering pipeline (§4.7).
 9. **Release pipeline:** build matrix, signing, smoke gate.
-10. **Publish channels:** Homebrew first (lowest ops friction), then WinGet, then NuGet tool.
-11. **v0.5 gate:** four-terminal matrix run + threat model + locked schema + #5156 Markdown rendering tests landed in TG.
-12. RC and GA.
+10. **`dotnet tool` packaging:** add `PackAsTool`/`ToolCommandName`/`PackageId=Terminal.Gui.clet` to `src/Clet/Clet.csproj` (mdv pattern, D-019). `dotnet pack -c Release` produces a global-tool `.nupkg`; `dotnet tool install -g --add-source ./bin/Release Terminal.Gui.clet` works locally end-to-end. This is the lowest-friction install path and the first publish channel exercised before Homebrew/WinGet.
+11. **Publish channels:** Homebrew (lowest ops friction for native AOT bottle), then WinGet, then NuGet tool push.
+12. **v0.5 gate:** four-terminal matrix run + threat model + locked schema + #5156 Markdown rendering tests landed in TG.
+13. RC and GA.
 
 ---
 
