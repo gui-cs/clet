@@ -147,4 +147,26 @@ public class CommandLineRootTests
 
         Assert.Equal (ExitCodes.UsageError, exit);
     }
+
+    [Fact]
+    public async Task Alias_TitleMissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "--title"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--title", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task RootHelp_MentionsTitleFlag ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["--help"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Contains ("--title", stdout.ToString ());
+    }
 }

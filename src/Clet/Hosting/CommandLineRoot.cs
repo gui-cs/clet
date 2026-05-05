@@ -59,6 +59,7 @@ internal sealed class CommandLineRoot
     {
         string alias = args [0];
         string? initial = null;
+        string? title = null;
         bool jsonOutput = false;
         bool fullscreen = false;
         TimeSpan? timeout = null;
@@ -118,6 +119,20 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
+            if (arg == "--title")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    stderr.WriteLine ("error: --title requires a value.");
+
+                    return ExitCodes.UsageError;
+                }
+
+                title = args [++i];
+
+                continue;
+            }
+
             if (arg.StartsWith ("--", StringComparison.Ordinal))
             {
                 if (i + 1 >= args.Length)
@@ -140,6 +155,7 @@ internal sealed class CommandLineRoot
             JsonOutput = jsonOutput,
             Fullscreen = fullscreen,
             Timeout = timeout,
+            Title = title,
             CletOptions = cletOptions,
             Arguments = positionalArgs.Count > 0 ? positionalArgs : null,
         };
@@ -330,7 +346,7 @@ internal sealed class CommandLineRoot
         stdout.WriteLine ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents");
         stdout.WriteLine ();
         stdout.WriteLine ("Usage:");
-        stdout.WriteLine ("  clet <alias> [initial] [--json] [--timeout <duration>] [--fullscreen] [--<opt> <value>]...");
+        stdout.WriteLine ("  clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout <duration>] [--fullscreen] [--<opt> <value>]...");
         stdout.WriteLine ("  clet list [--json]");
         stdout.WriteLine ("  clet help <alias>");
         stdout.WriteLine ("  clet --help");
