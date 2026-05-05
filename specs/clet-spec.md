@@ -741,13 +741,14 @@ Run before every minor release (v1.0, v1.1, ...). Captured in a release checklis
 
 Schedule follows TG releases, not a calendar; no dates here.
 
-| Milestone | Exit criteria |
-|-----------|---------------|
-| **v0.1 alpha** | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. |
-| **v0.3 alpha** | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. |
-| **v0.5 beta** | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. |
-| **v0.9 RC** | All §6 test layers passing in CI. One real release cycle exercised end-to-end. |
-| **v1.0 GA** | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
+| Milestone | Tracking | Exit criteria |
+|-----------|----------|---------------|
+| **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
+| **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
+| **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. TUIcast keystroke harness wired up. |
+| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. **TG dependency on a release tag, not `*-develop.*`** (see §8 risks). |
+| **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. |
+| **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
 
 ---
 
