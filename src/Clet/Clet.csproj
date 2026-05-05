@@ -7,12 +7,28 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Clet</RootNamespace>
     <AssemblyName>clet</AssemblyName>
+
+    <!-- NativeAOT publish settings (apply only to `dotnet publish`, not `dotnet pack`/`dotnet build`). -->
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>false</InvariantGlobalization>
     <StackTraceSupport>true</StackTraceSupport>
     <DebuggerSupport>false</DebuggerSupport>
     <EventSourceSupport>false</EventSourceSupport>
     <UseSystemResourceKeys>true</UseSystemResourceKeys>
+
+    <!-- dotnet tool packaging (mdv pattern; see specs/decisions.md D-019). -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>clet</ToolCommandName>
+    <PackageId>Terminal.Gui.clet</PackageId>
+    <Version>0.5.0-alpha</Version>
+    <Authors>gui-cs</Authors>
+    <Description>Turns every Terminal.Gui View into a CLI command — typed inputs, a real file picker, a Markdown viewer — with consistent JSON output, predictable exit codes, and full keyboard/mouse support.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/gui-cs/clet</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/gui-cs/clet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>terminal-gui;tui;cli;prompt;json;agent;select;file-picker;markdown</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +37,11 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Help\*.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="/" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>
