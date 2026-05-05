@@ -4,7 +4,12 @@
 
 > **Audience:** the maintainer paged at 3am for a `clet` release that escaped the §5.3 smoke gate. Assume you did not ship the bad release. Assume you have repo-admin on `gui-cs/clet`, push access to `gui-cs/homebrew-tap`, the WinGet PR-author cred, and the NuGet API key in a known location.
 
-`clet` auto-publishes to **three** channels on every Terminal.Gui release: Homebrew (gui-cs tap), WinGet (`microsoft/winget-pkgs`), and NuGet (`Clet.Tool`). When the §5.3 smoke gate fails, the workflow halts and nothing reaches users — that case is an *aborted* release, not a *bad* release, and is out of scope for this runbook. This runbook covers the case where the gate let something through (a regression it didn't cover, a manifest bug, a signing failure mid-publish) and one or more channels carry a broken `clet`.
+`clet` auto-publishes to channels on **two triggers** (D-020):
+
+- **TG release tag** (stable channel): NuGet `Terminal.Gui.clet` (latest), Homebrew (gui-cs tap), WinGet (`microsoft/winget-pkgs`).
+- **TG develop NuGet publish** (develop channel): NuGet `Terminal.Gui.clet` prerelease only (off `latest`; opt-in via `--prerelease`).
+
+When the §5.3 smoke gate fails, the workflow halts and nothing reaches users — that case is an *aborted* release, not a *bad* release, and is out of scope for this runbook. This runbook covers the case where the gate let something through (a regression it didn't cover, a manifest bug, a signing failure mid-publish) and one or more channels carry a broken `clet`. **§2.4 covers the develop channel, which has different blast radius and SLAs.**
 
 ---
 
@@ -67,6 +72,18 @@ If you are not sure, rollback. Re-publishing later is cheap; pulling back a bad 
 3. Click **Unlist** and confirm. (`dotnet nuget delete` is a list-only op, equivalent — use the web UI for the audit trail.)
 4. Verify: `dotnet tool search clet` should not surface the bad version.
 5. **Do not request a hard-delete from NuGet support** unless there's a security/IP reason. Hard-delete breaks `dotnet restore` for anyone who pinned, and removes the audit trail.
+
+### 2.4 Develop channel (NuGet prerelease)
+
+**What's different:** Develop builds publish to NuGet only, as prerelease versions (`X.Y.Z-develop.NN`). They do **not** appear as `latest` to default `dotnet tool install` consumers — only `--prerelease` users see them. Blast radius is therefore much smaller than the release channel.
+
+**Steps when a develop build is bad:**
+
+1. **Default action: do nothing.** TG develop publishes ~5–15× per week. The next develop publish supersedes within hours, and `--prerelease` users self-select for accepting some breakage. Filing an `incident:develop` issue (the workflow already does this on failure) is enough.
+2. **Unlist only if** the bad build is causing active harm to a known user (data loss, hang, security issue) and the next develop publish is more than ~24 hours away. Procedure is identical to §2.3 — unlist via the NuGet web UI; do not hard-delete.
+3. **Do not roll back the TG develop publish itself.** TG's develop branch is upstream of clet's; clet should not push back into TG's release cadence. If the bad clet develop is caused by a bad TG develop, file the issue against TG.
+
+**What `--prerelease` consumers should expect:** the same risk profile as TG develop. We don't add a separate stability gate; we mirror what TG ships.
 
 ---
 

@@ -7,9 +7,10 @@ Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a C
 ## Install
 
 ```sh
-brew install gui-cs/tap/clet      # macOS / Linux
-winget install gui-cs.clet        # Windows 10/11
-dotnet tool install -g Terminal.Gui.clet  # any platform with .NET SDK
+brew install gui-cs/tap/clet                            # macOS / Linux (stable)
+winget install gui-cs.clet                              # Windows 10/11 (stable)
+dotnet tool install -g Terminal.Gui.clet                # any platform with .NET SDK (stable)
+dotnet tool install -g Terminal.Gui.clet --prerelease   # track TG develop builds
 ```
 
 ## What it replaces
@@ -113,6 +114,9 @@ Whatever theme is set in your TG `ConfigurationManager` applies to every clet au
 **Q: Do I need .NET installed?**
 **No** for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
 **Yes** for `dotnet tool install -g Terminal.Gui.clet`.
+
+**Q: What's the `--prerelease` channel?**
+Every Terminal.Gui develop NuGet publish triggers a matching `clet` prerelease push (versioned `2.x.y-develop.NN` to mirror TG's own develop versioning). Stable users see no churn — `dotnet tool install -g Terminal.Gui.clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship release builds. If you want the bleeding edge, pass `--prerelease`. See [D-020](specs/decisions.md#d-020) for the rationale.
 
 ---
 

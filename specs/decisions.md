@@ -8,6 +8,28 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-020: Continuous-release loop on TG develop + release; channel from version suffix (Active)
+
+**Context.** Spec §5.1 originally fired clet's release workflow on a single trigger: `repository_dispatch type=tg-released` from a TG release tag. That left the §8 develop-pin risk wide open — clet had to hand-pin `Terminal.Gui Version="2.0.2-develop.NN"` and bump manually whenever TG develop changed. It also left clet silent during the long stretches between TG releases, even when develop carries shippable improvements. We want clet to track TG continuously (every develop NuGet publish drives a clet prerelease) **and** still produce stable artifacts on TG release tags (Homebrew, WinGet, NuGet "latest"). See [issue #30](https://github.com/gui-cs/clet/issues/30) for the kicked-off plan.
+
+**Decision.**
+
+1. **Two dispatch types.** TG fires `tg-released` on release tags and `tg-develop-published` on every develop NuGet publish. Both carry `client_payload.tg_version`. clet's workflow accepts both.
+2. **Channel from version suffix.** `tg_version` containing `-` ⇒ develop channel; otherwise ⇒ release channel. No separate `channel` field needed — the version string already carries the signal, and SemVer prerelease semantics line up with NuGet's listing rules.
+3. **Per-channel publishing.** NuGet runs on both channels; Homebrew and WinGet run on release only. NuGet's prerelease semantics ensure `dotnet tool install -g Terminal.Gui.clet` resolves to stable; `--prerelease` opts into develop.
+4. **clet version = TG version verbatim.** No version negotiation, no compatibility matrix; the workflow passes `-p:Version=${{ env.TG_VERSION }}` to pack/publish.
+5. **Replace the hard-pinned `<PackageReference>` with an MSBuild variable.** `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`, with `<TerminalGuiVersion>` defaulted in the same `PropertyGroup` to a known-good develop build for local development. The workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls exactly the TG version named by the dispatch — no version drift between the package label and what's linked.
+
+**Why:** The previous "pin develop, replace with release tag at v0.5" plan put the release schedule in tension with TG's own. Mirroring TG's develop story directly removes that tension; consumers who want stability stay on stable, consumers who want early bits opt in. Publishing the same version string TG uses keeps the 1:1 promise from §5.6 honest in both directions.
+
+**How to apply:** Spec §5.1, §5.4, §5.5, §5.6, §7 v0.5 row, and §8 risks all updated in the same PR. The §8 develop-pin risk row is **resolved**; a new "develop publish volume" row is added in its place. Failure handling distinguishes channel: release failures page, develop failures don't (next develop supersedes within hours; spam-paging on every flake would be untenable).
+
+**Status.** Active. Pending TG-side work: a `notify-clet.yml` workflow on `gui-cs/Terminal.Gui` that fires both dispatches with a `CLET_DISPATCH_PAT` (tracked as a separate TG-side issue).
+
+**Pointers.** Spec §5.1, §5.4, §5.5, §5.6, §7, §8. `src/Clet/Clet.csproj` (`<TerminalGuiVersion>` + variable PackageReference). `.github/workflows/release-on-tg-release.yml` (renamed to `release-on-tg.yml`).
+
+---
+
 ## D-019: Distribute clet as a single-project `dotnet tool` (mdv pattern) (Active)
 
 **Context.** Spec §5.4 originally hand-waved at "the `Clet.Tool` project (which references `Clet` and packages the build output as a global tool)" — but no such project exists in the repo, and there is no need for one. The sibling [`gui-cs/mdv`](https://github.com/gui-cs/mdv) viewer ships as a single-csproj global tool: `<PackAsTool>true</PackAsTool>` + `<ToolCommandName>mdv</ToolCommandName>` + `<PackageId>Terminal.Gui.mdv</PackageId>` directly on the executable's csproj. Install command is `dotnet tool install -g Terminal.Gui.mdv`. clet should adopt the same pattern: a single csproj that produces both the AOT single-file binary (for Homebrew/WinGet) and a `dotnet tool` package (for the cross-platform `dotnet tool install` path).

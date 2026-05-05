@@ -497,32 +497,39 @@ Target binary size: ~8MB. Cold-start budget: <100ms on Apple Silicon, <150ms on 
 
 ### 5.1 Trigger
 
-When `gui-cs/Terminal.Gui` cuts a release (`v2.X.Y` tag pushed), a `repository_dispatch` event is sent to `gui-cs/clet`. The `release-on-tg-release.yml` workflow consumes it.
+`gui-cs/Terminal.Gui` fires a `repository_dispatch` to `gui-cs/clet` on **two** events: every `*-develop.NN` NuGet publish (continuous develop channel) and every release tag (stable channel). The `release-on-tg.yml` workflow consumes both. **Channel is derived from the version string:** if `tg_version` contains `-` (a SemVer prerelease suffix), the dispatch is treated as develop; otherwise it's a release. See [D-020](decisions.md#d-020) for the rationale.
 
 ```yaml
-# gui-cs/Terminal.Gui/.github/workflows/notify-clet-on-release.yml (NEW; only TG-side clet artifact)
+# gui-cs/Terminal.Gui/.github/workflows/notify-clet.yml (NEW; only TG-side clet artifact)
 on:
   release:
-    types: [published]
+    types: [published]                # stable channel
+  workflow_run:
+    workflows: ["Publish develop NuGet"]
+    types: [completed]                # develop channel
 jobs:
   notify-clet:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.CLET_DISPATCH_PAT }}
           repository: gui-cs/clet
-          event-type: tg-released
-          client-payload: '{"tg_version": "${{ github.event.release.tag_name }}"}'
+          event-type: ${{ github.event_name == 'release' && 'tg-released' || 'tg-develop-published' }}
+          client-payload: |
+            {"tg_version": "${{ github.event.release.tag_name || github.event.workflow_run.head_commit.message }}"}
 ```
+
+The exact develop-channel hook into TG's existing publish workflow lives on the TG side; clet's contract is "you fire one of these two dispatches with a `tg_version`, we do the rest."
 
 ### 5.2 Build matrix
 
 ```yaml
-# gui-cs/clet/.github/workflows/release-on-tg-release.yml
+# gui-cs/clet/.github/workflows/release-on-tg.yml
 on:
   repository_dispatch:
-    types: [tg-released]
+    types: [tg-released, tg-develop-published]
 jobs:
   build:
     strategy:
@@ -576,19 +583,26 @@ Any failure halts the publish workflow. The maintainer is paged via the release 
 
 ### 5.4 Publish steps
 
-After all matrix jobs and smoke tests pass:
+After all matrix jobs and smoke tests pass. **Channel determines which publish steps run:**
 
-**Homebrew tap** (`gui-cs/homebrew-tap`):
+| Channel | Trigger | NuGet | Homebrew | WinGet | NuGet listing |
+|---------|---------|:-----:|:--------:|:------:|---------------|
+| Develop | `tg-develop-published` | ✅ | — | — | Prerelease (off `latest`) |
+| Release | `tg-released`          | ✅ | ✅ | ✅ | Stable (latest)            |
+
+The channel test is `if: ${{ !contains(env.TG_VERSION, '-') }}` for stable-only steps. NuGet's prerelease semantics surface develop builds only to consumers who pass `--prerelease`; `dotnet tool install -g Terminal.Gui.clet` continues to resolve the latest stable.
+
+**Homebrew tap** (`gui-cs/homebrew-tap`) — *release channel only*:
 - Generate `clet.rb` from `clet.rb.template` with new version + SHA256s for each bottle.
 - PR (or push-with-token) to the tap repo.
 - Verify with `brew install --build-bottle gui-cs/tap/clet` on a fresh runner.
 
-**WinGet** (PR to `microsoft/winget-pkgs`):
+**WinGet** (PR to `microsoft/winget-pkgs`) — *release channel only*:
 - Generate manifests from templates with new version + installer URLs + SHA256s.
 - Use `wingetcreate update` with the GitHub token.
 - Manifest PR is auto-merged by Microsoft's bot if validation passes (otherwise paged).
 
-**.NET tool** (NuGet) — follows the [mdv](https://github.com/gui-cs/mdv) packaging pattern (single project, `PackAsTool`):
+**.NET tool** (NuGet) — *both channels*; follows the [mdv](https://github.com/gui-cs/mdv) packaging pattern (single project, `PackAsTool`):
 - The `src/Clet/Clet.csproj` carries the tool metadata directly — no separate `Clet.Tool` project. Required properties: `<PackAsTool>true</PackAsTool>`, `<ToolCommandName>clet</ToolCommandName>`, `<PackageId>Terminal.Gui.clet</PackageId>`, plus standard NuGet metadata (`Description`, `PackageReadmeFile`, `PackageLicenseFile`, `PackageProjectUrl`, `RepositoryUrl`, `RepositoryType`, `PackageTags`). README and LICENSE are packed via `<None Include="..." Pack="true" PackagePath="/" />`.
 - `dotnet pack -c Release src/Clet/Clet.csproj` produces `Terminal.Gui.clet.<version>.nupkg`.
 - `dotnet nuget push Terminal.Gui.clet.<version>.nupkg --source https://api.nuget.org/v3/index.json --api-key <key>`.
@@ -597,14 +611,17 @@ After all matrix jobs and smoke tests pass:
 ### 5.5 Failure handling
 
 If any publish step fails:
-- The workflow opens an issue in `gui-cs/clet` titled `Release v<TG_VERSION> failed at <step>`.
-- Tags the maintainer team.
+- The workflow opens an issue titled `Release v<TG_VERSION> failed (<channel>)`. Channel is `release` or `develop`.
+- Labels reflect channel: release failures get `incident:release`, develop failures get `incident:develop`.
+- **Pager behavior differs by channel.** Release failures page; develop failures don't (next develop publish supersedes within hours, and per-merge develops would page-spam). If develop incidents accumulate (>5/week), file a follow-up to investigate root cause.
 - Already-published channels are noted; rollback is manual (we don't auto-revert).
 - The smoke-test step ensures broken binaries never hit a channel; failures here are most often manifest/signing problems, not runtime regressions.
 
 ### 5.6 Version 1:1 with TG
 
-The `Clet.csproj` `Version` property is set at build time from the dispatch payload's `tg_version`. There is no version negotiation, no compatibility matrix, no "clet 1.5 supports TG 2.3+." The pair is locked.
+clet's published version is the dispatch payload's `tg_version`, **verbatim including any prerelease suffix** (e.g. `2.0.2-develop.36` ⇒ clet `2.0.2-develop.36`; `2.1.0` ⇒ clet `2.1.0`). The workflow passes `-p:Version=${{ env.TG_VERSION }}` to both `dotnet pack` and `dotnet publish`. There is no version negotiation, no compatibility matrix, no "clet 1.5 supports TG 2.3+." The pair is locked.
+
+The csproj also declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between `tg_version` in the package label and what's actually linked. See [D-020](decisions.md#d-020).
 
 ---
 
@@ -760,7 +777,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 | **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
 | **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
 | **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. TUIcast keystroke harness wired up. |
-| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; `dotnet tool install -g Terminal.Gui.clet` packs and installs locally (mdv pattern, see D-019); Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. **TG dependency on a release tag, not `*-develop.*`** (see §8 risks). |
+| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; `dotnet tool install -g Terminal.Gui.clet` packs and installs locally (mdv pattern, see D-019); Homebrew tap and WinGet manifest in working draft form; **continuous-release loop wired up — every TG develop NuGet drives a clet prerelease push, every TG release tag drives a stable push** (D-020, supersedes the earlier "TG dep on a release tag" criterion); the gui-cs/clet release workflow proven against a real TG develop publish *and* a real TG release cut. |
 | **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. |
 | **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
 
@@ -774,7 +791,8 @@ Schedule follows TG releases, not a calendar; no dates here.
 | `FileDialog` typed-result refactor (§3.2) breaks downstream callers | Low | Medium | Coordinate with TG core team; flag as breaking in release notes; fix in-tree callers as part of the PR. |
 | Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + §6.8 dry-runs catch most issues pre-publish; `docs/runbooks/release-rollback.md` documents the response when a regression slips the gate and a published artifact must be withdrawn. |
 | Markdown View quality regression vs `glow` | Low | Medium | TG-side golden-file corpus (#5156); quarterly comparison run. |
-| TG `develop` carries #5157/#5158 but no release tag yet; clet pins to a `Terminal.Gui` `*-develop.*` preview NuGet | High (in-flight) | Low | Pin tracked in `src/Clet/Clet.csproj`; CI builds against the pinned preview. Pin is removed and replaced with the released TG version once TG cuts a tag. v0.5 schema-lock requires the pin to be gone; if it isn't, v0.5 is gated on TG releasing. |
+| ~~TG `develop` carries #5157/#5158 but no release tag yet; clet pins to a `Terminal.Gui` `*-develop.*` preview NuGet~~ | ~~High~~ | ~~Low~~ | **Resolved by D-020.** csproj uses `<PackageReference Version="$(TerminalGuiVersion)" />` defaulting to a known-good develop build; the release workflow overrides this from the dispatch payload. There is no longer a "pinned develop" — the pair is whatever was dispatched. |
+| Develop publishes per TG merge create NuGet version sprawl | Medium | Low | NuGet handles the volume (TG itself does this); prerelease semantics keep develop builds off `latest`. NuGet versions are immutable so cleanup isn't possible — but isn't needed either. |
 | First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | §6.8 weekly dry-runs catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
 | Naming concerns about "clet" surfacing in support channels | Low | Low | Acknowledge in docs; outlast. |
 
@@ -799,7 +817,7 @@ A suggested sequence (linear, not parallelizable until v0.3 except where noted):
    - **#5158 `FileDialog` typed-result refactor** — **landed on `develop`** as `Dialog<IReadOnlyList<string>?>`. Wave 4 (`pick-file`/`pick-directory`) is unblocked.
    - **#5156 `Markdown` View golden-file rendering tests** — outstanding; independent quality work, prerequisite for the v0.5 `clet md` link-safety verification but not for any earlier milestone.
 
-   The `*-develop.*` NuGet pin must be replaced with a released TG version before v0.5 schema-lock; that's tracked as a §8 risk row.
+   The `*-develop.*` pin issue is resolved by D-020 — the csproj uses a `$(TerminalGuiVersion)` MSBuild variable, set at build time from the dispatch payload.
 
 2. **`gui-cs/clet` repo bootstrapped:** solution layout, abstractions, registry, JSON, source generator. CI on push (build, unit tests).
 3. **First clet: `select`.** A direct port of `Examples/InlineSelect/Program.cs` to a `SelectClet : IClet<int?>` using `RunnableWrapper<OptionSelector, int?>`. End-to-end through unit + integration tests + a manual run from a real shell. This proves the entire pipeline (registry, alias dispatch, output formatter, exit codes, JSON schema) on the simplest non-trivial clet shape.
