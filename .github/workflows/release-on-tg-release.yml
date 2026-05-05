@@ -28,8 +28,6 @@ jobs:
         include:
           - rid: osx-arm64
             runner: macos-14
-          - rid: osx-x64
-            runner: macos-13
           - rid: linux-x64
             runner: ubuntu-22.04
           - rid: win-x64
