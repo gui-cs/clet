@@ -8,6 +8,56 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-017: Link safety default is SurfaceOnly for `clet md` (Active)
+
+**Context.** Spec Appendix A defines a `SurfaceOnly` link policy: hyperlinks are displayed but never opened automatically. The mdv reference viewer already implements this pattern — `LinkClicked` shows the URL in the status bar and sets `e.Handled = true`. AI agents need predictable, safe behavior when running `clet md` on untrusted Markdown.
+
+**Decision.** Default link behavior is SurfaceOnly: clicking a link shows the URL in the status bar, nothing more. A future `--allow-link-open` clet option can opt in to opening links in the default browser. Not implemented at v0.5 — the safe default ships first.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Clets/Viewer/MarkdownClet.cs` (LinkClicked handler), spec Appendix A.
+
+---
+
+## D-016: Help rendering uses print mode, not interactive fullscreen (Active)
+
+**Context.** Spec §4.7 says help is "surfaced through the same dismissable, themed, scrollable viewer experience" as `clet md`. Taken literally, `clet --help` would open an interactive fullscreen TUI that blocks until the user presses `q`. This conflicts with CLI conventions: help must work in pipes (`clet --help | less`), must not block for user interaction, and AI agents read stdout non-interactively.
+
+**Decision.** `clet --help` and `clet help <alias>` render Markdown to ANSI escape sequences and write to stdout, then exit immediately. "Same code path" means the same `Markdown` rendering engine (Terminal.Gui's `Markdown` View with `TextMateSyntaxHighlighter`), not the same interactive fullscreen mode. The print-mode pipeline is adapted from mdv's `RenderMarkdown()`. Root help reads from an embedded `overview.md` resource; per-alias help is generated dynamically from `IClet` metadata.
+
+**Why:** CLI help must be non-interactive for pipes, redirection, and AI agent consumption.
+
+**How to apply:** Any future help-related changes should keep the print-mode pipeline. If interactive help browsing is desired, it should be a separate command (e.g., `clet browse-help`), not the default for `--help`.
+
+**Status.** Active. Spec §4.7 should be read as "same rendering engine" rather than "same interactive mode."
+
+**Pointers.** `src/Clet/Hosting/MarkdownHelpRenderer.cs`, `src/Clet/Hosting/CommandLineRoot.cs` (WriteRootHelp, WriteAliasHelp), `src/Clet/Help/overview.md`.
+
+---
+
+## D-015: `clet md` content source is file arguments + stdin at v0.5 (Active)
+
+**Context.** Spec §9 open question #4 asks whether `clet md` takes file arguments (`clet md README.md`), stdin (`cat README.md | clet md`), or both.
+
+**Decision.** Both, with the following precedence:
+1. File arguments in `options.Arguments` — treated as file paths or glob patterns, expanded and read.
+2. Inline content via `--initial` — rendered directly as Markdown text.
+3. Stdin if redirected (`Console.IsInputRedirected`) — read to end and render.
+4. If none, return `Error("io", "No file specified.")`.
+
+The file expansion logic (glob support, file-not-found warnings) is adapted from mdv's `ExpandFiles()`. Multi-file support uses a `DropDownList` in the status bar, also adapted from mdv.
+
+**Why:** Both input methods are expected by shell users and AI agents. File args are the primary use case; stdin enables piping.
+
+**How to apply:** This resolves spec §9 question #4. The content resolution precedence order is fixed for v1.0.
+
+**Status.** Active. Resolves spec §9 open question #4.
+
+**Pointers.** `src/Clet/Clets/Viewer/MarkdownClet.cs` (content resolution logic).
+
+---
+
 ## D-014: `--title` is a built-in CLI flag, not a per-clet option (Active)
 
 **Context.** Every input clet renders its `RunnableWrapper`/`OpenDialog` with a `Title` and falls back to a per-clet default ("Select an option…", "Enter a number…", etc.). All 14 clets honor `CletRunOptions.Title` if set. The CLI parser, however, had no way to populate it — `--title` was being routed into the per-clet `--<opt>` bucket where most clets ignored it.

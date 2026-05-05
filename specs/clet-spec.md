@@ -454,7 +454,7 @@ clet --version
 
 **Theming.** No `--theme` flag. Theme selection goes through `ConfigurationManager`'s existing mechanisms (config files, env var, system theme); `clet` honors whatever it resolves.
 
-**Help rendering.** `clet --help` and `clet help <alias>` render their content via Terminal.Gui's `Markdown` View, the same code path `clet md` uses. Help content is authored as Markdown under `src/Clet/Help/` (one file per alias plus a top-level overview), embedded as resources, and surfaced through the same dismissable, themed, scrollable viewer experience as `mdv` and the help system in `Examples/UICatalog`. This means help is browsable with the keys the user already knows.
+**Help rendering.** `clet --help` and `clet help <alias>` render Markdown to ANSI escape sequences and write to stdout (print mode), then exit immediately — they do not open an interactive viewer (see D-016). "Same code path" means the same Terminal.Gui `Markdown` rendering engine with `TextMateSyntaxHighlighter`, not the same interactive fullscreen mode. Root help reads from an embedded `src/Clet/Help/overview.md` resource; per-alias help is generated dynamically from `IClet` metadata by `MarkdownHelpRenderer.BuildAliasHelpMarkdown()`. This keeps help pipeable (`clet --help | less`) and consumable by AI agents reading stdout.
 
 ### 4.8 Exit code mapping
 
@@ -773,7 +773,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 1. **Telemetry.** The PR/FAQ mentions an opt-in usage ping. Spec deliberately does not include this in v1.0 scope; revisit at v1.1 with a privacy review.
 2. **Homebrew tap repo name.** `gui-cs/homebrew-tap` is assumed; confirm it exists or create.
 3. **Code signing certs.** Apple Developer ID and Authenticode certs are operational dependencies; confirm ownership/renewal process before v0.9.
-4. **`md` content source.** File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both? Both is implied; confirm CLI shape.
+4. **`md` content source.** ~~File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both?~~ **Resolved (D-015).** Both file arguments and stdin, with precedence: file args → `--initial` inline content → stdin → error.
 5. **PR/FAQ update upstream.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly (Tig's quote, the strategic FAQ). Update the issue body to match this spec before v0.5. (This repo's own README has been corrected to match.)
 
 ---

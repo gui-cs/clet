@@ -32,7 +32,7 @@ public class CommandLineRootTests
         int exit = await root.InvokeAsync (["--help"], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.Ok, exit);
-        Assert.Contains ("Usage:", stdout.ToString ());
+        Assert.Contains ("clet", stdout.ToString ());
     }
 
     [Fact]

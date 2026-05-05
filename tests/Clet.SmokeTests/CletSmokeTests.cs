@@ -31,7 +31,7 @@ public class CletSmokeTests
 
         Assert.Equal (0, exit);
         Assert.Empty (stderr);
-        Assert.Contains ("Usage:", stdout);
+        Assert.Contains ("clet", stdout);
         Assert.Contains ("select", stdout);
     }
 
@@ -66,6 +66,28 @@ public class CletSmokeTests
 
         Assert.Equal (2, exit);
         Assert.Contains ("unknown alias", stderr);
+    }
+
+    [Fact]
+    public async Task ListJson_IncludesMdViewer ()
+    {
+        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (["list", "--json"]);
+
+        Assert.Equal (0, exit);
+        Assert.Empty (stderr);
+        Assert.Contains ("\"alias\":\"md\"", stdout);
+        Assert.Contains ("\"kind\":\"viewer\"", stdout);
+    }
+
+    [Fact]
+    public async Task HelpAlias_Md_PrintsMdHelp ()
+    {
+        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (["help", "md"]);
+
+        Assert.Equal (0, exit);
+        Assert.Empty (stderr);
+        Assert.Contains ("md", stdout);
+        Assert.Contains ("Markdown", stdout);
     }
 
     [Fact (Skip = "Requires real TG run loop with cancellation; v0.3 TUIcast harness will drive this against the AOT'd binary.")]
