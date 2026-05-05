@@ -84,7 +84,6 @@ jobs:
   publish-nuget:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ env.TG_VERSION != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -112,7 +111,9 @@ jobs:
   publish-homebrew:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ env.TG_VERSION != '' }}
+    # Skip if HOMEBREW_TAP_TOKEN isn't set — the formula step is still a
+    # placeholder, no need to drag down the run when we can't check out the tap.
+    if: ${{ vars.HOMEBREW_TAP_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
