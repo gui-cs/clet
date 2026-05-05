@@ -51,6 +51,14 @@ internal sealed class PickFileClet : IClet<JsonNode?>
         };
         dialog.Border.Thickness = new Thickness (0, 1, 0, 0);
 
+        dialog.IsRunningChanged += (_, _) =>
+        {
+            if (dialog.IsRunning)
+            {
+                dialog.SchemeName = CletStyling.BaseSchemeName;
+            }
+        };
+
         if (startPath is not null)
         {
             dialog.Path = startPath;
