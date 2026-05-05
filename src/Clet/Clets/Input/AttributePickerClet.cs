@@ -44,6 +44,7 @@ internal sealed class AttributePickerClet : IClet<JsonObject?>
             Title = options.Title ?? "Pick text attributes (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
+            SchemeName = CletStyling.BaseSchemeName,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
 

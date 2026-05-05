@@ -51,6 +51,7 @@ internal sealed class RangeClet : IClet<JsonObject?>
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
             ResultExtractor = rv => rv.RangeResult,
+            SchemeName = CletStyling.BaseSchemeName,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
 

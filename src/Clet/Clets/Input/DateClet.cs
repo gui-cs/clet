@@ -42,6 +42,7 @@ internal sealed class DateClet : IClet<string?>
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
             ResultExtractor = p => p.Value,
+            SchemeName = CletStyling.BaseSchemeName,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
         wrapper.KeyBindings.Add (Key.Enter, Command.Accept);

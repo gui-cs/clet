@@ -40,6 +40,7 @@ internal sealed class ColorClet : IClet<string?>
             Title = options.Title ?? "Pick a color (Enter to accept, Esc to cancel)",
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
+            SchemeName = CletStyling.BaseSchemeName,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
 

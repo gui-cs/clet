@@ -53,6 +53,7 @@ internal sealed class DurationClet : IClet<string?>
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
             ResultExtractor = e => ((IValue<TimeSpan>)e).Value,
+            SchemeName = CletStyling.BaseSchemeName,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
         wrapper.KeyBindings.Add (Key.Enter, Command.Accept);

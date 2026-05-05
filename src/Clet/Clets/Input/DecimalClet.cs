@@ -55,6 +55,7 @@ internal sealed class DecimalClet : IClet<decimal?>
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
             ResultExtractor = s => s.Value,
+            SchemeName = CletStyling.BaseSchemeName,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
         wrapper.KeyBindings.Add (Key.Enter, Command.Accept);
