@@ -2,16 +2,12 @@ using Xunit;
 
 namespace Clet.SmokeTests;
 
-// v0.11 smoke matrix per issue #9: process-level invocation of the clet binary.
+// Smoke matrix: process-level invocation of the clet binary (Process.Start).
+// Tests assert on exit code + stdout/stderr. They do not synthesize keystrokes.
 //
-// Five of the six smoke cases land here. They use Process.Start and assert on
-// exit code + stdout/stderr. They do not synthesize keystrokes.
-//
-// The sixth case (`clet select --json` happy-path with an Enter keystroke) is
-// deferred to v0.3 when TUIcast is wired up — at v0.11 we have one input clet
-// (select), and standing up a PTY/keystroke harness for a single happy-path
-// case is not worth the dependency. v0.3 brings 13 more clets and TUIcast at
-// the same time per spec §6.3.
+// The keystroke-driven cancel case (SelectTimeout_EmitsCancelEnvelopeAndExits130)
+// is still skipped. TUIcast wiring was planned at v0.3 but deferred — see
+// decisions log D-007 and bar-raise backlog #BR-7.
 public class CletSmokeTests
 {
     [Fact]
@@ -90,12 +86,11 @@ public class CletSmokeTests
         Assert.Contains ("Markdown", stdout);
     }
 
-    [Fact (Skip = "Requires real TG run loop with cancellation; v0.3 TUIcast harness will drive this against the AOT'd binary.")]
+    [Fact (Skip = "Requires PTY + keystroke injection; deferred — see decisions log D-007 and bar-raise #BR-7.")]
     public Task SelectTimeout_EmitsCancelEnvelopeAndExits130 ()
     {
-        // Intentionally not implemented at v0.11. The cancellation contract is unit-tested in
-        // ExitCodesTests + OutputFormatterTests; a process-level test of the timeout path needs
-        // the TUIcast harness from v0.3 to drive the binary in a controlled environment.
+        // The cancellation contract is unit-tested in ExitCodesTests + OutputFormatterTests.
+        // A process-level test needs a PTY harness (TUIcast or equivalent) to drive the binary.
         return Task.CompletedTask;
     }
 }

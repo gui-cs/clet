@@ -8,6 +8,18 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-019: Source generator cancelled — `BuiltInClets.RegisterAll` is permanent (Active)
+
+**Context.** D-004 (below) deferred the Roslyn source generator with "revisit before v0.3 GA; if hand-written stays clean at 14 clets, the generator may not be worth shipping." We shipped v0.3 with 14 hand-written registrations, then v0.5 with 15 (adding `MarkdownClet`). The generator project remains a `Placeholder.cs` file with zero real code. Bar-raise backlog #BR-11 tracked the "is this worth it?" question.
+
+**Decision.** The source generator is cancelled for v1.0. The 15-registration hand-written file is readable, instantly greppable, trivially diffable, and has no AOT surface area. The generator would require bootstrapping a Roslyn analyzer, a test project, incremental compilation wiring, and a `[Clet]` attribute that is currently `internal` — all for the privilege of not writing 15 lines. The complexity/value ratio is clearly negative at this scale. `src/Clet.SourceGen/` will be deleted before v1.0 GA (a v0.9 cleanup item).
+
+**Status.** Active. Supersedes D-004. Resolves bar-raise #BR-11.
+
+**Pointers.** `src/Clet/Registry/BuiltInClets.cs` (15 hand-written registrations), `src/Clet.SourceGen/Placeholder.cs` (to be deleted).
+
+---
+
 ## D-018: ASCII logo wired into `--help` banner and README hero section (Active)
 
 **Context.** [Issue #12 (branding)](https://github.com/gui-cs/clet/issues/12) approved the three-line box-drawing logo and tagline "One binary. Every prompt. JSON out. Go home." and called for the logo to be wired into `clet --help` and the README hero section.
@@ -196,13 +208,13 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 ---
 
-## D-004: Source generator deferred — `BuiltInClets.RegisterAll` hand-written (Pending)
+## D-004: Source generator deferred — `BuiltInClets.RegisterAll` hand-written (Superseded by D-019)
 
 **Context.** Spec §4.4 specifies a Roslyn source generator (`src/Clet.SourceGen`) that emits `BuiltInClets.RegisterAll(ICletRegistry)` from `[Clet("alias", typeof(TResult))]` attributes. The generator project landed in v0.1 as a placeholder; the actual generator is not implemented.
 
 **Decision.** Hand-write `Registry/BuiltInClets.cs` for now. As clets are added (v0.3 wave), keep registering them manually until the generator earns its keep. Bar-raise critique #11 questioned whether the generator is worth its complexity at all.
 
-**Status.** Pending — revisit before v0.3 GA. If hand-written stays clean at 14 clets, the generator may not be worth shipping.
+**Status.** Superseded by D-019. D-019 is the final decision: generator cancelled, hand-written is permanent.
 
 **Pointers.** `src/Clet/Registry/BuiltInClets.cs`, `src/Clet.SourceGen/Placeholder.cs`. Bar-raise [#BR-11 in the bar-raise backlog issue](https://github.com/gui-cs/clet/issues/11) tracks the "is this generator worth it?" question.
 

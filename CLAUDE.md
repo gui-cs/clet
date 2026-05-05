@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is clet
 
-`clet` is a CLI tool that exposes Terminal.Gui Views as shell commands with typed, JSON-serializable results. It targets shells, scripts, and AI agents. The binary is a thin host: parse args, look up a clet alias in the registry, init Terminal.Gui, call `RunAsync`, serialize the result, exit. Currently at v0.1-alpha with one clet (`select`); v1.0 targets 14 input clets and 1 viewer clet (`md`).
+`clet` is a CLI tool that exposes Terminal.Gui Views as shell commands with typed, JSON-serializable results. It targets shells, scripts, and AI agents. The binary is a thin host: parse args, look up a clet alias in the registry, init Terminal.Gui, call `RunAsync`, serialize the result, exit. Currently at v0.5-beta with 15 clets (14 input + 1 viewer); v1.0 ships the same set with locked schema, proven release pipeline, and the TG `develop` pin replaced by a release tag.
 
 ## Build and Test
 
@@ -25,19 +25,19 @@ There is no separate lint step. CI runs on ubuntu-latest with `dotnet-quality: p
 
 Four projects in two repos (this repo only contains the `clet` side):
 
-- **`src/Clet/`** — The CLI executable (net10.0). Depends on `Terminal.Gui` v2 (preview NuGet, currently `2.0.2-develop.24` — pin tracked in `src/Clet/Clet.csproj`, must be replaced with a release tag before v0.5 schema-lock per spec §8 risks). All abstractions are `internal` (not published until v2 plugin system).
-- **`src/Clet.SourceGen/`** — Roslyn source generator for static clet registration (planned `[Clet]` attribute). Currently a placeholder; `BuiltInClets.RegisterAll` is hand-written until the generator earns its keep — see `specs/decisions.md` D-004.
+- **`src/Clet/`** — The CLI executable (net10.0). Depends on `Terminal.Gui` v2 (preview NuGet, currently `2.0.2-develop.24` — pin tracked in `src/Clet/Clet.csproj`; replacing it with a TG release tag was a v0.5 exit criterion that was not met, now a v0.9 blocker per spec §8). All abstractions are `internal` (not published until v2 plugin system).
+- **`src/Clet.SourceGen/`** — Roslyn source generator placeholder. The generator was never implemented; `BuiltInClets.RegisterAll` is hand-written and stays that way — see `specs/decisions.md` D-019 (supersedes D-004).
 - **`tests/Clet.UnitTests/`** — Registry, JSON schema, host pipeline (CommandLineRoot, OutputFormatter, ExitCodes, BuiltInClets) tests.
 - **`tests/Clet.IntegrationTests/`** — In-process tests that init Terminal.Gui (`Application.Create()`, `app.Init("ansi")`).
-- **`tests/Clet.SmokeTests/`** — Process-level smoke tests (`Process.Start` against the built `Clet.dll`). The keystroke-driven cases land at v0.3 with TUIcast — see `specs/decisions.md` D-007.
+- **`tests/Clet.SmokeTests/`** — Process-level smoke tests (`Process.Start` against the built `Clet.dll`). The keystroke-driven cancel case is still skipped; TUIcast wiring deferred past v0.3 — see `specs/decisions.md` D-007 and bar-raise backlog #BR-7.
 
 ### Key directory layout inside `src/Clet/`
 
 - `Abstractions/` — `IClet`, `IClet<TValue>`, `IViewerClet`, `ICletRegistry`, `CletKind`, `CletRunResult<T>`, `CletRunOptions`, `CletOptionDescriptor`, `BoxedCletResult` (non-generic dispatch type — see decisions D-005)
 - `Registry/` — `CletRegistry` (instance-based, case-insensitive alias lookup, duplicate protection); `BuiltInClets.RegisterAll` (manual registration; D-004)
 - `Json/` — `SchemaV1` (the JSON envelope) and `CletJsonContext` (source-generated System.Text.Json)
-- `Clets/Input/` — Input clet implementations (currently `SelectClet`)
-- `Clets/Viewer/` — Viewer clet implementations (planned: `md`)
+- `Clets/Input/` — Input clet implementations (14 clets: `SelectClet`, `TextClet`, `IntClet`, `DecimalClet`, `ConfirmClet`, `DateClet`, `TimeClet`, `DurationClet`, `ColorClet`, `MultiSelectClet`, `AttributePickerClet`, `PickFileClet`, `PickDirectoryClet`, `RangeClet`)
+- `Clets/Viewer/` — Viewer clet implementations (`MarkdownClet` — alias `md`)
 - `Hosting/` — `Program.cs` entry point, `CommandLineRoot` (hand-rolled CLI parser; D-006), `AliasDispatcher`, `OutputFormatter`, `ExitCodes`
 
 ### Core patterns

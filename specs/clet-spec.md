@@ -756,7 +756,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 | Milestone | Tracking | Exit criteria |
 |-----------|----------|---------------|
 | **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
-| **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
+| **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help shipped; Markdown-rendered help accelerated into this milestone (not v0.5 as originally planned). Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness still deferred — see [decisions log D-007](decisions.md)). |
 | **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. TUIcast keystroke harness wired up. |
 | **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; Homebrew tap and WinGet manifest in working draft form; the gui-cs/clet release workflow proven against a real TG release cut. **TG dependency on a release tag, not `*-develop.*`** (see §8 risks). |
 | **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. |
@@ -772,7 +772,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 | `FileDialog` typed-result refactor (§3.2) breaks downstream callers | Low | Medium | Coordinate with TG core team; flag as breaking in release notes; fix in-tree callers as part of the PR. |
 | Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + §6.8 dry-runs catch most issues pre-publish; `docs/runbooks/release-rollback.md` documents the response when a regression slips the gate and a published artifact must be withdrawn. |
 | Markdown View quality regression vs `glow` | Low | Medium | TG-side golden-file corpus (#5156); quarterly comparison run. |
-| TG `develop` carries #5157/#5158 but no release tag yet; clet pins to a `Terminal.Gui` `*-develop.*` preview NuGet | High (in-flight) | Low | Pin tracked in `src/Clet/Clet.csproj`; CI builds against the pinned preview. Pin is removed and replaced with the released TG version once TG cuts a tag. v0.5 schema-lock requires the pin to be gone; if it isn't, v0.5 is gated on TG releasing. |
+| TG `develop` pin not replaced at v0.5; clet still pins `Terminal.Gui` `2.0.2-develop.24` | High (ongoing) | Medium | v0.5 shipped with the pin intact (accepted risk). Blocking for v0.9: must pin to a TG release tag before RC. Tracked in `src/Clet/Clet.csproj`. |
 | First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | §6.8 weekly dry-runs catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
 | Naming concerns about "clet" surfacing in support channels | Low | Low | Acknowledge in docs; outlast. |
 
@@ -790,6 +790,8 @@ Schedule follows TG releases, not a calendar; no dates here.
 
 ## 10. Implementation Order
 
+Steps 1–11 are complete as of v0.5. Step 12 (RC/GA) targets v0.9–v1.0. This section is preserved for historical context; new contributors should read §7 milestones for current state.
+
 A suggested sequence (linear, not parallelizable until v0.3 except where noted):
 
 1. **TG-side prerequisites — status:**
@@ -797,7 +799,7 @@ A suggested sequence (linear, not parallelizable until v0.3 except where noted):
    - **#5158 `FileDialog` typed-result refactor** — **landed on `develop`** as `Dialog<IReadOnlyList<string>?>`. Wave 4 (`pick-file`/`pick-directory`) is unblocked.
    - **#5156 `Markdown` View golden-file rendering tests** — outstanding; independent quality work, prerequisite for the v0.5 `clet md` link-safety verification but not for any earlier milestone.
 
-   The `*-develop.*` NuGet pin must be replaced with a released TG version before v0.5 schema-lock; that's tracked as a §8 risk row.
+   The `*-develop.*` NuGet pin was not replaced at v0.5 (see updated §8 risk row); it must be replaced before v0.9 RC.
 
 2. **`gui-cs/clet` repo bootstrapped:** solution layout, abstractions, registry, JSON, source generator. CI on push (build, unit tests).
 3. **First clet: `select`.** A direct port of `Examples/InlineSelect/Program.cs` to a `SelectClet : IClet<int?>` using `RunnableWrapper<OptionSelector, int?>`. End-to-end through unit + integration tests + a manual run from a real shell. This proves the entire pipeline (registry, alias dispatch, output formatter, exit codes, JSON schema) on the simplest non-trivial clet shape.
