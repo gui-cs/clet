@@ -8,6 +8,96 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
+## D-014: `--title` is a built-in CLI flag, not a per-clet option (Active)
+
+**Context.** Every input clet renders its `RunnableWrapper`/`OpenDialog` with a `Title` and falls back to a per-clet default ("Select an option…", "Enter a number…", etc.). All 14 clets honor `CletRunOptions.Title` if set. The CLI parser, however, had no way to populate it — `--title` was being routed into the per-clet `--<opt>` bucket where most clets ignored it.
+
+**Decision.** `--title <text>` is parsed at the host level (`CommandLineRoot.DispatchAlias`) alongside `--initial`, `--json`, `--timeout`, `--fullscreen`, and stored as `CletRunOptions.Title`. Individual clets do **not** declare `title` in their `Options` list — adding it 14 times would be churn and the per-clet help would falsely imply each clet handles it differently.
+
+**Status.** Active. Listed in root help (§4.7).
+
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (`DispatchAlias` parsing + `WriteRootHelp`), `src/Clet/Abstractions/CletRunOptions.cs` (Title property), each clet's `Title = options.Title ?? "default"` line.
+
+---
+
+## D-013: All clet wrappers/dialogs render with `Schemes.Base` (Active)
+
+**Context.** By default a `RunnableWrapper` inherits the surrounding scheme; an `OpenDialog` calls `FileDialog.SetStyle()` which forces `SchemeName` to `Schemes.Dialog` once the dialog enters its running state — even if we set `Schemes.Base` in the object initializer. Without intervention, file/directory pickers render with a different palette than the other 12 inline clets.
+
+**Decision.** All clets set `SchemeName = CletStyling.BaseSchemeName` (resolves `SchemeManager.SchemesToSchemeName(Schemes.Base)`) on their wrapper/dialog. For `pick-file` and `pick-directory`, an `IsRunningChanged` handler re-applies `Schemes.Base` once the dialog has actually started running, working around `FileDialog.SetStyle()`'s `Base → Dialog` rewrite. The handler is **load-bearing** — deleting it silently regresses the file pickers to the dialog scheme.
+
+**Status.** Active. Revisit when Terminal.Gui exposes a way to opt out of `FileDialog.SetStyle()`'s scheme rewrite, at which point the handler can be replaced with the simpler initializer-only form.
+
+**Pointers.** `src/Clet/Hosting/CletStyling.cs`, `src/Clet/Clets/Input/PickFileClet.cs` (IsRunningChanged handler), `src/Clet/Clets/Input/PickDirectoryClet.cs` (same).
+
+---
+
+## D-012: Code signing deferred post-1.0 (Active)
+
+**Context.** Spec §5.2 calls for macOS (Developer ID + notarization) and Windows (Authenticode) code signing in the release pipeline. Apple Developer Program costs $99/yr; Azure Trusted Signing costs ~$10/mo. Homebrew bottles require signed binaries for Gatekeeper; unsigned binaries get quarantined.
+
+**Decision.** Defer all code signing until after v1.0, when adoption numbers justify the cost. At v0.5/v1.0:
+- Homebrew ships a **build-from-source formula** (no bottles, no signing needed; user's machine compiles via `dotnet publish`).
+- `dotnet tool install -g clet` works without signing (NuGet packages aren't gated by OS code signing).
+- WinGet can ship unsigned `.exe` with a SmartScreen warning; acceptable for early adopters.
+- Skip `scripts/sign-macos.sh` and `scripts/sign-windows.ps1` steps in release workflows.
+
+Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction, or when a corporate adopter requires signed binaries.
+
+**Status.** Active. Only three secrets needed at v0.5: `CLET_DISPATCH_PAT`, `NUGET_API_KEY`, `HOMEBREW_TAP_TOKEN`.
+
+**Pointers.** Spec §5.2 (build matrix signing steps), §5.4 (publish steps). `gui-cs/homebrew-tap` repo (must be created before v0.5).
+
+---
+
+## D-011: `range` is integer-only at v0.3 (Active)
+
+**Context.** Spec §4.3.2 defines the `range` value shape as `{"low": <T>, "high": <T>}` where `<T>` is the scalar of the underlying numeric/date/time type.
+
+**Decision.** At v0.3, `T = int` only. The `RangeClet` uses two `NumericUpDown<int>` controls. Decimal range and date/time range are deferred until demand exists — adding them later is a new clet alias or a generic type parameter, not a breaking change to the existing wire format.
+
+**Status.** Active. Revisit if users request decimal or date ranges before v0.5 schema-lock.
+
+**Pointers.** `src/Clet/Clets/Input/RangeClet.cs`, `src/Clet/Clets/Input/RangeView.cs`.
+
+---
+
+## D-010: `pick-file`/`pick-directory` run inline, not fullscreen (Active)
+
+**Context.** Spec implies file dialogs need fullscreen because `OpenDialog` is a TG `Dialog`. Early draft plan proposed adding a `RequiresFullscreen` property to `IClet`.
+
+**Decision.** File picker clets render inline by default with `Width = Dim.Fill, Height = Dim.Fill`. Users who want fullscreen pass `--fullscreen` (already handled by `AliasDispatcher` via `options.Fullscreen`). No `RequiresFullscreen` property added to `IClet` — the existing `--fullscreen` flag is sufficient.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Clets/Input/PickFileClet.cs`, `src/Clet/Clets/Input/PickDirectoryClet.cs`, `src/Clet/Hosting/AliasDispatcher.cs` (line 39 already checks `options.Fullscreen`).
+
+---
+
+## D-009: `multi-select` returns array of strings, not indices (Active)
+
+**Context.** Spec §4.3.2 says `multi-select` value shape is `array of integers (zero-based indices, ascending)`.
+
+**Decision.** Return array of selected label texts as a `JsonArray` of strings, not indices. Same reasoning as D-008: shell scripts and AI agents almost always want the label, not the index. Consistent with `select` returning text.
+
+**Status.** Active. Locked at v0.5 schema-lock.
+
+**Pointers.** `src/Clet/Clets/Input/MultiSelectClet.cs`.
+
+---
+
+## D-008: `select` returns text, not zero-based index (Active)
+
+**Context.** Spec §4.3.2 says `select` value shape is `integer` (zero-based index of the selected item).
+
+**Decision.** The v0.1 implementation returns the selected label text (`string?`), not the index. Rationale: shell scripts and AI agents almost always want the label, not the index. The index is recoverable from the choices list if needed. This is the shipped behavior since v0.1.
+
+**Status.** Active. Locked at v0.5 schema-lock.
+
+**Pointers.** `src/Clet/Clets/Input/SelectClet.cs`.
+
+---
+
 ## D-007: TUIcast keystroke smoke deferred from v0.11 to v0.3 (Active)
 
 **Context.** Spec §5.3 / §6.3 specify TUIcast (PTY-based, deterministic-script keystroke driver) as the process-level smoke harness. Issue #9 (v0.11) initially listed all six smoke cases including a `clet select --json` happy-path that requires an `Enter` keystroke through a PTY.
