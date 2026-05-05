@@ -169,4 +169,52 @@ public class CommandLineRootTests
         Assert.Equal (ExitCodes.Ok, exit);
         Assert.Contains ("--title", stdout.ToString ());
     }
+
+    [Fact]
+    public async Task List_ShortJsonFlag_EmitsJson ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["list", "-j"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.Contains ("\"schemaVersion\":1", stdout.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_ShortJsonFlag_IsRecognised ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        using CancellationTokenSource cts = new ();
+        cts.Cancel ();
+
+        // -j should be accepted without error (clet cancels immediately via token)
+        int exit = await root.InvokeAsync (["select", "-j", "--options", "a,b"], cts.Token, stdout, stderr);
+
+        // Cancelled is fine; usage error would mean -j was not recognised
+        Assert.NotEqual (ExitCodes.UsageError, exit);
+    }
+
+    [Fact]
+    public async Task Alias_ShortTitleFlag_MissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "-t"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--title", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_ShortInitialFlag_MissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "-i"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--initial", stderr.ToString ());
+    }
 }
