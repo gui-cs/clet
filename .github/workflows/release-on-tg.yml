@@ -1,14 +1,18 @@
-name: Release on TG Release
+name: Release on TG
 
-# Triggered by repository_dispatch from gui-cs/Terminal.Gui when a release is published.
-# Also supports manual trigger for rollback patches (§5.4, runbook §3).
+# Triggered by repository_dispatch from gui-cs/Terminal.Gui:
+#   - tg-released:          on a TG release tag           → release channel (NuGet stable + Homebrew + WinGet)
+#   - tg-develop-published: on a TG develop NuGet publish → develop channel (NuGet prerelease only)
+# Channel is derived from the version string: contains '-' ⇒ develop, otherwise ⇒ release.
+# See specs/decisions.md D-020 for rationale.
+# Manual trigger (workflow_dispatch) is supported for rollback patches and dry-runs.
 on:
   repository_dispatch:
-    types: [tg-released]
+    types: [tg-released, tg-develop-published]
   workflow_dispatch:
     inputs:
       tg_version:
-        description: 'Terminal.Gui version (e.g. 2.0.3)'
+        description: 'Terminal.Gui version (e.g. 2.1.0 for release, 2.0.2-develop.36 for develop)'
         required: true
 
 permissions:
@@ -21,8 +25,7 @@ env:
 jobs:
   build:
     strategy:
-      # One bad RID shouldn't kill the others — we'd rather see all the failures
-      # in one run than chase one at a time.
+      # One bad RID shouldn't kill the others — surface all failures in one run.
       fail-fast: false
       matrix:
         include:
@@ -34,8 +37,7 @@ jobs:
             runner: windows-2022
           # linux-arm64 and win-arm64 need GitHub's native ARM runners
           # (ubuntu-22.04-arm, windows-11-arm); cross-compile from x64 fails at
-          # link time. Re-enable when wiring native ARM runners (tracked for
-          # v0.9 RC milestone, not blocking v0.5 dry-runs).
+          # link time. Re-enable when wiring native ARM runners (tracked for v0.9 RC).
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -46,15 +48,11 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: 'preview'
 
-      - name: Set version
-        run: echo "CLET_VERSION=${{ env.TG_VERSION }}" >> $GITHUB_ENV
-        shell: bash
-
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore -p:TerminalGuiVersion=${{ env.TG_VERSION }}
 
       - name: Build
-        run: dotnet build --no-restore -c Release
+        run: dotnet build --no-restore -c Release -p:TerminalGuiVersion=${{ env.TG_VERSION }} -p:Version=${{ env.TG_VERSION }}
 
       - name: Unit Tests
         run: dotnet run --project tests/Clet.UnitTests --no-build -c Release
@@ -68,6 +66,7 @@ jobs:
           -r ${{ matrix.rid }}
           --self-contained
           -p:PublishAot=true
+          -p:TerminalGuiVersion=${{ env.TG_VERSION }}
           -p:Version=${{ env.TG_VERSION }}
           -o publish/${{ matrix.rid }}
 
@@ -81,6 +80,8 @@ jobs:
           path: publish/${{ matrix.rid }}/
           retention-days: 30
 
+  # NuGet publish runs on BOTH channels. NuGet's prerelease semantics keep develop
+  # builds off `latest` automatically; consumers opt in via `--prerelease`.
   publish-nuget:
     needs: build
     runs-on: ubuntu-latest
@@ -96,8 +97,7 @@ jobs:
       - name: Pack
         run: >
           dotnet pack src/Clet -c Release
-          -p:PackAsTool=true
-          -p:ToolCommandName=clet
+          -p:TerminalGuiVersion=${{ env.TG_VERSION }}
           -p:Version=${{ env.TG_VERSION }}
           -o packages/
 
@@ -108,12 +108,13 @@ jobs:
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
+  # Homebrew runs on RELEASE channel only (no '-' in version).
+  # Skipped on develop, and on release if HOMEBREW_TAP_ENABLED isn't set
+  # (the formula step is still a placeholder; D-012).
   publish-homebrew:
     needs: build
     runs-on: ubuntu-latest
-    # Skip if HOMEBREW_TAP_TOKEN isn't set — the formula step is still a
-    # placeholder, no need to drag down the run when we can't check out the tap.
-    if: ${{ vars.HOMEBREW_TAP_ENABLED == 'true' }}
+    if: ${{ !contains(github.event.client_payload.tg_version || github.event.inputs.tg_version, '-') && vars.HOMEBREW_TAP_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -133,19 +134,38 @@ jobs:
           echo "# and SHA256s from the downloaded artifacts."
           echo "# For now, Homebrew ships as build-from-source (D-012)."
 
+  # WinGet runs on RELEASE channel only.
+  publish-winget:
+    needs: build
+    runs-on: windows-latest
+    if: ${{ !contains(github.event.client_payload.tg_version || github.event.inputs.tg_version, '-') && vars.WINGET_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate manifests (placeholder)
+        run: |
+          Write-Host "# WinGet manifest generation placeholder"
+          Write-Host "# TODO: Generate from templates with version=${{ env.TG_VERSION }}"
+        shell: pwsh
+
   notify-failure:
-    needs: [build, publish-nuget, publish-homebrew]
+    needs: [build, publish-nuget, publish-homebrew, publish-winget]
     if: failure()
     runs-on: ubuntu-latest
     steps:
       - name: Create failure issue
         uses: actions/github-script@v7
+        env:
+          IS_DEVELOP: ${{ contains(github.event.client_payload.tg_version || github.event.inputs.tg_version, '-') }}
         with:
           script: |
+            const isDevelop = process.env.IS_DEVELOP === 'true';
+            const channel = isDevelop ? 'develop' : 'release';
+            const label = isDevelop ? 'incident:develop' : 'incident:release';
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Release v${process.env.TG_VERSION} failed`,
-              body: `The release workflow for TG version \`${process.env.TG_VERSION}\` failed.\n\nSee [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.\n\nRefer to \`docs/runbooks/release-rollback.md\` for rollback procedures.`,
-              labels: ['incident']
+              title: `Release v${process.env.TG_VERSION} failed (${channel})`,
+              body: `The ${channel} release workflow for TG version \`${process.env.TG_VERSION}\` failed.\n\nSee [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.\n\nRefer to \`docs/runbooks/release-rollback.md\` for rollback procedures.`,
+              labels: [label]
             });
