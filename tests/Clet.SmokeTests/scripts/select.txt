@@ -1,0 +1,7 @@
+# TUIcast keystroke script for `clet select`. Wired up at v0.3 when the §6.3
+# TUIcast harness lands. Empty placeholder so the scripts/ directory is in the
+# layout the spec calls for.
+#
+# Format (per TUIcast deterministic-script mode): comma-separated keystroke
+# tokens. Example for a happy-path Enter on the first option:
+#   wait:200,Enter

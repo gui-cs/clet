@@ -1,0 +1,91 @@
+# clet design decisions log
+
+Cross-cutting decisions that don't fit cleanly into a single milestone issue or a single spec section. New entries go on top. Each entry is short by design — context, decision, status, and a pointer to where it took effect.
+
+When a decision changes, **don't edit the entry** — add a new one above it that supersedes the old, and mark the old one `Superseded by #N`. The log is append-only so future agents can see what was tried.
+
+Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
+
+---
+
+## D-007: TUIcast keystroke smoke deferred from v0.11 to v0.3 (Active)
+
+**Context.** Spec §5.3 / §6.3 specify TUIcast (PTY-based, deterministic-script keystroke driver) as the process-level smoke harness. Issue #9 (v0.11) initially listed all six smoke cases including a `clet select --json` happy-path that requires an `Enter` keystroke through a PTY.
+
+**Decision.** Land five of the six smoke cases at v0.11 using `Process.Start` (no PTY: `--version`, `--help`, `list --json`, `help select`, `help <unknown>`). Defer the keystroke-driven cases (happy-path Enter, `--timeout 100ms` cancel envelope) to v0.3, where 13 more clets land at the same time and TUIcast pays for its dependency cost. The cancel/timeout *behavior* is unit-tested at v0.11 (`OutputFormatterTests`, `CommandLineRootTests`, `ExitCodesTests`); only the process-level wiring is deferred.
+
+**Status.** Active. `tests/Clet.SmokeTests/scripts/select.txt` placeholder is in place so the v0.3 wire-up is a content edit, not a layout change. Spec §5.3 / §6.3 still describe the full TUIcast harness — that's the v0.3 target, not v0.11 reality.
+
+**Pointers.** [Issue #9](https://github.com/gui-cs/clet/issues/9), `tests/Clet.SmokeTests/CletSmokeTests.cs` (the deliberately `[Fact(Skip=...)]` test).
+
+---
+
+## D-006: Hand-rolled CLI parser at v0.11 instead of System.CommandLine (Active)
+
+**Context.** Spec §4.6 names `System.CommandLine` (SCL) as the CLI root. SCL is in long-running beta and its API has churned across `2.0.0-beta4`, `beta5`, `beta6` (2022–2025).
+
+**Decision.** Hand-roll a ~300-line parser at v0.11 (`src/Clet/Hosting/CommandLineRoot.cs`). The v0.11 surface is small: `--help`, `--version`, `help <alias>`, `list [--json]`, `<alias> [initial] [--json] [--timeout] [--<opt> <value>]`. The dependency churn isn't worth it for this surface size.
+
+**Status.** Active for v0.11. Revisit at **v0.3** if AOT polish needs SCL's reflection-free parsing or if the surface grows enough (more clets, more global flags) that hand-rolled stops being clean. If we swap, the call site is one constructor in `Program.Main`.
+
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs`. Spec §4.6 still names SCL — that's intent, not current code.
+
+---
+
+## D-005: Non-generic `IClet.RunBoxedAsync` via default interface methods (Active)
+
+**Context.** The host needs to dispatch any clet without knowing its `TValue` at compile time, but reflection-based generic dispatch isn't AOT-clean (and AOT lands at v0.3).
+
+**Decision.** Add a non-generic `Task<BoxedCletResult> RunBoxedAsync(...)` to `IClet`. Provide it as a default interface method on `IClet<T>` and `IViewerClet` that wraps the typed `RunAsync`. Concrete clets (`SelectClet`) get it for free; the host calls through `IClet`.
+
+**Status.** Active. `BoxedCletResult` is `(CletRunStatus, object? Value, string? ErrorCode, string? ErrorMessage)`.
+
+**Pointers.** `src/Clet/Abstractions/IClet.cs`, `src/Clet/Abstractions/BoxedCletResult.cs`, `src/Clet/Abstractions/IViewerClet.cs`.
+
+---
+
+## D-004: Source generator deferred — `BuiltInClets.RegisterAll` hand-written (Pending)
+
+**Context.** Spec §4.4 specifies a Roslyn source generator (`src/Clet.SourceGen`) that emits `BuiltInClets.RegisterAll(ICletRegistry)` from `[Clet("alias", typeof(TResult))]` attributes. The generator project landed in v0.1 as a placeholder; the actual generator is not implemented.
+
+**Decision.** Hand-write `Registry/BuiltInClets.cs` for now. As clets are added (v0.3 wave), keep registering them manually until the generator earns its keep. Bar-raise critique #11 questioned whether the generator is worth its complexity at all.
+
+**Status.** Pending — revisit before v0.3 GA. If hand-written stays clean at 14 clets, the generator may not be worth shipping.
+
+**Pointers.** `src/Clet/Registry/BuiltInClets.cs`, `src/Clet.SourceGen/Placeholder.cs`. Bar-raise [#BR-11 in the bar-raise backlog issue](https://github.com/gui-cs/clet/issues/11) tracks the "is this generator worth it?" question.
+
+---
+
+## D-003: `range` clet emits `{"low": <T>, "high": <T>}` (Active)
+
+**Context.** Spec §9 originally listed the `range` `value` shape as an open question (tuple vs object vs separate fields).
+
+**Decision.** Named object: `{"low": <T>, "high": <T>}` where `<T>` matches the range's underlying numeric/date/time type. Stable JSON across languages, self-documenting, easy to extend later (e.g., add `step`).
+
+**Status.** Active. Locked at v0.5 schema-lock per spec §4.3.2.
+
+**Pointers.** `specs/clet-spec.md` §4.3.2.
+
+---
+
+## D-002: Cancel envelope is `{"schemaVersion":1,"status":"cancelled"}` regardless of TG behavior (Active)
+
+**Context.** TG #5157 (now landed on develop) leaves "disposition of `IValue<T>.Value` after cancel" as a TG-internal decision. Clet's wire contract was at risk of being coupled to that decision.
+
+**Decision.** Decouple. On cancel, clet emits exactly `{"schemaVersion":1,"status":"cancelled"}` — no `value`, no `code`, no partial result — regardless of whether the underlying View's `IValue<T>.Value` is readable. TG's eventual answer is welcome but not load-bearing.
+
+**Status.** Active. Locked in spec §3.1 and §4.3.
+
+**Pointers.** `specs/clet-spec.md` §3.1, §4.3. `src/Clet/Json/SchemaV1.cs` `Cancelled()` factory.
+
+---
+
+## D-001: No `type` field on the JSON wire envelope (Active)
+
+**Context.** Press release originally showed `{"status":"ok","type":"System.String","value":"prod"}`. CLR-typed `type` field leaked .NET into a cross-language wire format that AI agents in any language consume.
+
+**Decision.** Drop `type` from the result envelope entirely. Result types are advertised once per alias by `clet list --json`; consumers cache the registry once per session and don't branch on per-call type names.
+
+**Status.** Active. Locked at schema v1 (spec §4.3, §4.3.1).
+
+**Pointers.** `specs/clet-spec.md` §4.3, §4.3.1. `README.md` lines 70 and 80 (envelope examples). `src/Clet/Json/SchemaV1.cs`.

@@ -10,6 +10,12 @@ internal interface IClet
     CletKind Kind { get; }
     Type ResultType { get; }
     IReadOnlyList<CletOptionDescriptor> Options { get; }
+
+    Task<BoxedCletResult> RunBoxedAsync (
+        IApplication app,
+        string? input,
+        CletRunOptions options,
+        CancellationToken cancellationToken);
 }
 
 internal interface IClet<TValue> : IClet
@@ -19,4 +25,15 @@ internal interface IClet<TValue> : IClet
         string? initial,
         CletRunOptions options,
         CancellationToken cancellationToken);
+
+    async Task<BoxedCletResult> IClet.RunBoxedAsync (
+        IApplication app,
+        string? input,
+        CletRunOptions options,
+        CancellationToken cancellationToken)
+    {
+        CletRunResult<TValue> result = await RunAsync (app, input, options, cancellationToken);
+
+        return new (result.Status, result.Value, result.ErrorCode, result.ErrorMessage);
+    }
 }

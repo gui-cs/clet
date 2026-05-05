@@ -9,4 +9,15 @@ internal interface IViewerClet : IClet
         string? content,
         CletRunOptions options,
         CancellationToken cancellationToken);
+
+    async Task<BoxedCletResult> IClet.RunBoxedAsync (
+        IApplication app,
+        string? input,
+        CletRunOptions options,
+        CancellationToken cancellationToken)
+    {
+        CletRunResult result = await RunAsync (app, input, options, cancellationToken);
+
+        return new (result.Status, null, result.ErrorCode, result.ErrorMessage);
+    }
 }
