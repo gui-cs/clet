@@ -46,7 +46,7 @@ internal sealed class PickFileClet : IClet<JsonNode?>
             Height = 25,
             AllowsMultipleSelection = multi,
             BorderStyle = LineStyle.Rounded,
-            ShadowStyle = ShadowStyles.None,
+            ShadowStyle = null,
         };
         dialog.Border.Thickness = new Thickness (0, 1, 0, 0);
 

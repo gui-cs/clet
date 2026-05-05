@@ -39,7 +39,7 @@ internal sealed class PickDirectoryClet : IClet<string?>
             Height = 25,
             OpenMode = OpenMode.Directory,
             BorderStyle = LineStyle.Rounded,
-            ShadowStyle = ShadowStyles.None,
+            ShadowStyle = null,
         };
         dialog.Border.Thickness = new Thickness (0, 1, 0, 0);
 
