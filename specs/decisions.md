@@ -384,3 +384,15 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 **Status.** Active.
 
 **Pointers.** `src/Clet/Abstractions/CletRunOptions.cs`, `src/Clet/Hosting/CommandLineRoot.cs`, `src/Clet/Clets/Input/MultilineTextClet.cs`. Compare D-014 (`--title` as built-in flag).
+
+## D-027: `--cat` non-interactive stdout rendering for viewer clets (Active)
+
+**Context.** The `md` viewer clet renders in a fullscreen interactive TUI, but many workflows need formatted markdown dumped to a pipe — quick previews in CI logs, piping to a pager (`clet md --cat README.md | less -R`), or AI agents consuming human-readable output without driving a TUI (issue #29).
+
+**Decision.** Add `--cat` as a built-in CLI flag (like `--fullscreen` or `--json`). When passed to a viewer clet, it bypasses TUI initialization and renders content directly to stdout using `MarkdownHelpRenderer.RenderToAnsi` — the same ANSI rendering pipeline used by `clet --help`. Content is resolved from file arguments, `--initial`, or stdin (same sources as the normal viewer path). If no content is available, exits with usage error (exit 2). The flag is a no-op (ignored) for input clets.
+
+**Rationale.** Reuses the existing `MarkdownHelpRenderer.RenderToAnsi` infrastructure already proven for help rendering. The flag is host-level (not clet-specific) because the rendering bypass happens before the clet's `RunAsync` is called — the dispatcher short-circuits. Name `--cat` chosen for familiarity with the unix `cat` command.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Abstractions/CletRunOptions.cs` (`Cat` property), `src/Clet/Hosting/CommandLineRoot.cs` (parsing), `src/Clet/Hosting/AliasDispatcher.cs` (`ResolveViewerContent` + render bypass), spec §4.7.

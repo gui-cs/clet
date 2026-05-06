@@ -352,4 +352,48 @@ public class CommandLineRootTests
         Assert.Equal (ExitCodes.UsageError, exit);
         Assert.Contains ("invalid --initial value", stderr.ToString ());
     }
+
+    [Fact]
+    public async Task MdCat_WithInitial_RendersToStdoutAndExitsOk ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["md", "--cat", "--initial", "# Hello"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.Ok, exit);
+        Assert.NotEmpty (stdout.ToString ());
+        Assert.Empty (stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task MdCat_WithFile_RendersFileToStdout ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string tempFile = Path.GetTempFileName ();
+
+        try
+        {
+            File.WriteAllText (tempFile, "# Test File\n\nSome content.");
+
+            int exit = await root.InvokeAsync (["md", "--cat", tempFile], CancellationToken.None, stdout, stderr);
+
+            Assert.Equal (ExitCodes.Ok, exit);
+            Assert.NotEmpty (stdout.ToString ());
+        }
+        finally
+        {
+            File.Delete (tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task MdCat_NoContent_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["md", "--cat"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--cat requires content", stderr.ToString ());
+    }
 }

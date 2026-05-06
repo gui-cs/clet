@@ -38,6 +38,23 @@ internal sealed class AliasDispatcher
             ? CancellationTokenSource.CreateLinkedTokenSource (cancellationToken)
             : CancellationTokenSource.CreateLinkedTokenSource (cancellationToken, timeoutSource.Token);
 
+        // --cat mode: render viewer content directly to stdout without TUI
+        if (options.Cat && clet is IViewerClet)
+        {
+            string? markdown = ResolveViewerContent (initial, options);
+
+            if (markdown is null)
+            {
+                stderr.WriteLine ("error: --cat requires content via file arguments, --initial, or stdin.");
+
+                return ExitCodes.UsageError;
+            }
+
+            MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
+
+            return ExitCodes.Ok;
+        }
+
         BoxedCletResult result;
 
         {
@@ -66,5 +83,40 @@ internal sealed class AliasDispatcher
         OutputFormatter.Write (result, options.JsonOutput, stdout, stderr);
 
         return ExitCodes.FromResult (result);
+    }
+
+    /// <summary>
+    /// Resolves markdown content for --cat mode from file arguments, initial value, or stdin.
+    /// </summary>
+    private static string? ResolveViewerContent (string? initial, CletRunOptions options)
+    {
+        if (options.Arguments is { Count: > 0 } args)
+        {
+            List<string> contents = [];
+
+            foreach (string arg in args)
+            {
+                if (File.Exists (arg))
+                {
+                    contents.Add (File.ReadAllText (arg));
+                }
+            }
+
+            return contents.Count > 0 ? string.Join ("\n\n", contents) : null;
+        }
+
+        if (!string.IsNullOrEmpty (initial))
+        {
+            return initial;
+        }
+
+        if (Console.IsInputRedirected)
+        {
+            string stdinContent = Console.In.ReadToEnd ();
+
+            return string.IsNullOrEmpty (stdinContent) ? null : stdinContent;
+        }
+
+        return null;
     }
 }
