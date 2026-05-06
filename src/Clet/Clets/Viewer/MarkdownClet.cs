@@ -104,6 +104,15 @@ internal sealed class MarkdownClet : IViewerClet
             return new () { Status = CletRunStatus.Error, ErrorCode = "io", ErrorMessage = "No file specified. Usage: clet md <file.md>" };
         }
 
+        // Track current file directory for resolving relative links
+        string? currentFileDir = files.Count > 0 ? Path.GetDirectoryName (Path.GetFullPath (files [0])) : null;
+
+        // File access policy for link navigation (reuse the same confinement as file loading)
+        FileAccessPolicy linkPolicy = new (
+            Directory.GetCurrentDirectory (),
+            options.AllowedFiles,
+            options.AllowBinary);
+
         // Parse --theme option
         ThemeName syntaxTheme = ThemeName.DarkPlus;
 
@@ -139,6 +148,16 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.LinkClicked += (_, e) =>
         {
+            // Try to navigate to local .md files that pass the file access policy
+            if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath))
+            {
+                LoadFile (resolvedPath);
+                e.Handled = true;
+
+                return;
+            }
+
+            // SurfaceOnly: show URL in status bar, don't open
             statusShortcut.Title = e.Url;
             e.Handled = true;
         };
@@ -268,13 +287,81 @@ internal sealed class MarkdownClet : IViewerClet
 
         void LoadFile (string filePath)
         {
-            string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (filePath))!;
+            string fullPath = Path.GetFullPath (filePath);
+            string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (fullPath))!;
             markdownView.Text = fileContent;
 
-            FileInfo fileInfo = new (filePath);
+            currentFileDir = Path.GetDirectoryName (fullPath);
+
+            FileInfo fileInfo = new (fullPath);
             fileSizeShortcut.Title = FormatFileSize (fileInfo.Length);
-            statusShortcut.Title = Path.GetFileName (filePath);
+            statusShortcut.Title = Path.GetFileName (fullPath);
         }
+    }
+
+    /// <summary>
+    /// Resolves a link URL to a local markdown file path if it passes the file access policy.
+    /// </summary>
+    internal static bool TryResolveLocalMarkdownLink (
+        string url,
+        string currentDir,
+        FileAccessPolicy policy,
+        out string? resolvedPath)
+    {
+        resolvedPath = null;
+
+        // Strip fragment (e.g. #section)
+        int fragmentIndex = url.IndexOf ('#');
+        string pathPart = fragmentIndex >= 0 ? url [..fragmentIndex] : url;
+
+        if (string.IsNullOrWhiteSpace (pathPart))
+        {
+            return false;
+        }
+
+        // Handle file:// URIs
+        if (pathPart.StartsWith ("file://", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Uri.TryCreate (pathPart, UriKind.Absolute, out Uri? fileUri) || !fileUri.IsFile)
+            {
+                return false;
+            }
+
+            pathPart = fileUri.LocalPath;
+        }
+        // Reject non-local schemes (http://, https://, mailto:, etc.)
+        else if (pathPart.Contains ("://", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string fullPath;
+
+        try
+        {
+            fullPath = Path.IsPathRooted (pathPart)
+                ? Path.GetFullPath (pathPart)
+                : Path.GetFullPath (Path.Combine (currentDir, pathPart));
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (!File.Exists (fullPath))
+        {
+            return false;
+        }
+
+        // Delegate all security checks (extension, cwd confinement, binary, size) to the policy
+        if (policy.CheckFile (fullPath) is not null)
+        {
+            return false;
+        }
+
+        resolvedPath = fullPath;
+
+        return true;
     }
 
     private static List<string> ExpandFiles (IReadOnlyList<string> patterns, FileAccessPolicy policy, out string? error)
