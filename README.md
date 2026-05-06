@@ -2,7 +2,9 @@
 
 **One binary. Every prompt. JSON out. Go home.**
 
-Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a CLI command — typed inputs, a real file picker, a Markdown viewer — with consistent JSON output, predictable exit codes, and full keyboard/mouse support. Works for humans and AI agents alike.
+A `clet` is a CLI-let - Simple CLI commands that prompt the user with rich TUI (full mouse/keyboard), typed inputs, consistent JSON output and exit codes.
+
+Works for humans and AI agents alike.
 
 ## Install
 
