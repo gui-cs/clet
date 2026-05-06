@@ -21,7 +21,7 @@ public class FileAccessPolicySmokeTests
             return; // Skip if the file doesn't exist on this system
         }
 
-        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (
+        (int exit, _, string stderr) = await CletProcess.RunAsync (
             ["md", "--cat", systemFile]);
 
         // Should be refused — not in allowlist (.md/.markdown/.txt) or outside cwd
