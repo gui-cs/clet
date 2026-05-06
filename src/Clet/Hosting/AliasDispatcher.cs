@@ -43,16 +43,15 @@ internal sealed class AliasDispatcher
         {
             string? markdown = ResolveViewerContent (initial, options, stderr);
 
-            if (markdown is null)
+            if (markdown is not null)
             {
-                stderr.WriteLine ("error: --cat requires content via file arguments, --initial, or stdin.");
+                MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
 
-                return ExitCodes.UsageError;
+                return ExitCodes.Ok;
             }
 
-            MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
-
-            return ExitCodes.Ok;
+            // No static content resolved — fall through to RunAsync.
+            // The clet may handle --cat internally (e.g. HelpClet builds content dynamically).
         }
 
         BoxedCletResult result;

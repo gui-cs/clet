@@ -129,18 +129,6 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.LinkClicked += (_, e) =>
         {
-            // Check link resolver first (used by help navigation)
-            if (options.LinkResolver?.Invoke (e.Url) is { } resolved)
-            {
-                markdownView.Text = resolved.Markdown;
-                window.Title = resolved.Title;
-                fileSizeShortcut.Title = FormatFileSize (System.Text.Encoding.UTF8.GetByteCount (resolved.Markdown));
-                statusShortcut.Title = resolved.Title;
-                e.Handled = true;
-
-                return;
-            }
-
             statusShortcut.Title = e.Url;
             e.Handled = true;
         };

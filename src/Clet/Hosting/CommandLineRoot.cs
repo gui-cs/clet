@@ -44,26 +44,6 @@ internal sealed class CommandLineRoot
 
                 return ExitCodes.Ok;
 
-            case "help":
-            {
-                string? helpAlias = null;
-                bool helpCat = false;
-
-                for (int i = 1; i < args.Length; i++)
-                {
-                    if (args [i] is "--cat")
-                    {
-                        helpCat = true;
-                    }
-                    else
-                    {
-                        helpAlias = args [i];
-                    }
-                }
-
-                return await DispatchHelp (helpAlias, helpCat, cancellationToken, stdout, stderr);
-            }
-
             case "list":
                 return WriteList (args, stdout);
         }
@@ -80,11 +60,17 @@ internal sealed class CommandLineRoot
         string alias = args [0];
 
         // Support `clet <alias> help`, `clet <alias> --help`, `clet <alias> -h`
+        // Rewrite as `clet help <alias> [--cat]` and re-dispatch.
         if (args.Length >= 2 && args [1] is "help" or "--help" or "-h")
         {
-            bool helpCat = Array.Exists (args, a => a == "--cat");
+            List<string> helpArgs = ["help", alias];
 
-            return await DispatchHelp (alias, helpCat, cancellationToken, stdout, stderr);
+            if (Array.Exists (args, a => a == "--cat"))
+            {
+                helpArgs.Add ("--cat");
+            }
+
+            return await DispatchAlias (helpArgs.ToArray (), cancellationToken, stdout, stderr);
         }
 
         string? initial = null;
@@ -267,108 +253,6 @@ internal sealed class CommandLineRoot
         }
 
         return await _dispatcher.DispatchAsync (alias, initial, options, cancellationToken, stdout, stderr);
-    }
-
-    private async Task<int> DispatchHelp (
-        string? alias,
-        bool cat,
-        CancellationToken cancellationToken,
-        TextWriter stdout,
-        TextWriter stderr)
-    {
-        string markdown;
-        string title;
-
-        (markdown, title) = BuildHelpContent (alias, stderr, out int? earlyExit);
-
-        if (earlyExit is not null)
-        {
-            return earlyExit.Value;
-        }
-
-        if (cat)
-        {
-            MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
-
-            return ExitCodes.Ok;
-        }
-
-        // Build a link resolver so help pages can link to each other
-        (string Markdown, string Title)? ResolveHelpLink (string url)
-        {
-            if (!url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            // "clet:help" → overview, "clet:help:range" → alias help
-            string? linkAlias = url.Length > "clet:help:".Length
-                ? url ["clet:help:".Length..]
-                : null;
-
-            (string md, string t) = BuildHelpContent (linkAlias, stderr, out _);
-
-            return (md, t);
-        }
-
-        CletRunOptions options = new ()
-        {
-            Title = title,
-            LinkResolver = ResolveHelpLink,
-        };
-
-        return await _dispatcher.DispatchAsync ("md", markdown, options, cancellationToken, stdout, stderr);
-    }
-
-    private (string Markdown, string Title) BuildHelpContent (string? alias, TextWriter stderr, out int? earlyExit)
-    {
-        earlyExit = null;
-
-        if (alias == "help")
-        {
-            string helpMd = "# clet help\n\nNavigating clet's built-in help system.\n\n";
-            string? helpExtra = MarkdownHelpRenderer.ReadEmbeddedHelp ("help.md");
-
-            if (helpExtra is not null)
-            {
-                helpMd += helpExtra;
-            }
-
-            helpMd += "\n\n---\n\n[Back to overview](clet:help)\n";
-
-            return (helpMd, "clet help");
-        }
-
-        if (alias is not null)
-        {
-            if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
-            {
-                stderr.WriteLine ($"error: unknown alias '{alias}'. Try 'clet list' to see available clets.");
-                earlyExit = ExitCodes.UsageError;
-
-                return (string.Empty, string.Empty);
-            }
-
-            string md = MarkdownHelpRenderer.BuildAliasHelpMarkdown (clet);
-            md += $"\n\n---\n\n[Back to overview](clet:help)\n";
-
-            return (md, $"clet help {clet.PrimaryAlias}");
-        }
-
-        string? rawMarkdown = MarkdownHelpRenderer.ReadEmbeddedHelp ("overview.md");
-
-        if (rawMarkdown is null)
-        {
-            earlyExit = ExitCodes.Ok;
-
-            return ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents", "clet");
-        }
-
-        string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
-        string markdown = rawMarkdown.Replace ("{{CLET_TABLE}}", cletTable);
-        markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
-
-        return (markdown, "clet");
     }
 
     private int WriteList (string[] args, TextWriter stdout)
