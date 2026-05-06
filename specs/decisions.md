@@ -6,6 +6,20 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-022: `--rows` / `-r` is a built-in CLI flag, not a per-clet option (Active)
+
+**Context.** The `multiline-text` clet issue (#48) proposed `--rows` as a clet-specific option (in the `Options` list) to control the visible row height of the `TextView`. During implementation review, the requirement was broadened: `--rows` should work for any clet, not just `multiline-text`. The same "number of visible rows" concept is meaningful for other clets (e.g., `select`, `multi-select`).
+
+**Decision.** Add `--rows` / `-r` as a built-in global flag parsed by `CommandLineRoot.DispatchAlias`, alongside `--title`, `--initial`, `--json`, `--fullscreen`, and `--timeout`. Store the value in `CletRunOptions.Rows` (type `int?`). Each clet reads `options.Rows` and falls back to its own default. `MultilineTextClet` defaults to 5 rows. Other clets may adopt `options.Rows` in future PRs as needed.
+
+**Why:** Keeping `--rows` global is consistent with how `--title` was handled (D-014 — title is also conceptually per-clet but elevated to a universal flag because it applies uniformly). It avoids each clet that wants row control having to redeclare a `rows` option descriptor. It keeps the CLI surface predictable: any clet that renders a scrollable or variable-height view honours the same flag.
+
+**How to apply:** `CletRunOptions.Rows` added. `CommandLineRoot` now parses `--rows <n>` (n must be a positive integer) and `-r <n>`. Error message on missing or non-positive value. `MultilineTextClet` uses `options.Rows ?? 5`. Spec §4.7 updated to include `--rows <n>` in the CLI surface line.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Abstractions/CletRunOptions.cs`, `src/Clet/Hosting/CommandLineRoot.cs`, `src/Clet/Clets/Input/MultilineTextClet.cs`. Compare D-014 (`--title` as built-in flag).
+
 ## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
 
 **Context.** The original PR/FAQ pitched clet as a way to expose any Terminal.Gui View with `IValue<T>` to the shell automatically. v1.0 ships 15 hand-written clets instead. Spec §11 lays out what we learned, what full auto-discovery would require on both the TG side (a `[Shellable]` attribute or marker, wire-format declaration, initial-value parser, per-View option surface) and the clet side (a real source generator), and the cross-cutting cost (TG core would need to host clet-shaped opinions, schema-lock would couple to TG's `[Shellable]` surface).

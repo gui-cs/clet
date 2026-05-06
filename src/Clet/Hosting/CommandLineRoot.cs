@@ -64,6 +64,7 @@ internal sealed class CommandLineRoot
         bool jsonOutput = false;
         bool fullscreen = false;
         TimeSpan? timeout = null;
+        int? rows = null;
         Dictionary<string, string> cletOptions = new (StringComparer.OrdinalIgnoreCase);
         List<string> positionalArgs = [];
 
@@ -134,6 +135,27 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
+            if (arg is "--rows" or "-r")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    stderr.WriteLine ("error: --rows requires a value.");
+
+                    return ExitCodes.UsageError;
+                }
+
+                if (!int.TryParse (args [++i], out int parsedRows) || parsedRows < 1)
+                {
+                    stderr.WriteLine ($"error: invalid --rows value '{args [i]}'. Must be a positive integer.");
+
+                    return ExitCodes.UsageError;
+                }
+
+                rows = parsedRows;
+
+                continue;
+            }
+
             if (arg.StartsWith ("--", StringComparison.Ordinal))
             {
                 if (i + 1 >= args.Length)
@@ -157,6 +179,7 @@ internal sealed class CommandLineRoot
             Fullscreen = fullscreen,
             Timeout = timeout,
             Title = title,
+            Rows = rows,
             CletOptions = cletOptions,
             Arguments = positionalArgs.Count > 0 ? positionalArgs : null,
         };

@@ -322,6 +322,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emi
 | Alias                         | `value` shape                                                |
 |-------------------------------|--------------------------------------------------------------|
 | `text`                        | string                                                       |
+| `multiline-text`              | string (newlines preserved as `\n`)                          |
 | `int`                         | integer                                                      |
 | `decimal`                     | number (JSON number; consumer decides float vs decimal)      |
 | `confirm`                     | boolean                                                      |
@@ -433,7 +434,7 @@ internal static class Program
 ### 4.7 CLI surface
 
 ```
-clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--<opt> <value>]...
+clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--rows <n>] [--<opt> <value>]...
 clet list [--json]
 clet help <alias>
 clet --help
