@@ -6,7 +6,28 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
-## D-022: clet versions independently of Terminal.Gui (Active)
+## D-023: Two-branch versioning — main (alpha/stable) + develop (Supersedes D-022)
+
+**Context.** D-022 established independent versioning but treated `main` as the only branch. With the release workflow triggering on every push to `main`, merging any code change became an accidental release. TG itself uses a two-branch model (`main` for releases, `develop` for daily work) and we should mirror it.
+
+**Decision.** Two branches, two version channels:
+
+- **`main`** (release): produces `v{BASE}-{PHASE}.N` during prerelease phases (e.g. `v1.0.0-alpha.1`, `v1.0.0-alpha.2`) and `v{MAJOR}.{MINOR}.{PATCH}` once stable. Build number `N` auto-increments from the latest matching tag.
+- **`develop`** (default): produces `v{BASE}-develop.N` (e.g. `v1.0.0-develop.1`, `v1.0.0-develop.2`). Tracks main's base version from csproj `<Version>`.
+
+The csproj `<Version>` (e.g. `1.0.0-alpha`) controls the phase. To exit alpha: change to `1.0.0` and merge to main; the workflow produces `v1.0.0`. `develop` is the default GitHub branch; PRs target `develop`; merging `develop` → `main` is a deliberate release act.
+
+Both channels tag every build (needed for auto-increment). Both publish to NuGet (prerelease suffixes keep develop/alpha off `latest`). Homebrew/WinGet publish only on stable main releases (no `-` in version).
+
+**Why:** Prevents accidental releases from code merges. Mirrors TG's proven model. PRs get CI on `develop` without triggering the release pipeline.
+
+**Status.** Active. Supersedes D-022.
+
+**Pointers.** `.github/workflows/release.yml`, `.github/workflows/ci.yml` (PR targets both branches), `src/Clet/Clet.csproj` (`<Version>1.0.0-alpha</Version>`).
+
+---
+
+## D-022: clet versions independently of Terminal.Gui (Superseded by D-023)
 
 **Context.** The original spec (§1, §5.6, §7) tied clet's version 1:1 to Terminal.Gui's. D-020 point 4 made this explicit: "clet version = TG version verbatim." That made sense when clet was conceived as a TG satellite moving in lockstep. It's now clear this was a bad idea: clet has its own wire contract (`schemaVersion: 1`) that versioning should reflect; TG releases on its own cadence; and the develop NuGet builds (`2.0.0-develop.X`) polluted the package history with TG's version numbers.
 
@@ -16,7 +37,7 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Why:** With `schemaVersion: 1` as the public API surface, clet's major version should reflect schema stability, not TG's release cadence. Starting at `1.0.0` aligns with the JSON contract already locked. The develop-build NuGet pollution made the cost concrete. The pre-release `2.0.0-develop.X` builds will be unlisted on nuget.org.
 
-**Status.** Active. Supersedes D-020 point 4.
+**Status.** Superseded by D-023. The independent versioning principle remains; the branching model changed.
 
 **Pointers.** Spec §1, §4.7 (`--version` format), §5.6 (versioning), §4.3.1 (schema versioning policy). `src/Clet/Clet.csproj` (`<Version>`). `src/Clet/Hosting/CommandLineRoot.cs` (GetVersion + GetTerminalGuiVersion combined output). `.github/workflows/release.yml` (auto-increment logic).
 
