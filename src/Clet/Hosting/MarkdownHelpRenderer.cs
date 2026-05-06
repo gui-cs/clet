@@ -214,9 +214,11 @@ internal static class MarkdownHelpRenderer
 
         foreach (IClet clet in registry.All)
         {
+            string primaryLink = $"[`{clet.PrimaryAlias}`](clet:help:{clet.PrimaryAlias})";
+
             string aliases = clet.Aliases.Count <= 1
-                ? $"`{clet.PrimaryAlias}`"
-                : string.Join (", ", clet.Aliases.Select (a => $"`{a}`"));
+                ? primaryLink
+                : primaryLink + ", " + string.Join (", ", clet.Aliases.Skip (1).Select (a => $"`{a}`"));
 
             string options = BuildOptionsColumn (clet);
 

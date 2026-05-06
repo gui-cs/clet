@@ -279,37 +279,11 @@ internal sealed class CommandLineRoot
         string markdown;
         string title;
 
-        if (alias is not null)
+        (markdown, title) = BuildHelpContent (alias, stderr, out int? earlyExit);
+
+        if (earlyExit is not null)
         {
-            if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
-            {
-                stderr.WriteLine ($"error: unknown alias '{alias}'. Try 'clet list' to see available clets.");
-
-                return ExitCodes.UsageError;
-            }
-
-            markdown = MarkdownHelpRenderer.BuildAliasHelpMarkdown (clet);
-            title = $"clet help {clet.PrimaryAlias}";
-        }
-        else
-        {
-            string? rawMarkdown = MarkdownHelpRenderer.ReadEmbeddedHelp ("overview.md");
-
-            if (rawMarkdown is null)
-            {
-                stdout.WriteLine ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents");
-                stdout.WriteLine ();
-                stdout.WriteLine ("Usage: clet <alias> [options]");
-                stdout.WriteLine ("       clet list [--json]");
-                stdout.WriteLine ("       clet help <alias>");
-
-                return ExitCodes.Ok;
-            }
-
-            string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
-            markdown = rawMarkdown.Replace ("{{CLET_TABLE}}", cletTable);
-            markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
-            title = "clet";
+            return earlyExit.Value;
         }
 
         if (cat)
@@ -319,12 +293,67 @@ internal sealed class CommandLineRoot
             return ExitCodes.Ok;
         }
 
+        // Build a link resolver so help pages can link to each other
+        (string Markdown, string Title)? ResolveHelpLink (string url)
+        {
+            if (!url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            // "clet:help" → overview, "clet:help:range" → alias help
+            string? linkAlias = url.Length > "clet:help:".Length
+                ? url ["clet:help:".Length..]
+                : null;
+
+            (string md, string t) = BuildHelpContent (linkAlias, stderr, out _);
+
+            return (md, t);
+        }
+
         CletRunOptions options = new ()
         {
             Title = title,
+            LinkResolver = ResolveHelpLink,
         };
 
         return await _dispatcher.DispatchAsync ("md", markdown, options, cancellationToken, stdout, stderr);
+    }
+
+    private (string Markdown, string Title) BuildHelpContent (string? alias, TextWriter stderr, out int? earlyExit)
+    {
+        earlyExit = null;
+
+        if (alias is not null)
+        {
+            if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
+            {
+                stderr.WriteLine ($"error: unknown alias '{alias}'. Try 'clet list' to see available clets.");
+                earlyExit = ExitCodes.UsageError;
+
+                return (string.Empty, string.Empty);
+            }
+
+            string md = MarkdownHelpRenderer.BuildAliasHelpMarkdown (clet);
+            md += $"\n\n---\n\n[Back to overview](clet:help)\n";
+
+            return (md, $"clet help {clet.PrimaryAlias}");
+        }
+
+        string? rawMarkdown = MarkdownHelpRenderer.ReadEmbeddedHelp ("overview.md");
+
+        if (rawMarkdown is null)
+        {
+            earlyExit = ExitCodes.Ok;
+
+            return ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents", "clet");
+        }
+
+        string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
+        string markdown = rawMarkdown.Replace ("{{CLET_TABLE}}", cletTable);
+        markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
+
+        return (markdown, "clet");
     }
 
     private int WriteList (string[] args, TextWriter stdout)
