@@ -276,7 +276,7 @@ clet --version
   ╚═╝╩═╝╚═╝ ╩
 ```
 
-**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option. Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`). See [D-014](decisions.md) for why `--title` is a host flag.
+**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`, `md`); clets that do not consume positional args reject them with a usage error (exit 2) before the clet runs. See [D-025](decisions.md) for the `AcceptsPositionalArgs` design and [D-014](decisions.md) for why `--title` is a host flag.
 
 **Input-size caps.** `--initial` is capped at 64 K characters (code units). `clet md` stdin is capped at 8 M characters. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. These caps prevent OOM from untrusted piped input (see Appendix A). Per-clet options (`--<name> <value>`) are not yet capped; tracked as a follow-up.
 

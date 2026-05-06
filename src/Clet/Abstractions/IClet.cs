@@ -11,6 +11,13 @@ internal interface IClet
     Type ResultType { get; }
     IReadOnlyList<CletOptionDescriptor> Options { get; }
 
+    /// <summary>
+    /// Whether this clet consumes positional arguments. Defaults to <see langword="false"/>.
+    /// Clets that accept positional args (e.g. <c>select</c>, <c>multi-select</c>, <c>md</c>)
+    /// should override this to return <see langword="true"/>.
+    /// </summary>
+    bool AcceptsPositionalArgs => false;
+
     Task<BoxedCletResult> RunBoxedAsync (
         IApplication app,
         string? input,

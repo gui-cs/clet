@@ -61,4 +61,12 @@ public class MarkdownCletTests
         Assert.Equal ("theme", clet.Options [0].Name);
         Assert.False (clet.Options [0].Required);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsTrue ()
+    {
+        MarkdownClet clet = new ();
+
+        Assert.True (clet.AcceptsPositionalArgs);
+    }
 }

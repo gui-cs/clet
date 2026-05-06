@@ -197,6 +197,24 @@ internal sealed class CommandLineRoot
             Arguments = positionalArgs.Count > 0 ? positionalArgs : null,
         };
 
+        // Validate positional args before dispatching.
+        // Look up the clet here (cheap dictionary lookup) so we can gate on AcceptsPositionalArgs.
+        if (positionalArgs.Count > 0
+            && _registry.TryResolve (alias, out IClet? clet)
+            && clet is not null
+            && !clet.AcceptsPositionalArgs)
+        {
+            string joined = string.Join (" ", positionalArgs);
+            stderr.WriteLine ($"error: '{alias}' does not accept positional arguments: {joined}");
+
+            if (positionalArgs.Count == 1)
+            {
+                stderr.WriteLine ($"hint: did you mean 'clet {alias} --initial {positionalArgs [0]}'?");
+            }
+
+            return ExitCodes.UsageError;
+        }
+
         return await _dispatcher.DispatchAsync (alias, initial, options, cancellationToken, stdout, stderr);
     }
 

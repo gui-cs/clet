@@ -67,6 +67,21 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 
 **Pointers.** `.github/workflows/release.yml`, `.github/workflows/ci.yml` (PR targets both branches), `src/Clet/Clet.csproj` (`<Version>1.0.0-alpha</Version>`).
 
+---
+
+## D-025: Clets declare `AcceptsPositionalArgs`; non-positional clets reject them early (Active)
+
+**Context.** The CLI parser in `CommandLineRoot.DispatchAlias` collected all non-flag tokens into `CletRunOptions.Arguments` and forwarded them unconditionally. Clets that don't consume positional args (everything except `select`, `multi-select`, and `md`) silently ignored them, giving the user no feedback. `clet color - blue` would open the color picker as if the args weren't there. A bare `-` (common stdin convention) also fell through to positional args rather than being flagged.
+
+**Decision.** Add `bool AcceptsPositionalArgs { get; }` to the `IClet` interface with a default implementation of `false`. `SelectClet`, `MultiSelectClet`, and `MarkdownClet` override it to `true`. In `CommandLineRoot.DispatchAlias`, after parsing all args and before dispatching, the clet is resolved from the registry and checked: if `!clet.AcceptsPositionalArgs && positionalArgs.Count > 0`, emit an error to stderr (exit 2) without starting Terminal.Gui. When exactly one positional arg is present, a `hint:` line suggests the likely intended flag (`--initial`).
+
+**Why:** Early rejection in the CLI layer (before TUI init) keeps the feedback fast and the error message useful. The property approach is the simplest declaration that doesn't require clets to report "consumed" state after run. The three positional-consuming clets are known and stable; the default of `false` means new clets are safe by default.
+
+**How to apply.** `src/Clet/Abstractions/IClet.cs` — new default property. `src/Clet/Hosting/CommandLineRoot.cs` — early validation block. `SelectClet`, `MultiSelectClet`, `MarkdownClet` — explicit override. Spec §4.7 updated to describe the rejection. New unit tests in `CommandLineRootTests`, `SelectCletTests`, `MultiSelectCletTests`, `MarkdownCletTests`, `IntCletTests`.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Abstractions/IClet.cs`, `src/Clet/Hosting/CommandLineRoot.cs`, spec §4.7.
 ## D-022: clet versions independently of Terminal.Gui (Superseded by D-023)
 
 **Context.** The original spec (§1, §5.6, §7) tied clet's version 1:1 to Terminal.Gui's. D-020 point 4 made this explicit: "clet version = TG version verbatim." That made sense when clet was conceived as a TG satellite moving in lockstep. It's now clear this was a bad idea: clet has its own wire contract (`schemaVersion: 1`) that versioning should reflect; TG releases on its own cadence; and the develop NuGet builds (`2.0.0-develop.X`) polluted the package history with TG's version numbers.

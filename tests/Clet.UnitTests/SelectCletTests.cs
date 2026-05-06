@@ -53,4 +53,12 @@ public class SelectCletTests
         Assert.Equal ("options", clet.Options [0].Name);
         Assert.True (clet.Options [0].Required);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsTrue ()
+    {
+        SelectClet clet = new ();
+
+        Assert.True (clet.AcceptsPositionalArgs);
+    }
 }

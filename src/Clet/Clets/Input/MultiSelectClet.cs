@@ -19,6 +19,8 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
         new ("options", "o", typeof (string), "Comma-separated list of options to display.", true, null),
     ];
 
+    public bool AcceptsPositionalArgs => true;
+
     public async Task<CletRunResult<JsonArray?>> RunAsync (
         IApplication app,
         string? initial,

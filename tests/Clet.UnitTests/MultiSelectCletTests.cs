@@ -53,4 +53,12 @@ public class MultiSelectCletTests
         Assert.Equal ("options", clet.Options [0].Name);
         Assert.True (clet.Options [0].Required);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsTrue ()
+    {
+        MultiSelectClet clet = new ();
+
+        Assert.True (clet.AcceptsPositionalArgs);
+    }
 }

@@ -27,6 +27,8 @@ internal sealed class MarkdownClet : IViewerClet
             false, nameof (ThemeName.DarkPlus)),
     ];
 
+    public bool AcceptsPositionalArgs => true;
+
     public async Task<CletRunResult> RunAsync (
         IApplication app,
         string? content,
