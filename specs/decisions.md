@@ -6,6 +6,16 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-023: Input-size caps to prevent OOM from untrusted input (Active)
+
+**Context.** Appendix A of the spec names `--initial`, env vars, and stdin as untrusted inputs but specified no length caps. An agent piping a 4 GB log into `clet md -` would OOM the binary with no error message or exit code — just a dead process. Issue #38.
+
+**Decision.** Cap `--initial` at 64 K characters (enforced in `CommandLineRoot` argument parsing). Cap `clet md` stdin at 8 M characters (enforced in `MarkdownClet`'s content resolver). On exceed: exit 65 (validation), error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Both caps are documented in spec §4.7 and Appendix A. Caps are measured in .NET `char` count (UTF-16 code units), not bytes — this is faster and provides a solid OOM-protection bound even though the actual byte footprint varies with encoding. Per-clet options (`cletOptions` values) are not yet capped; tracked as a follow-up.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (MaxInitialChars constant + guard), `src/Clet/Clets/Viewer/MarkdownClet.cs` (MaxStdinChars + length-limited read), `specs/clet-spec.md` §4.7 + Appendix A.
+
 ## D-022: clet versions independently of Terminal.Gui (Active)
 
 **Context.** The original spec (§1, §5.6, §7) tied clet's version 1:1 to Terminal.Gui's. D-020 point 4 made this explicit: "clet version = TG version verbatim." That made sense when clet was conceived as a TG satellite moving in lockstep. It's now clear this was a bad idea: clet has its own wire contract (`schemaVersion: 1`) that versioning should reflect; TG releases on its own cadence; and the develop NuGet builds (`2.0.0-develop.X`) polluted the package history with TG's version numbers.

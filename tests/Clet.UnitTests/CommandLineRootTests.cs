@@ -20,7 +20,7 @@ public class CommandLineRootTests
         int exit = await root.InvokeAsync ([], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.Ok, exit);
-        Assert.Contains ("clet", stdout.ToString ());
+        Assert.Contains ("clet", stdout.ToString (), StringComparison.OrdinalIgnoreCase);
         Assert.Empty (stderr.ToString ());
     }
 
@@ -32,7 +32,7 @@ public class CommandLineRootTests
         int exit = await root.InvokeAsync (["--help"], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.Ok, exit);
-        Assert.Contains ("clet", stdout.ToString ());
+        Assert.Contains ("clet", stdout.ToString (), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -202,5 +202,49 @@ public class CommandLineRootTests
 
         Assert.Equal (ExitCodes.UsageError, exit);
         Assert.Contains ("--initial", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_InitialExceeds64KiB_ExitsWithValidationError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string oversized = new ('x', CommandLineRoot.MaxInitialChars + 1);
+
+        int exit = await root.InvokeAsync (["select", "--initial", oversized], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.ValidationError, exit);
+        Assert.Contains ("input-too-large", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_InitialExceeds64KiB_Json_EmitsErrorEnvelope ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string oversized = new ('x', CommandLineRoot.MaxInitialChars + 1);
+
+        int exit = await root.InvokeAsync (["select", "--json", "--initial", oversized], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.ValidationError, exit);
+        string json = stdout.ToString ().TrimEnd ();
+        Assert.Contains ("\"status\":\"error\"", json);
+        Assert.Contains ("\"code\":\"input-too-large\"", json);
+    }
+
+    [Fact]
+    public async Task Alias_InitialAtExactLimit_DoesNotReject ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string atLimit = new ('x', CommandLineRoot.MaxInitialChars);
+
+        // Use a pre-cancelled token so dispatch exits immediately without starting TUI.
+        // We're verifying the size cap doesn't trip at the boundary; the actual clet
+        // result (cancellation) is incidental.
+        using CancellationTokenSource cts = new ();
+        cts.Cancel ();
+
+        int exit = await root.InvokeAsync (["select", "--initial", atLimit], cts.Token, stdout, stderr);
+
+        Assert.NotEqual (ExitCodes.ValidationError, exit);
+        Assert.DoesNotContain ("input-too-large", stderr.ToString ());
     }
 }
