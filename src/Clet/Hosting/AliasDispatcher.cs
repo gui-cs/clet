@@ -41,7 +41,7 @@ internal sealed class AliasDispatcher
         // --cat mode: render viewer content directly to stdout without TUI
         if (options.Cat && clet is IViewerClet)
         {
-            string? markdown = ResolveViewerContent (initial, options);
+            string? markdown = ResolveViewerContent (initial, options, stderr);
 
             if (markdown is null)
             {
@@ -88,7 +88,7 @@ internal sealed class AliasDispatcher
     /// <summary>
     /// Resolves markdown content for --cat mode from file arguments, initial value, or stdin.
     /// </summary>
-    private static string? ResolveViewerContent (string? initial, CletRunOptions options)
+    private static string? ResolveViewerContent (string? initial, CletRunOptions options, TextWriter stderr)
     {
         if (options.Arguments is { Count: > 0 } args)
         {
@@ -98,7 +98,18 @@ internal sealed class AliasDispatcher
             {
                 if (File.Exists (arg))
                 {
-                    contents.Add (File.ReadAllText (arg));
+                    try
+                    {
+                        contents.Add (File.ReadAllText (arg));
+                    }
+                    catch (Exception ex)
+                    {
+                        stderr.WriteLine ($"Warning: Could not read file '{arg}': {ex.Message}");
+                    }
+                }
+                else
+                {
+                    stderr.WriteLine ($"Warning: File not found: {arg}");
                 }
             }
 
@@ -112,7 +123,26 @@ internal sealed class AliasDispatcher
 
         if (Console.IsInputRedirected)
         {
-            string stdinContent = Console.In.ReadToEnd ();
+            // Enforce the same 8 M character cap as MarkdownClet's stdin path
+            const int maxChars = MarkdownClet.MaxStdinChars;
+            char[] buffer = new char[maxChars + 1];
+            int totalRead = 0;
+            int charsRead;
+
+            while (totalRead <= maxChars
+                   && (charsRead = Console.In.Read (buffer, totalRead, buffer.Length - totalRead)) > 0)
+            {
+                totalRead += charsRead;
+            }
+
+            if (totalRead > maxChars)
+            {
+                stderr.WriteLine ("error: stdin exceeds the 8 M character limit.");
+
+                return null;
+            }
+
+            string stdinContent = new (buffer, 0, totalRead);
 
             return string.IsNullOrEmpty (stdinContent) ? null : stdinContent;
         }
