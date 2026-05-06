@@ -22,6 +22,13 @@ Tracks Terminal.Gui's `develop` channel — a new clet prerelease lands on NuGet
 dotnet tool install -g clet --prerelease
 ```
 
+> **zsh/bash users:** If `clet` isn't found after `dotnet tool install`, add the tools directory to your PATH:
+> ```sh
+> echo 'export PATH="$HOME/.dotnet/tools:$PATH"' >> ~/.zshrc  # or ~/.bashrc
+> source ~/.zshrc
+> ```
+> PowerShell does this automatically; zsh and bash do not.
+
 ## What it replaces
 
 | Task | Before `clet` | With `clet` |
