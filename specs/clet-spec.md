@@ -1,6 +1,6 @@
 # `clet` Implementation Spec
 
-**Status:** draft v0.4 · for review · companion to the PR/FAQ in [issue #5155](https://github.com/gui-cs/Terminal.Gui/issues/5155)
+**Status:** draft v0.5 · companion to the PR/FAQ in [issue #5155](https://github.com/gui-cs/Terminal.Gui/issues/5155)
 
 This is the implementation spec. It assumes the PR/FAQ is broadly accepted and covers what to build, where it lives, what changes in Terminal.Gui to support it, how it ships, and how it's tested.
 
@@ -8,11 +8,11 @@ This is the implementation spec. It assumes the PR/FAQ is broadly accepted and c
 
 ### In scope (v1.0)
 
-- New repo `gui-cs/clet` containing all clet code: abstractions, registry, JSON, source generator, built-in clets, CLI binary, native installer manifests, release automation.
+- New repo `gui-cs/clet` containing all clet code: abstractions, registry, JSON, source generator placeholder, built-in clets, CLI binary, release automation.
 - Targeted changes to `gui-cs/Terminal.Gui` core (§3) that benefit TG generally and unblock clet specifically.
 - Fourteen input clets and one viewer clet (`md`) statically registered in v1.0.
 - Native installer channels: Homebrew (gui-cs tap), WinGet, .NET tool. NativeAOT for native channels.
-- Auto-release workflow tied to TG releases. clet versions independently; major version tied to `schemaVersion` changes per §4.3.1.
+- Independent SemVer; major version tied to `schemaVersion` changes per §4.3.1 (see [D-022](decisions.md)).
 - JSON output contract (schemaVersion 1).
 - Inline input rendering; alt-screen viewer rendering.
 - Theming via TG's `ConfigurationManager`.
@@ -36,248 +36,141 @@ gui-cs/Terminal.Gui                           gui-cs/clet
 │     (core; §3 tweaks land here,             │   ├── Clet/
 │      no clet-specific types)                │   │     Abstractions/  (IClet, ICletRegistry, ...)
 ├── Tests/                                    │   │     Registry/
-│     (TG core tests only;                    │   │     Json/          (CletJsonContext, schema)
-│      clet tests live in gui-cs/clet)        │   │     Clets/Input/   (Text, PickFile, ...)
-└── .github/workflows/                        │   │     Clets/Viewer/  (Markdown)
-      notify-clet-on-release.yml (NEW)        │   │     Hosting/       (Program.cs, CLI)
-                                              │   └── Clet.SourceGen/  (build-time analyzer)
+│     (TG core tests only;                    │   │     Json/          (CletJsonContext, SchemaV1)
+│      clet tests live in gui-cs/clet)        │   │     Clets/Input/   (14 input clets)
+└── .github/workflows/                        │   │     Clets/Viewer/  (MarkdownClet)
+      notify-clet-on-release.yml (NEW)        │   │     Hosting/       (Program.cs, CLI parser)
+                                              │   │     Help/          (overview.md)
+                                              │   └── Clet.SourceGen/  (placeholder; D-021)
                                               ├── tests/
                                               │     Clet.UnitTests/
                                               │     Clet.IntegrationTests/
                                               │     Clet.SmokeTests/
-                                              │     Clet.ContractTests/
-                                              │     Clet.PerfTests/
-                                              ├── packaging/
-                                              │     homebrew/clet.rb.template
-                                              │     winget/manifests.template
-                                              │     dotnet-tool/Clet.Tool.csproj
-                                              ├── .github/workflows/
-                                              │     ci.yml
-                                              │     release-on-tg-release.yml
-                                              │     publish-homebrew.yml
-                                              │     publish-winget.yml
-                                              │     publish-nuget.yml
-                                              └── scripts/
-                                                    sign-macos.sh
-                                                    sign-windows.ps1
-                                                    notarize-macos.sh
-                                                    update-homebrew-tap.sh
+                                              │     Clet.UITests/
+                                              │     SPEC.md
+                                              ├── docs/
+                                              │     threat-model.md
+                                              │     runbooks/release-rollback.md
+                                              ├── specs/
+                                              │     clet-spec.md (this file)
+                                              │     decisions.md
+                                              │     press-release.md
+                                              └── .github/workflows/
+                                                    ci.yml
+                                                    release.yml
 ```
 
 **Process model.** The `clet` binary is a thin shell:
-1. Parses CLI args (System.CommandLine).
+1. Parses CLI args (hand-rolled parser — see [D-006](decisions.md)).
 2. Looks up the alias in its in-process `ICletRegistry`.
 3. Initializes a Terminal.Gui `IApplication`.
-4. Calls `clet.RunAsync(...)`.
+4. Calls `clet.RunBoxedAsync(...)`.
 5. Serializes the result, emits to stdout, exits with the right code.
 
 All of (3)+(4) is plain Terminal.Gui hosting against TG's public API. The clet itself is a Terminal.Gui View. Nothing in TG core knows about clets; nothing in clets requires private TG API.
 
 ### 2.1 Ownership
 
-**TG core** (rendering, drivers, Views, keybindings) → `gui-cs/Terminal.Gui` maintainers.  
-**CLI host, registry, JSON envelope, packaging, clets** → `gui-cs/clet` maintainers.  
-**Cross-repo bugs** file in `gui-cs/clet` first; the clet maintainer reproduces, isolates, and escalates upstream if the root cause is in TG core. A `clet` repro makes the upstream report self-contained.
+**TG core** (rendering, drivers, Views, keybindings) → `gui-cs/Terminal.Gui` maintainers.
+**CLI host, registry, JSON envelope, packaging, clets** → `gui-cs/clet` maintainers.
+**Cross-repo bugs** file in `gui-cs/clet` first; the clet maintainer reproduces, isolates, and escalates upstream if the root cause is in TG core.
 
 ## 3. Terminal.Gui Changes Required
 
-Most of what an early draft of this spec assumed would need to change in TG is already done or already tracked, including:
+All prerequisite TG changes have landed on `develop`:
 
-- **Inline rendering** is shipping today and exercised by `md`, the inline examples, and `gui-cs/ai`.
-- **AOT compatibility** is tracked in TG core; remaining issues surface most efficiently by building `clet` and running it. The AOT publish tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.7) are the discovery mechanism.
-- **`ConfigurationManager`** path-based loading is broadly used and tested.
-- **`Markdown` View** is vetted for the read-only, dismissable, themed shape clet needs.
-- **Terminal-driver inline-capable detection** is already in place.
+- **Inline rendering** — shipping and exercised by `md`, the inline examples, and `gui-cs/ai`.
+- **AOT compatibility** — tracked in TG core; remaining issues surface by building/running `clet`.
+- **`ConfigurationManager`** path-based loading — broadly used and tested.
+- **`Markdown` View** — vetted for the read-only, dismissable, themed shape clet needs.
+- **Terminal-driver inline-capable detection** — in place.
+- **`Application.RunAsync(Toplevel, CancellationToken)`** ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)) — landed. Clet binds directly.
+- **`FileDialog` typed result** ([#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) — landed as `Dialog<IReadOnlyList<string>?>`.
 
-The two items previously outstanding ([#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157) and [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)) have **landed on TG `develop`**. clet builds against the TG version named by the dispatch payload via `<TerminalGuiVersion>` in `src/Clet/Clet.csproj`; the local-development default tracks a known-good develop build. There is no longer a "pin to remove" — see [D-020](decisions.md#d-020) for the continuous-release design.
+clet builds against the TG version named by `<TerminalGuiVersion>` in `src/Clet/Clet.csproj`; the release workflow overrides it from the dispatch payload. See [D-020](decisions.md).
 
-### 3.1 Cancellation token plumbing (LANDED on `develop`) ; was [#5157](https://github.com/gui-cs/Terminal.Gui/issues/5157)
+### 3.1 Cancellation contract
 
-`IApplication.RunAsync(Toplevel, CancellationToken)` is on TG `develop`. Clet binds to it directly; no fallback path needed.
+On cancel, clet emits `{"schemaVersion":1,"status":"cancelled"}` and nothing else — no `value`, no `code`, no partial result — regardless of whether `IValue<T>.Value` is readable on the underlying View. This is clet's wire contract; TG's disposition of `IValue<T>.Value` on cancellation is a TG-internal concern.
 
-Clet's wire contract does not depend on TG's decision about whether `IValue<T>.Value` is readable after cancel; the cancel envelope is fixed at `{"schemaVersion":1,"status":"cancelled"}` regardless (§4.3). Any partial-result behavior TG settles on is welcome but not load-bearing for clet.
+### 3.2 FileDialog typed result
 
-### 3.2 FileDialog: typed result refactor (LANDED on `develop`) ; was [#5158](https://github.com/gui-cs/Terminal.Gui/issues/5158)
-
-`FileDialog` now inherits from `Dialog<IReadOnlyList<string>?>`. A non-null list represents accept; `null` represents cancel. Read-only is the right shape for a typed result — callers do not mutate the dialog's selection after Run returns.
-
-The `pick-file` and `pick-directory` clets bind to `IValue<IReadOnlyList<string>?>` directly, with no per-clet glue code. The §4.3.2 per-clet `value` shape table already specifies the resulting JSON wire format (string for single-select, array of strings for `--multi`), independent of TG's collection type.
-
-This change is breaking for any TG v2 caller that was reading the old `int` OK/Cancel sentinel; that breakage was accepted by the TG team because v2.1 already carries one breaking change.
+`FileDialog` inherits from `Dialog<IReadOnlyList<string>?>`. The `pick-file` and `pick-directory` clets bind to this directly. The §4.3.2 per-clet `value` shape table specifies the resulting JSON wire format (string for single-select, array of strings for `--multi`).
 
 ## 4. `gui-cs/clet` Repo
 
-This repo holds everything: abstractions, registry, JSON, source generator, built-in clets, the CLI binary, packaging, and release automation. One assembly is published; everything else is build-time only or test-only.
+This repo holds everything: abstractions, registry, JSON, source generator placeholder, built-in clets, the CLI binary, and release automation. One assembly is published; everything else is build-time only or test-only.
 
 ### 4.1 Project layout
 
 ```
 gui-cs/clet/
-├── README.md
-├── LICENSE
-├── Clet.sln
+├── Clet.slnx
 ├── src/
-│   ├── Clet/                              (single Exe project; PublishAot=true; net10.0)
-│   │   ├── Clet.csproj
+│   ├── Clet/                              (single Exe; PublishAot=true; net10.0)
 │   │   ├── Abstractions/
-│   │   │     IClet.cs
-│   │   │     IViewerClet.cs
+│   │   │     IClet.cs                     (IClet + IClet<T> with RunBoxedAsync DIM)
+│   │   │     IViewerClet.cs               (with RunBoxedAsync DIM)
 │   │   │     ICletRegistry.cs
+│   │   │     BoxedCletResult.cs
 │   │   │     CletKind.cs                  (Input | Viewer)
 │   │   │     CletRunOptions.cs
-│   │   │     CletRunResult.cs             (record + record<T>)
-│   │   │     CletRunStatus.cs             (Ok | Cancelled | Error | NoResult)
+│   │   │     CletRunResult.cs             (non-generic + generic)
+│   │   │     CletRunStatus.cs
 │   │   │     CletOptionDescriptor.cs
 │   │   ├── Registry/
 │   │   │     CletRegistry.cs
-│   │   │     CletRegistration.cs
+│   │   │     BuiltInClets.cs              (hand-written; D-004/D-021)
 │   │   ├── Json/
-│   │   │     CletJsonContext.cs           ([JsonSerializable] for source-gen)
-│   │   │     CletJsonOutput.cs
+│   │   │     CletJsonContext.cs           ([JsonSerializable] source-gen)
 │   │   │     SchemaV1.cs
 │   │   ├── Clets/
 │   │   │   ├── Input/
-│   │   │   │     TextClet.cs
-│   │   │   │     IntClet.cs
-│   │   │   │     DecimalClet.cs
-│   │   │   │     SelectClet.cs
-│   │   │   │     MultiSelectClet.cs
-│   │   │   │     ConfirmClet.cs
-│   │   │   │     PickFileClet.cs
-│   │   │   │     PickDirectoryClet.cs
-│   │   │   │     DateClet.cs
-│   │   │   │     TimeClet.cs
-│   │   │   │     DurationClet.cs
-│   │   │   │     ColorClet.cs
-│   │   │   │     AttributePickerClet.cs
+│   │   │   │     SelectClet.cs, TextClet.cs, IntClet.cs, DecimalClet.cs,
+│   │   │   │     ConfirmClet.cs, MultiSelectClet.cs, PickFileClet.cs,
+│   │   │   │     PickDirectoryClet.cs, DateClet.cs, TimeClet.cs,
+│   │   │   │     DurationClet.cs, ColorClet.cs, AttributePickerClet.cs,
 │   │   │   │     RangeClet.cs
+│   │   │   │     (+ helpers: LabelParser.cs, FileFilterParser.cs, RangeView.cs)
 │   │   │   └── Viewer/
 │   │   │         MarkdownClet.cs
-│   │   └── Hosting/
-│   │         Program.cs                   (Main, async)
-│   │         CommandLineRoot.cs           (System.CommandLine root)
-│   │         AliasDispatcher.cs
-│   │         OutputFormatter.cs
-│   │         ExitCodes.cs
-│   └── Clet.SourceGen/                    (build-time analyzer; not shipped)
-│         Clet.SourceGen.csproj
-│         CletAttribute.cs
-│         RegistrationGenerator.cs
+│   │   ├── Help/
+│   │   │     overview.md                  (embedded resource for --help)
+│   │   ├── Hosting/
+│   │   │     Program.cs
+│   │   │     CommandLineRoot.cs           (hand-rolled CLI parser; D-006)
+│   │   │     AliasDispatcher.cs
+│   │   │     OutputFormatter.cs
+│   │   │     ExitCodes.cs
+│   │   │     MarkdownHelpRenderer.cs
+│   │   │     CletStyling.cs
+│   │   └── Properties/
+│   │         AssemblyInfo.cs              (InternalsVisibleTo)
+│   └── Clet.SourceGen/                    (placeholder; D-021)
 ├── tests/
-│   ├── Clet.UnitTests/                    (parallelizable; pure logic)
-│   ├── Clet.IntegrationTests/             (TG hosting + run-loop)
-│   ├── Clet.SmokeTests/                   (process-level: spawn the exe)
-│   ├── Clet.ContractTests/                (JSON schema validation)
-│   └── Clet.PerfTests/                    (cold-start budgets)
-├── packaging/
-│   ├── homebrew/
-│   │   └── clet.rb.template
-│   ├── winget/
-│   │   ├── gui-cs.clet.installer.yaml.template
-│   │   ├── gui-cs.clet.locale.en-US.yaml.template
-│   │   └── gui-cs.clet.yaml.template
-│   └── dotnet-tool/
-│       └── Clet.Tool.csproj
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                          (build, test on push)
-│       ├── release-on-tg-release.yml       (triggered by TG release)
-│       ├── publish-homebrew.yml
-│       ├── publish-winget.yml
-│       └── publish-nuget.yml
-├── scripts/
-│   ├── sign-macos.sh
-│   ├── sign-windows.ps1
-│   ├── notarize-macos.sh
-│   └── update-homebrew-tap.sh
+│   ├── SPEC.md                            (testing spec)
+│   ├── Clet.UnitTests/
+│   ├── Clet.IntegrationTests/
+│   ├── Clet.SmokeTests/
+│   └── Clet.UITests/
 └── docs/
-    ├── installing.md
-    ├── json-schema.md
-    └── exit-codes.md
+    ├── threat-model.md
+    └── runbooks/release-rollback.md
 ```
 
-**One src project (`Clet`).** Abstractions, registry, JSON, built-in clets, and `Program.Main` all compile into one assembly. No internal NuGet packaging. The source generator is a separate project because Roslyn analyzers must be (build-time only, never referenced at runtime).
+**One src project (`Clet`).** Abstractions, registry, JSON, built-in clets, and `Program.Main` all compile into one assembly. The source generator is a separate project because Roslyn analyzers must be (build-time only).
 
-### 4.2 Public types (sketch)
+### 4.2 Core types
 
-These are `internal` to the `Clet` assembly in v1.0. v2 may extract them to `Clet.Abstractions` and publish, when third-party plugin loading lands.
+All types are `internal` to the `Clet` assembly in v1.0. v2 may extract them to `Clet.Abstractions`. See source files in `src/Clet/Abstractions/` for canonical definitions. Key shapes:
 
-```csharp
-namespace Clet;
-
-internal enum CletKind { Input, Viewer }
-
-internal enum CletRunStatus { Ok, Cancelled, Error, NoResult }
-
-internal sealed record CletRunOptions
-{
-    public string? Title { get; init; }
-    public bool JsonOutput { get; init; }
-    public TimeSpan? Timeout { get; init; }
-    public bool Fullscreen { get; init; }
-    public IReadOnlyDictionary<string, string>? CletOptions { get; init; }
-}
-
-internal readonly record struct CletRunResult
-{
-    public CletRunStatus Status { get; init; }
-    public string? ErrorCode { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-
-internal readonly record struct CletRunResult<T>
-{
-    public CletRunStatus Status { get; init; }
-    public T? Value { get; init; }
-    public string? ErrorCode { get; init; }
-    public string? ErrorMessage { get; init; }
-
-    public CletRunResult ToUntyped () => new () { Status = Status, ErrorCode = ErrorCode, ErrorMessage = ErrorMessage };
-}
-
-internal interface IClet
-{
-    string PrimaryAlias { get; }
-    IReadOnlyList<string> Aliases { get; }
-    string Description { get; }
-    CletKind Kind { get; }
-    Type ResultType { get; }
-    IReadOnlyList<CletOptionDescriptor> Options { get; }
-}
-
-internal interface IClet<TValue> : IClet
-{
-    Task<CletRunResult<TValue>> RunAsync (
-        IApplication app,
-        string? initial,
-        CletRunOptions options,
-        CancellationToken cancellationToken);
-}
-
-internal interface IViewerClet : IClet
-{
-    Task<CletRunResult> RunAsync (
-        IApplication app,
-        string? content,
-        CletRunOptions options,
-        CancellationToken cancellationToken);
-}
-
-internal interface ICletRegistry
-{
-    void Register (IClet clet);
-    bool TryResolve (string alias, out IClet clet);
-    IReadOnlyCollection<IClet> All { get; }
-}
-
-internal sealed record CletOptionDescriptor (
-    string Name,
-    string? ShortName,
-    Type ValueType,
-    string Description,
-    bool Required,
-    string? DefaultValue);
-```
+- **`IClet`** — declares `PrimaryAlias`, `Aliases`, `Description`, `Kind`, `ResultType`, `Options`, and `RunBoxedAsync(IApplication, string?, CletRunOptions, CancellationToken)`.
+- **`IClet<TValue> : IClet`** — adds typed `RunAsync(...)` returning `CletRunResult<TValue>`. Provides `RunBoxedAsync` as a default interface method.
+- **`IViewerClet : IClet`** — typed `RunAsync(...)` returning `CletRunResult` (no value). Also provides `RunBoxedAsync` via DIM.
+- **`BoxedCletResult`** — `(CletRunStatus, object?, string?, string?)` record struct for non-generic dispatch.
+- **`CletRunOptions`** — `Title`, `JsonOutput`, `Timeout`, `Fullscreen`, `CletOptions`, `Arguments`.
+- **`CletRunResult` / `CletRunResult<T>`** — `Status`, `Value` (generic only), `ErrorCode`, `ErrorMessage`.
+- **`ICletRegistry`** — `Register(IClet)`, `TryResolve(string, out IClet?)`, `All`.
 
 ### 4.3 JSON schema (v1)
 
@@ -311,19 +204,19 @@ internal sealed record CletOptionDescriptor (
 { "schemaVersion": 1, "status": "no-result" }
 ```
 
-**No `type` field on the envelope.** The result type is advertised once, per-alias, in `clet list --json`. Agents that need it cache the registry; they do not branch on a per-call CLR type name. This keeps the wire format language-agnostic (no `System.String`-shaped values leak across the boundary).
+**No `type` field on the envelope.** Result types are advertised once per alias by `clet list --json`. Consumers cache the registry; they do not branch on a per-call CLR type name. See [D-001](decisions.md).
 
-**Cancel is decoupled from TG.** On cancel, clet emits `{"schemaVersion":1,"status":"cancelled"}` and nothing else — no `value`, no `code`, no partial result — regardless of whether `IValue<T>.Value` is readable on the underlying View at the moment of cancellation. This is the contract clet promises to AI-agent consumers; TG's eventual answer to #5157's "disposition of `IValue<T>.Value` on cancellation" question is a TG-internal concern.
+**Cancel is decoupled from TG.** See §3.1.
 
-Schema is published in this repo under `docs/json-schema.md` and pinned in `Json/SchemaV1.cs`. JSON contract tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.5) validate every emitted line against this schema.
+Schema is pinned in `src/Clet/Json/SchemaV1.cs`. JSON contract tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.5) validate emitted output against this schema.
 
 ### 4.3.1 Schema versioning policy
 
-`schemaVersion: 1` is the contract for the entire `clet 1.x` line. Changes within `1.x` are additive only — existing fields never change meaning, never become required, never change type. A `schemaVersion: 2` is permitted only at a `clet 2.0.0` boundary, and `clet 2.x` must accept `--schema-version 1` to emit the v1 envelope for at least one minor release of the 2.x line, giving consumers a parallel-period to migrate. Breakage notices land in `gui-cs/clet` release notes and in the footer of `clet --version` for the parallel period.
+`schemaVersion: 1` is the contract for the entire `clet 1.x` line. Changes within `1.x` are additive only — existing fields never change meaning, never become required, never change type. A `schemaVersion: 2` is permitted only at a `clet 2.0.0` boundary, and `clet 2.x` must accept `--schema-version 1` to emit the v1 envelope for at least one minor release, giving consumers a parallel-period to migrate.
 
 ### 4.3.2 Per-clet `value` shapes
 
-For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emit a scalar; the table below names the non-scalar cases explicitly so consumers can encode them once.
+For schema-lock at v0.5, the shape of `value` is fixed per alias.
 
 | Alias                         | `value` shape                                                |
 |-------------------------------|--------------------------------------------------------------|
@@ -341,100 +234,26 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias. Most clets emi
 | `duration`                    | string, ISO-8601 duration (`PT1H30M`)                        |
 | `color`                       | string, `#RRGGBB` (lowercase hex)                            |
 | `attribute-picker`            | object, `{"fg": "#RRGGBB", "bg": "#RRGGBB", "style": "..."}` |
-| `range`                       | object, `{"low": <T>, "high": <T>}` (`<T>` = scalar of type; `int` only at v0.3 — see [D-011](decisions.md)) |
+| `range`                       | object, `{"low": <T>, "high": <T>}` (`int` only at v0.3 — see [D-011](decisions.md)) |
 
-### 4.4 Source-generated registration
+### 4.4 Registration
 
-For AOT compatibility and to avoid `typeof(...)` registration spam in `Program.Main`:
-
-```csharp
-[Clet ("text", typeof (string))]
-internal sealed class TextClet : IClet<string> { ... }
-```
-
-The generator produces `BuiltInClets.RegisterAll(ICletRegistry registry)` which calls `registry.Register(new TextClet())` for each.
+`BuiltInClets.RegisterAll(ICletRegistry)` hand-registers all 15 clets. The `Clet.SourceGen` project is a placeholder; auto-discovery is deferred to v2 per [D-021](decisions.md). There is no `[Clet]` attribute in shipped code.
 
 ### 4.5 Built-in clet implementation pattern
 
-Each input clet wraps an existing TG View in `RunnableWrapper<TView, TResult>`, which auto-extracts the typed result via `IValue<TResult>`. The pattern mirrors `Examples/InlineSelect/Program.cs` in `gui-cs/Terminal.Gui` (the canonical inline-mode example).
+Each input clet wraps a TG View in `RunnableWrapper<TView, TResult>`, which auto-extracts the typed result via `IValue<TResult>`. See `src/Clet/Clets/Input/SelectClet.cs` for the canonical example.
 
-Sketch for `SelectClet` (the first clet to build; replicates `InlineSelect`):
-
-```csharp
-[Clet ("select", typeof (int?))]
-internal sealed class SelectClet : IClet<int?>
-{
-    public async Task<CletRunResult<int?>> RunAsync (
-        IApplication app,
-        string? initial,
-        CletRunOptions options,
-        CancellationToken cancellationToken)
-    {
-        string[] labels = options.CletOptions? ["options"]?.Split (',') ?? [];
-
-        OptionSelector selector = new ()
-        {
-            Labels = labels,
-            AssignHotKeys = true,
-        };
-
-        RunnableWrapper<OptionSelector, int?> wrapper = new (selector)
-        {
-            Title = options.Title ?? "Select an option (Enter to accept, Esc to cancel)",
-            Width = Dim.Fill (),
-            BorderStyle = LineStyle.Rounded,
-        };
-
-        await app.RunAsync (wrapper, cancellationToken);
-
-        return cancellationToken.IsCancellationRequested
-            ? new () { Status = CletRunStatus.Cancelled }
-            : new () { Status = CletRunStatus.Ok, Value = wrapper.Result };
-    }
-}
-```
-
-**Pattern observations:**
+**Pattern:**
 - The clet does not own the run loop or the application lifecycle; the host (`Program.Main`) does.
-- `RunnableWrapper<TView, TResult>` is the existing TG primitive that bridges Views to typed results. Clet does not invent a new wrapper.
-- `await app.RunAsync(wrapper, ct)` is the `IApplication.RunAsync(Toplevel, CancellationToken)` overload that landed on TG `develop` (§3.1); clet binds to it directly.
-- Viewer clets follow the same shape but use a Markdown-shaped View (or other read-only View) and return `CletRunResult` (no `T`).
+- `RunnableWrapper<TView, TResult>` is the TG primitive that bridges Views to typed results.
+- `await app.RunAsync(wrapper, ct)` uses the `IApplication.RunAsync(Toplevel, CancellationToken)` overload (§3).
+- Viewer clets follow the same shape but return `CletRunResult` (no `T`).
+- `SelectClet` returns `string?` (the label text), not `int?` (the index) — see [D-008](decisions.md).
 
-**Initial-value parsing.** When a clet's `TResult` implements `System.IParsable<TResult>` (or `System.ISpanParsable<TResult>`) from .NET 7+, the `--initial <string>` flag parses for free with no reflection:
+### 4.6 `Program.Main`
 
-```csharp
-if (TResult.TryParse (initial, CultureInfo.InvariantCulture, out TResult parsed))
-{
-    selector.Value = parsed;  // or whatever IValue<T> setter the View exposes
-}
-```
-
-This is the standard .NET parsing contract; we don't invent a new interface. Most relevant types already implement it:
-- `int`, `decimal`, `bool`, `DateTime`, `DateOnly`, `TimeOnly`, `TimeSpan`, `Guid`, `IPAddress`: built-in.
-- `Color`: TG already implements `ISpanParsable<Color>` (`Terminal.Gui/Drawing/Color/Color.cs`).
-- Custom records and enums: trivially implementable (often a one-line `static abstract` override).
-
-For types where `IParsable` doesn't fit (collections like `List<string>`, multi-select results, free-form structured input), the clet registers a parser delegate as part of `[Clet]` registration. AOT-clean either way (static-abstract dispatch is an interface call resolved at link time).
-
-### 4.6 `Program.Main` outline
-
-```csharp
-internal static class Program
-{
-    public static async Task<int> Main (string[] args)
-    {
-        using CancellationTokenSource cts = new ();
-        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel (); };
-
-        ICletRegistry registry = new CletRegistry ();
-        BuiltInClets.RegisterAll (registry);
-
-        CommandLineRoot root = new (registry);
-
-        return await root.InvokeAsync (args, cts.Token);
-    }
-}
-```
+See `src/Clet/Hosting/Program.cs`. The host creates a `CancellationTokenSource`, registers all clets, and delegates to `CommandLineRoot.InvokeAsync(args, token, Console.Out, Console.Error)`.
 
 ### 4.7 CLI surface
 
@@ -446,9 +265,9 @@ clet --help
 clet --version
 ```
 
-**`--version` output.** `clet --version` prints a single line in the format `X.Y.Z (Terminal.Gui A.B.C)` where `X.Y.Z` is clet's own SemVer and `A.B.C` is the Terminal.Gui version the binary was built against. The TG version is informational — it helps users file bugs and lets agents know what TG features are available. See D-022.
+**`--version` output.** `clet --version` prints `X.Y.Z (Terminal.Gui A.B.C)` where `X.Y.Z` is clet's own SemVer and `A.B.C` is the TG version the binary was built against. See [D-022](decisions.md).
 
-**`--help` banner.** `clet --help` (and `clet` with no arguments) prints the ASCII logo followed by a plain-text usage summary. The logo is the approved three-line box-drawing art:
+**`--help` banner.** `clet --help` (and bare `clet`) prints the ASCII logo followed by usage:
 
 ```
   ╔═╗╦  ╔═╗╔╦╗
@@ -456,15 +275,13 @@ clet --version
   ╚═╝╩═╝╚═╝ ╩
 ```
 
-Plain-text help renders at v0.11. Markdown-rendered help (Terminal.Gui `Markdown` View) defers to v0.5.
-
-**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`); other clets ignore them. See decisions log D-014 for why `--title` is a host flag rather than a per-clet option.
+**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option. Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`). See [D-014](decisions.md) for why `--title` is a host flag.
 
 **Defaults.** Input clets render inline. Viewer clets (`md`) render fullscreen. `--fullscreen` forces fullscreen for input clets; it's a no-op for viewers.
 
-**Theming.** No `--theme` flag. Theme selection goes through `ConfigurationManager`'s existing mechanisms (config files, env var, system theme); `clet` honors whatever it resolves.
+**Theming.** No `--theme` flag. Theme selection goes through `ConfigurationManager`'s existing mechanisms.
 
-**Help rendering.** `clet --help` and `clet help <alias>` render Markdown to ANSI escape sequences and write to stdout (print mode), then exit immediately — they do not open an interactive viewer (see D-016). "Same code path" means the same Terminal.Gui `Markdown` rendering engine with `TextMateSyntaxHighlighter`, not the same interactive fullscreen mode. Root help reads from an embedded `src/Clet/Help/overview.md` resource; per-alias help is generated dynamically from `IClet` metadata by `MarkdownHelpRenderer.BuildAliasHelpMarkdown()`. This keeps help pipeable (`clet --help | less`) and consumable by AI agents reading stdout.
+**Help rendering.** `clet --help` and `clet help <alias>` render Markdown to ANSI escape sequences and write to stdout (print mode), then exit immediately — no interactive viewer (see [D-016](decisions.md)). Root help reads from embedded `src/Clet/Help/overview.md`; per-alias help is generated dynamically from `IClet` metadata by `MarkdownHelpRenderer.BuildAliasHelpMarkdown()`. Help is pipeable (`clet --help | less`) and consumable by AI agents reading stdout.
 
 ### 4.8 Exit code mapping
 
@@ -495,133 +312,61 @@ Target binary size: ~8MB. Cold-start budget: <100ms on Apple Silicon, <100ms on 
 
 ### 5.1 Trigger
 
-`gui-cs/Terminal.Gui` fires a `repository_dispatch` to `gui-cs/clet` on **two** events: every `*-develop.NN` NuGet publish (continuous develop channel) and every release tag (stable channel). The `release-on-tg.yml` workflow consumes both. **Channel is derived from the version string:** if `tg_version` contains `-` (a SemVer prerelease suffix), the dispatch is treated as develop; otherwise it's a release. See [D-020](decisions.md#d-020) for the rationale.
+`gui-cs/Terminal.Gui` fires a `repository_dispatch` to `gui-cs/clet` on two events: every `*-develop.NN` NuGet publish (develop channel) and every release tag (stable channel). Channel is derived from the version string: if `tg_version` contains `-` (SemVer prerelease suffix), the dispatch is develop; otherwise release. See [D-020](decisions.md).
 
-```yaml
-# gui-cs/Terminal.Gui/.github/workflows/notify-clet.yml (NEW; only TG-side clet artifact)
-on:
-  release:
-    types: [published]                # stable channel
-  workflow_run:
-    workflows: ["Publish develop NuGet"]
-    types: [completed]                # develop channel
-jobs:
-  notify-clet:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'release' || github.event.workflow_run.conclusion == 'success' }}
-    steps:
-      - uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.CLET_DISPATCH_PAT }}
-          repository: gui-cs/clet
-          event-type: ${{ github.event_name == 'release' && 'tg-released' || 'tg-develop-published' }}
-          client-payload: |
-            {"tg_version": "${{ github.event.release.tag_name || github.event.workflow_run.head_commit.message }}"}
-```
-
-The exact develop-channel hook into TG's existing publish workflow lives on the TG side; clet's contract is "you fire one of these two dispatches with a `tg_version`, we do the rest."
+Additionally, the release workflow fires on pushes to clet's own main branch (changes in `src/` or `tests/`) and manual `workflow_dispatch`. See [D-022](decisions.md).
 
 ### 5.2 Build matrix
 
-```yaml
-# gui-cs/clet/.github/workflows/release-on-tg.yml
-on:
-  repository_dispatch:
-    types: [tg-released, tg-develop-published]
-jobs:
-  build:
-    strategy:
-      matrix:
-        rid:
-          - osx-arm64
-          - osx-x64
-          - linux-x64
-          - linux-arm64
-          - win-x64
-          - win-arm64
-        include:
-          - rid: osx-arm64   ; runner: macos-14
-          - rid: osx-x64     ; runner: macos-13
-          - rid: linux-x64   ; runner: ubuntu-22.04
-          - rid: linux-arm64 ; runner: ubuntu-22.04-arm
-          - rid: win-x64     ; runner: windows-2022
-          - rid: win-arm64   ; runner: windows-11-arm
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - run: dotnet publish src/Clet -c Release -r ${{ matrix.rid }} --self-contained -p:PublishAot=true
-      - name: Smoke test
-        run: ./scripts/smoke-test.sh
-      - name: Sign (macOS)
-        if: startsWith(matrix.rid, 'osx-')
-        run: ./scripts/sign-macos.sh
-      - name: Sign (Windows)
-        if: startsWith(matrix.rid, 'win-')
-        run: ./scripts/sign-windows.ps1
-      - uses: actions/upload-artifact@v4
-```
+The actual workflow is `.github/workflows/release.yml`. It builds AOT binaries for the target RIDs. Code signing is deferred post-1.0 per [D-012](decisions.md); Homebrew ships a build-from-source formula.
 
 ### 5.3 Smoke test gate (P0; release fails closed)
 
-Before any publish step, every built binary runs a smoke matrix. The gate is process-level: it spawns the AOT'd binary as a real OS process, drives it from outside, and asserts on exit code + stdout JSON.
+Before any publish step, every built binary runs a smoke matrix. The gate is process-level: it spawns the AOT'd binary, drives it from outside, and asserts on exit code + stdout JSON.
 
-**Driver:** [`gui-cs/TUIcast`](https://github.com/gui-cs/TUIcast) in deterministic-script mode. TUIcast spawns the target binary inside a PTY (`node-pty`), writes keystrokes directly to the PTY file descriptor (not stdin redirection — Terminal.Gui drivers don't read keystrokes from stdin the way bash heredocs assume), and captures the asciinema stream as a side effect. The deterministic mode takes a comma-separated keystroke script (`"wait:500,ArrowDown,Enter"`) — no AI in the loop, fully reproducible. TUIcast's `poc-uicatalog.yml` workflow already proves this stack works against a Terminal.Gui binary in GitHub Actions.
+**Driver:** [`gui-cs/TUIcast`](https://github.com/gui-cs/TUIcast) in deterministic-script mode. TUIcast spawns the binary inside a PTY, writes keystrokes to the PTY fd, and captures an asciinema stream. Deterministic mode takes a comma-separated keystroke script (`"wait:500,ArrowDown,Enter"`).
 
 **Cases:**
 
-1. `clet --version` returns the clet version and the Terminal.Gui version in a single line: `X.Y.Z (Terminal.Gui A.B.C)`. The TG version portion is the smoke gate's authoritative source for which TG build the binary was linked against.
-2. `clet list --json` validates against the schema.
-3. For each input clet: TUIcast spawns with `--initial <stub> --json --timeout 1s` and a per-clet keystroke script that drives it to accept; verify exit 0 and JSON envelope.
-4. For `md`: TUIcast spawns against a fixture markdown file with `"wait:500,q"`; verify exit 0 and `{"schemaVersion":1,"status":"ok"}`.
+1. `clet --version` — returns `X.Y.Z (Terminal.Gui A.B.C)`.
+2. `clet list --json` — validates against the schema.
+3. For each input clet: TUIcast spawns with `--initial <stub> --json --timeout 1s` and a per-clet keystroke script; verify exit 0 and JSON envelope.
+4. For `md`: spawns against a fixture markdown file with `"wait:500,q"`; verify exit 0 and `{"schemaVersion":1,"status":"ok"}`.
 5. Cancellation: spawn with `--timeout 100ms`, no keystrokes; verify exit 130 and `{"schemaVersion":1,"status":"cancelled"}`.
 
-**Asciinema artifact.** TUIcast captures every smoke run as `.cast`; on failure, the cast is uploaded as a workflow artifact. Release-failure forensics get a replay, not just a stack trace.
+**Asciinema artifact.** TUIcast captures every smoke run as `.cast`; on failure, the cast is uploaded as a workflow artifact.
 
-Any failure halts the publish workflow. The maintainer is paged via the release issue's auto-comment.
+Any failure halts the publish workflow.
 
 ### 5.4 Publish steps
 
-After all matrix jobs and smoke tests pass. **Channel determines which publish steps run:**
+After all matrix jobs and smoke tests pass. Channel determines which publish steps run:
 
-| Channel | Trigger | NuGet | Homebrew | WinGet | NuGet listing |
-|---------|---------|:-----:|:--------:|:------:|---------------|
-| Develop | `tg-develop-published` | ✅ | — | — | Prerelease (off `latest`) |
-| Release | `tg-released`          | ✅ | ✅ | ✅ | Stable (latest)            |
+| Channel | Trigger | NuGet | Homebrew | WinGet |
+|---------|---------|:-----:|:--------:|:------:|
+| Develop | `tg-develop-published` / push / dispatch | prerelease | — | — |
+| Release | `tg-released`          | stable | build-from-source | manifest PR |
 
-The channel test is `if: ${{ !contains(env.TG_VERSION, '-') }}` for stable-only steps. NuGet's prerelease semantics surface develop builds only to consumers who pass `--prerelease`; `dotnet tool install -g Terminal.Gui.clet` continues to resolve the latest stable.
+**.NET tool** (NuGet) — follows the [mdv](https://github.com/gui-cs/mdv) pattern: `<PackAsTool>true</PackAsTool>`, `<ToolCommandName>clet</ToolCommandName>`, `<PackageId>Terminal.Gui.clet</PackageId>` on `src/Clet/Clet.csproj`. Install: `dotnet tool install -g Terminal.Gui.clet`. See [D-019](decisions.md).
 
-**Homebrew tap** (`gui-cs/homebrew-tap`) — *release channel only*:
-- Generate `clet.rb` from `clet.rb.template` with new version + SHA256s for each bottle.
-- PR (or push-with-token) to the tap repo.
-- Verify with `brew install --build-bottle gui-cs/tap/clet` on a fresh runner.
+**Homebrew tap** (`gui-cs/homebrew-tap`) — release channel only. Build-from-source formula per [D-012](decisions.md).
 
-**WinGet** (PR to `microsoft/winget-pkgs`) — *release channel only*:
-- Generate manifests from templates with new version + installer URLs + SHA256s.
-- Use `wingetcreate update` with the GitHub token.
-- Manifest PR is auto-merged by Microsoft's bot if validation passes (otherwise paged).
-
-**.NET tool** (NuGet) — *both channels*; follows the [mdv](https://github.com/gui-cs/mdv) packaging pattern (single project, `PackAsTool`):
-- The `src/Clet/Clet.csproj` carries the tool metadata directly — no separate `Clet.Tool` project. Required properties: `<PackAsTool>true</PackAsTool>`, `<ToolCommandName>clet</ToolCommandName>`, `<PackageId>Terminal.Gui.clet</PackageId>`, plus standard NuGet metadata (`Description`, `PackageReadmeFile`, `PackageLicenseFile`, `PackageProjectUrl`, `RepositoryUrl`, `RepositoryType`, `PackageTags`). README and LICENSE are packed via `<None Include="..." Pack="true" PackagePath="/" />`.
-- `dotnet pack -c Release src/Clet/Clet.csproj` produces `Terminal.Gui.clet.<version>.nupkg`.
-- `dotnet nuget push Terminal.Gui.clet.<version>.nupkg --source https://api.nuget.org/v3/index.json --api-key <key>`.
-- End-user install: `dotnet tool install -g Terminal.Gui.clet`. The tool command is `clet` (independent of the package id, matching the `mdv` / `Terminal.Gui.mdv` pattern). The packed tool is the framework-dependent IL build; the AOT single-file binary is a separate artifact shipped through Homebrew/WinGet (see D-019).
+**WinGet** (PR to `microsoft/winget-pkgs`) — release channel only. Unsigned binary with SmartScreen warning acceptable for early adopters per [D-012](decisions.md).
 
 ### 5.5 Failure handling
 
 If any publish step fails:
-- The workflow opens an issue titled `Release v<TG_VERSION> failed (<channel>)`. Channel is `release` or `develop`.
-- Labels reflect channel: release failures get `incident:release`, develop failures get `incident:develop`.
-- **Pager behavior differs by channel.** Release failures page; develop failures don't (next develop publish supersedes within hours, and per-merge develops would page-spam). If develop incidents accumulate (>5/week), file a follow-up to investigate root cause.
-- Already-published channels are noted; rollback is manual (we don't auto-revert).
-- The smoke-test step ensures broken binaries never hit a channel; failures here are most often manifest/signing problems, not runtime regressions.
+- The workflow opens an issue titled `Release v<VERSION> failed (<channel>)`.
+- Release failures page; develop failures don't (next develop publish supersedes within hours).
+- Already-published channels are noted; rollback is manual (see `docs/runbooks/release-rollback.md`).
 
 ### 5.6 Versioning
 
-clet maintains its own SemVer, independent of Terminal.Gui's version. Major bumps correspond to `schemaVersion` changes (per §4.3.1). Minor bumps cover new clets or significant CLI additions. Patch bumps cover bug fixes, including rebuilds against new TG versions. The TG version is surfaced in `--version` output for diagnostics only. See [D-022](decisions.md#d-022).
+clet maintains its own SemVer, independent of Terminal.Gui's version. Major bumps = `schemaVersion` changes (§4.3.1). Minor bumps = new clets or significant CLI additions. Patch bumps = bug fixes, including rebuilds against new TG versions. The TG version is surfaced in `--version` output for diagnostics only. See [D-022](decisions.md).
 
-**Auto-increment.** The release workflow (`.github/workflows/release.yml`) auto-increments the patch version on every trigger: (1) TG dispatch (main or develop release), (2) push to clet main that changes `src/` or `tests/`, or (3) manual `workflow_dispatch`. The base version is read from `Clet.csproj <Version>`; the latest `vMAJOR.MINOR.*` git tag determines the next patch. For develop-channel builds, the TG prerelease suffix is appended (e.g. `1.0.1-develop.37`). To force a minor or major bump, push a tag (e.g. `v1.1.0`) to main — the workflow uses that verbatim.
+**Auto-increment.** The release workflow reads the base version from `Clet.csproj <Version>`, finds the latest `vMAJOR.MINOR.*` tag, and increments patch. For develop-channel builds, the TG prerelease suffix is appended (e.g. `1.0.1-develop.37`). A git tag on HEAD overrides the computed version for minor/major bumps.
 
-The csproj declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between the build and what's actually linked. See [D-020](decisions.md#d-020).
+The csproj declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local dev) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}`. See [D-020](decisions.md).
 
 ## 6. Testing
 
@@ -630,168 +375,94 @@ Full testing strategy lives in [`tests/SPEC.md`](../tests/SPEC.md). Summary:
 - **Nine test layers**, each with a clear "what does this catch" purpose. Three harness families: in-process logic (no `Application.Init`), in-process UI (`IApplication` + `InputInjection` + `Driver.Contents` snapshots, frame-stepped), process-level (TUIcast over PTY).
 - The **four-terminal manual matrix** ([#23](https://github.com/gui-cs/clet/issues/23)) is the v0.5 gate.
 - The **JSON contract tests** are the schema-lock guard (`SchemaV1`).
-- The **smoke tests** are the release gate; they're identical to the §5.3 release-pipeline smoke gate so a green PR run is byte-equivalent evidence the release will be green.
-
-References to specific layers from elsewhere in this spec name them rather than numbering — see `tests/SPEC.md` for the up-to-date numbering.
+- The **smoke tests** are the release gate.
 
 ## 7. Milestones
 
-Schedule follows TG releases, not a calendar; no dates here.
+Schedule follows TG releases, not a calendar.
 
 | Milestone | Tracking | Exit criteria |
 |-----------|----------|---------------|
-| **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
-| **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
-| **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish green on `gui-cs/clet` CI ([`tests/SPEC.md`](../tests/SPEC.md) §2.7). TUIcast keystroke harness wired up. |
-| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; `dotnet tool install -g Terminal.Gui.clet` packs and installs locally (mdv pattern, see D-019); **continuous-release loop wired up and proven on the develop channel** — every TG develop NuGet drives a clet prerelease push (D-020, supersedes the earlier "TG dep on a release tag" criterion). The release-tag trigger proof and the Homebrew/WinGet draft manifests **moved to v0.9 RC** — both are gated on a real TG release cut. |
-| **v0.75 alpha** | [#33](https://github.com/gui-cs/clet/issues/33) | Friends-and-family alpha. ≥5 external testers have installed via a published channel and run a non-trivial flow; ≥3 alpha-feedback Issues filed by non-maintainers (alpha feedback = GitHub Issues, no Discussions); README points testers at the Issues tracker; ≥2 of the 4 target terminals driven by someone other than the maintainer; both stable and `--prerelease` install paths exercised end-to-end; maintainer dogfooding `clet` (not `dotnet run`) in real workflows for ≥2 weeks; ≥1 AI agent harness consuming `clet --json` for a non-toy task; all P0 alpha bugs resolved or explicitly deferred to v0.9. **Not v0.9 RC** — the four-terminal matrix run, full smoke-gate coverage, and the rollback runbook exercise are still v0.9 gates. |
-| **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. **Release workflow proven against a real TG release cut** (release-tag half of D-020; develop half closed at v0.5). **Homebrew formula + WinGet manifest in working-draft form** (§5.4; D-012 build-from-source acceptable for first release). One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. Alpha-feedback (v0.75) P1/P2 bugs triaged; ones marked for v0.9 are resolved here. |
-| **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. Issue templates for clet bugs in place. |
+| **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | Repo bootstrapped; abstractions, registry, JSON in place; `select` clet working in unit + integration tests. No runnable binary — see v0.11. |
+| **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable binary. CLI host per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Process-level smoke harness (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — [D-007](decisions.md)). |
+| **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish green. TUIcast keystroke harness wired up. |
+| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming/schema/exit-codes locked; inline rendering verified on four-terminal matrix; `Markdown` View integration verified; threat model published (`docs/threat-model.md`); `dotnet tool install -g Terminal.Gui.clet` works locally ([D-019](decisions.md)); continuous-release loop proven on develop channel ([D-020](decisions.md)). Release-tag trigger proof and Homebrew/WinGet draft manifests moved to v0.9 RC. |
+| **v0.75 alpha** | [#33](https://github.com/gui-cs/clet/issues/33) | Friends-and-family alpha. >=5 external testers; >=3 Issues filed by non-maintainers; maintainer dogfooding for >=2 weeks; >=1 AI agent harness consuming `--json`; all P0 alpha bugs resolved or deferred. |
+| **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing. Release workflow proven against a real TG release. Homebrew formula + WinGet manifest in working-draft form. One real release cycle exercised. Rollback runbook exercised once. |
+| **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. |
 
 ## 8. Risks and Mitigations
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------:|-------:|------------|
-| AOT issue surfaces during `gui-cs/clet` build or smoke test | Medium | Medium | AOT publish tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.7) catch before publish; file against TG core; if blocking on a release, fall back to self-contained single-file (~30MB) and document. |
-| `FileDialog` typed-result refactor (§3.2) breaks downstream callers | Low | Medium | Coordinate with TG core team; flag as breaking in release notes; fix in-tree callers as part of the PR. |
-| Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + release-pipeline dry-runs ([`tests/SPEC.md`](../tests/SPEC.md) §2.9) catch most issues pre-publish; `docs/runbooks/release-rollback.md` documents the response when a regression slips the gate and a published artifact must be withdrawn. |
+| AOT issue surfaces during build or smoke test | Medium | Medium | AOT publish tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.7) catch before publish; fall back to self-contained single-file (~30MB) if blocking. |
+| Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + release-pipeline dry-runs catch most issues; `docs/runbooks/release-rollback.md` documents withdrawal. |
 | Markdown View quality regression vs `glow` | Low | Medium | TG-side golden-file corpus (#5156); quarterly comparison run. |
-| ~~TG `develop` carries #5157/#5158 but no release tag yet; clet pins to a `Terminal.Gui` `*-develop.*` preview NuGet~~ | ~~High~~ | ~~Low~~ | **Resolved by D-020.** csproj uses `<PackageReference Version="$(TerminalGuiVersion)" />` defaulting to a known-good develop build; the release workflow overrides this from the dispatch payload. There is no longer a "pinned develop" — the pair is whatever was dispatched. |
-| Develop publishes per TG merge create NuGet version sprawl | Medium | Low | NuGet handles the volume (TG itself does this); prerelease semantics keep develop builds off `latest`. NuGet versions are immutable so cleanup isn't possible — but isn't needed either. |
-| First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | Weekly release-pipeline dry-runs ([`tests/SPEC.md`](../tests/SPEC.md) §2.9) catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
-| Naming concerns about "clet" surfacing in support channels | Low | Low | Acknowledge in docs; outlast. |
+| Develop publishes create NuGet version sprawl | Medium | Low | NuGet handles the volume; prerelease semantics keep develops off `latest`. |
+| First real release fails mid-publish | Medium | High | Weekly release-pipeline dry-runs; `docs/runbooks/release-rollback.md` walks through per-channel withdrawal. Runbook exercised before v0.9 RC. |
+| Naming concerns about "clet" | Low | Low | Acknowledge in docs; outlast. |
 
 ## 9. Open Questions
 
-1. **Telemetry.** The PR/FAQ mentions an opt-in usage ping. Spec deliberately does not include this in v1.0 scope; revisit at v1.1 with a privacy review.
-2. **Homebrew tap repo name.** `gui-cs/homebrew-tap` is assumed; confirm it exists or create.
-3. **Code signing certs.** Apple Developer ID and Authenticode certs are operational dependencies; confirm ownership/renewal process before v0.9.
-4. **`md` content source.** ~~File argument (`clet md README.md`), stdin (`cat README.md | clet md -`), or both?~~ **Resolved (D-015).** Both file arguments and stdin, with precedence: file args → `--initial` inline content → stdin → error.
-5. **PR/FAQ update upstream.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly (Tig's quote, the strategic FAQ). Update the issue body to match this spec before v0.5. (This repo's own README has been corrected to match.)
-6. **"Any-View ambition" / auto-discovered clets.** The original PR/FAQ pitched clet as making *any* `IValue<T>` View "just work" as a CLI. v1.0 ships 15 hand-written clets instead. Whether to pursue full auto-discovery — and what TG would have to expose to make it work — is laid out in §11. Decision deferred past v1.0.
+1. **Telemetry.** Not in v1.0 scope; revisit at v1.1 with a privacy review.
+2. **Homebrew tap repo name.** `gui-cs/homebrew-tap` assumed; confirm it exists or create.
+3. **Code signing certs.** Deferred post-1.0 per [D-012](decisions.md). Confirm ownership/renewal before signing is re-enabled.
+4. ~~**`md` content source.**~~ Resolved ([D-015](decisions.md)). Both file arguments and stdin, with precedence: file args -> `--initial` -> stdin -> error.
+5. **PR/FAQ update upstream.** Issue #5155's PR/FAQ still references `Terminal.Gui.Clets` as a separate assembly. Update the issue body to match this spec before v1.0.
+6. **"Any-View ambition" / auto-discovered clets.** Deferred to v2 per [D-021](decisions.md). See §11.
 
 ## 10. Implementation Order
 
-A suggested sequence (linear, not parallelizable until v0.3 except where noted):
+Steps 1-10 are done (through v0.5). Remaining:
 
-1. **TG-side prerequisites — status:**
-   - **#5157 `Application.RunAsync(Toplevel, CancellationToken)`** — **landed on `develop`**. Clet binds directly via the pinned `Terminal.Gui` `*-develop.*` preview NuGet (see §3 preamble, §8 risks).
-   - **#5158 `FileDialog` typed-result refactor** — **landed on `develop`** as `Dialog<IReadOnlyList<string>?>`. Wave 4 (`pick-file`/`pick-directory`) is unblocked.
-   - **#5156 `Markdown` View golden-file rendering tests** — outstanding; independent quality work, prerequisite for the v0.5 `clet md` link-safety verification but not for any earlier milestone.
-
-   The `*-develop.*` pin issue is resolved by D-020 — the csproj uses a `$(TerminalGuiVersion)` MSBuild variable, set at build time from the dispatch payload.
-
-2. **`gui-cs/clet` repo bootstrapped:** solution layout, abstractions, registry, JSON, source generator. CI on push (build, unit tests).
-3. **First clet: `select`.** A direct port of `Examples/InlineSelect/Program.cs` to a `SelectClet : IClet<int?>` using `RunnableWrapper<OptionSelector, int?>`. End-to-end through unit + integration tests + a manual run from a real shell. This proves the entire pipeline (registry, alias dispatch, output formatter, exit codes, JSON schema) on the simplest non-trivial clet shape.
-4. **CLI host.** Program.Main, System.CommandLine, alias dispatch, output formatter. Smoke test harness ([`tests/SPEC.md`](../tests/SPEC.md) §2.4) running on a single RID.
-5. **Second wave of clets:** `text`, `confirm`, `int`, `decimal`. These exercise `IParsable<T>`-based initial-value parsing across the most common scalar types.
-6. **Third wave:** `multi-select`, `range`, `date`, `time`, `duration`, `color`, `attribute-picker`. Covers more `IValue<T>` shapes and the more complex Views.
-7. **Fourth wave:** `pick-directory`, `pick-file`. #5158 has landed on TG `develop` (§3.2); `FileDialog` typed result is `IReadOnlyList<string>?` (string for single-select wire format, array of strings for `--multi`, per §4.3.2).
-8. **`md` viewer clet.** First viewer clet; exercises the `IViewerClet` contract and the help-rendering pipeline (§4.7).
-9. **Release pipeline:** build matrix, signing, smoke gate.
-10. **`dotnet tool` packaging:** add `PackAsTool`/`ToolCommandName`/`PackageId=Terminal.Gui.clet` to `src/Clet/Clet.csproj` (mdv pattern, D-019). `dotnet pack -c Release` produces a global-tool `.nupkg`; `dotnet tool install -g --add-source ./bin/Release Terminal.Gui.clet` works locally end-to-end. This is the lowest-friction install path and the first publish channel exercised before Homebrew/WinGet.
-11. **Publish channels:** Homebrew (lowest ops friction for native AOT bottle), then WinGet, then NuGet tool push.
-12. **v0.5 gate:** four-terminal matrix run + threat model + locked schema + #5156 Markdown rendering tests landed in TG.
-13. **v0.75 alpha — friends-and-family testing.** Point the README at the Issues tracker for alpha feedback (no Discussions), recruit ≥5 external testers, dogfood for ≥2 weeks, run an AI agent harness against `--json`. P0 bugs resolved or explicitly deferred. Surface area is what was locked in v0.5 — don't add features here. ([#33](https://github.com/gui-cs/clet/issues/33))
-14. RC and GA.
+11. **Publish channels:** Homebrew (build-from-source), then WinGet, then NuGet tool push.
+12. **v0.75 alpha** — friends-and-family testing ([#33](https://github.com/gui-cs/clet/issues/33)).
+13. **v0.9 RC** — release workflow proven against real TG release; Homebrew/WinGet manifests in working-draft form; rollback runbook exercised.
+14. **v1.0 GA.**
 
 ## 11. Future: auto-discovered clets ("any IValue<T> View just works")
 
-The original PR/FAQ pitched clet as a way to expose **any** Terminal.Gui View with an `IValue<T>` to the shell — just point clet at the View and the alias, parsing, JSON output, and exit codes fall out for free. v1.0 ships 15 hand-written clets instead. This section captures what we learned from building those, what would be needed to deliver on the original ambition, and why the recommendation for v1.x is to stay with hand-written clets and revisit at v2.
+The original PR/FAQ pitched clet as exposing **any** `IValue<T>` View to the shell automatically. v1.0 ships 15 hand-written clets instead. This section captures the design exploration; [D-021](decisions.md) records the deferral to v2.
 
-### 11.1 What v1.0 actually ships
+### 11.1 What v1.0 ships
 
-15 clets, each ~50–150 lines of C# under `src/Clet/Clets/{Input,Viewer}/`. Each clet declares, by hand:
+15 clets, each ~50-150 lines under `src/Clet/Clets/{Input,Viewer}/`. Each declares aliases, description, kind, result type, options, and a `RunAsync`. `BuiltInClets.RegisterAll` is hand-written ([D-004](decisions.md)/[D-021](decisions.md)).
 
-- `PrimaryAlias` and `Aliases` (the CLI surface)
-- `Description` (one-line purpose for `clet list` and `clet help`)
-- `Kind` (`Input` / `Viewer`)
-- `ResultType` (CLR type, used by `clet list --json` advertising)
-- `Options` (per-clet `CletOptionDescriptor[]` — name, short name, value type, description, required, default)
-- A `RunAsync` method that constructs the View, applies `--initial`, runs it, extracts the result, and maps to a `CletRunResult<TValue>`.
+### 11.2 Key learnings
 
-`BuiltInClets.RegisterAll` is hand-written; the `Clet.SourceGen` project exists as a placeholder per [D-004](decisions.md). The spec sketch in §4.5 still shows a `[Clet("alias", typeof(TResult))]` attribute — that attribute does not exist in the shipped code, and the §4.5 sketch should be read as illustrative, not normative.
+- **Most per-clet code is metadata, not behavior.** `TextClet` is 65 lines; unique behavior is 2 lines.
+- **Cross-cutting concerns live above clets.** `--title` ([D-014](decisions.md)), scheme ([D-013](decisions.md)), link safety ([D-017](decisions.md)), exit codes, JSON envelope — all host-level.
+- **Wire format isn't derivable from `IValue<T>`.** `SelectClet`'s `IValue<int?>` becomes a `string` on the wire. `PickFile`'s `IValue<IReadOnlyList<string>?>` becomes string or array depending on `--multi`. The §4.3.2 table is hand-curated.
+- **Initial-value parsing is per-clet.** `IntClet` parses `"42"` as `int`; `SelectClet` parses as label-to-index lookup; `PickFileClet` doesn't take an initial.
 
-### 11.2 What we learned that informs the question
+### 11.3 What full auto-discovery would require
 
-- **Most per-clet code is metadata, not behavior.** `TextClet` is 65 lines; the unique behavior is two of them (`Text = initial`, `ResultExtractor = t => t.Text`). The rest is alias/description/options declaration plus boilerplate for cancel handling.
-- **Cross-cutting concerns pull *out* of clets, not into them.** `--title` ([D-014](decisions.md)), scheme application ([D-013](decisions.md)), link safety ([D-017](decisions.md)), exit-code mapping, and JSON envelope shape all live above the per-clet layer. Auto-discovery wouldn't change that — those stay where they are.
-- **The wire format isn't fully derivable from `IValue<T>`.** SelectClet's `IValue<int?>` (an index into the labels array) becomes a `string` on the wire (the selected label). PickFile's `IValue<IReadOnlyList<string>?>` becomes either a `string` or `array<string>` depending on `--multi`. The §4.3.2 per-clet shape table is hand-curated for review at schema-lock; auto-derivation would need to declare the wire shape explicitly per View.
-- **Initial-value parsing is per-clet, not generic.** `IntClet` parses `"42"` as `int`. `SelectClet` parses `"staging"` as a label-to-index lookup. `PickFileClet` doesn't take an initial. There is no single "string → T" function that covers all the cases.
-- **The source generator never earned its keep at this surface size.** [D-004](decisions.md) is `Pending`; with 15 clets, hand-registration has not been the bottleneck.
+**TG-side (the harder half):** `[Shellable]` attribute or marker interface, wire-format declaration (`ToWire` hook), initial-value parser, per-View option surface.
 
-### 11.3 What full auto-discovery would actually require
+**clet-side:** Real source generator scanning TG assemblies for `[Shellable]` types, emitting registration + dispatch glue.
 
-For "any TG View with `IValue<T>` becomes a clet automatically," the work splits across both repos.
+**Cross-cutting:** Schema-lock coupling (TG attribute changes become wire-format changes); plugin-loading exclusion still applies (runtime `LoadFrom` remains out of scope).
 
-#### TG-side asks (the harder half)
+### 11.4 Decision
 
-A. **Discovery contract.** Either a `[Shellable]` attribute (e.g. `[Shellable(alias: "select", description: "Pick from a list of options.")]`) or an `IShellable` marker interface on the View type. **Closed by default** — only Views that explicitly opt in are discoverable, both for security (no surprise CLI surface from arbitrary Views) and to keep the catalog curated.
+**Don't pursue in v1.x.** The leverage only kicks in with a long tail of post-v1.0 Views or third-party Views wanting shell exposure — both are post-v1.0 stories. At v2, use §11.3 as the starting checklist for TG-side co-design. See [D-021](decisions.md).
 
-B. **Display metadata.** Alias(es), one-line description, recommended init shape (size, border, key bindings). Either as attribute properties or a static factory the View exposes.
+### 11.5 Open questions for v2
 
-C. **Wire-format declaration.** The View (or its `[Shellable]` attribute) declares its JSON shape, separate from the View's internal `IValue<T>`. Concretely: a `[ShellableWireFormat(typeof(string))]` or a `static T ToWire(IValue<T> value)` hook, so SelectClet's index-to-label mapping and PickFile's list-or-string mapping are part of the declared contract, not buried in clet's hand-written `RunAsync`.
-
-D. **Initial-value parser.** Static `bool TryParseInitial(string raw, out T parsed)` on the View, or attribute-pointed parser type. Required so clet can apply `--initial` without per-clet code.
-
-E. **Per-View option surface.** Each option (e.g. `select --options "a,b,c"`, `multi-select --multi`) declared as metadata on the View. Same shape as today's `CletOptionDescriptor`. The View's runtime would consume the parsed options through a generic dispatch path.
-
-#### clet-side mechanism
-
-F. **Real source generator.** Scan referenced TG assemblies at compile time for `[Shellable]` types, emit `BuiltInClets.RegisterAll` plus per-View dispatch glue. AOT-friendly. Replaces today's hand-written registration. This is what `Clet.SourceGen` was always meant to be.
-
-G. **Or runtime reflection scan** — explicitly *not* the right answer. Fights AOT trim, can't be locked down at build time, and conflicts with the §A "no plugin loading" stance.
-
-#### Cross-cutting
-
-H. **Schema-lock coupling.** Today's §4.3.2 wire-format table is hand-curated and reviewed at v0.5 schema-lock. Auto-discovery means a TG-side attribute change to a `[Shellable]` View becomes a clet wire-format change. This needs a guard rail — golden-file contract tests that fail loudly when a Shellable View's wire shape changes without an explicit `schemaVersion` bump (per [§4.3.1](#431-schema-versioning-policy)).
-
-I. **Plugin-loading exclusion still applies.** Even with auto-discovery, runtime `LoadFrom` of third-party assemblies remains excluded ([Appendix A](#appendix-a-threat-model-summary)). "Any View" really means "any `[Shellable]` View in a TG assembly the clet binary was *compiled* against." Third-party Views require a v2 plugin model, also out of scope today.
-
-J. **TG-core willingness.** A `[Shellable]` attribute and `ToWire`/`TryParseInitial` hooks are clet-shaped opinions sitting in TG core. The original §2 architecture decision said "nothing in TG core knows about clets" — full auto-discovery softens that. Whether TG core would accept these primitives, or whether they belong in a `Terminal.Gui.Shellable` companion package, is a co-design question, not a clet-only one.
-
-### 11.4 Cost vs. leverage
-
-15 clets at ~50–150 lines each is roughly 1500 LOC of mostly-metadata. That's not free, but it's not the bottleneck for v1.0. The leverage of full auto-discovery only kicks in if we expect:
-
-- A long tail of new TG Views landing post-v1.0 that should be exposed automatically without clet-side changes, **or**
-- Third-party Views (community packages, `Terminal.Gui.Extensions.*`, etc.) wanting shell exposure.
-
-Both are post-v1.0 stories. v1.0 already defers third-party plugin loading to v2 ([§1 Out of scope](#out-of-scope-deferred-to-v2-or-later)). And the v1.0 input list is locked at v0.5 — adding a 16th clet between v0.5 and v1.0 is a deliberate reopen of schema-lock, not a routine event auto-discovery would smooth.
-
-### 11.5 Decision (recorded in [D-021](decisions.md))
-
-**Don't pursue full auto-discovery in v1.x.** [D-021](decisions.md) records this decision; D-004 is superseded by it. Specifically:
-
-- Hand-write `BuiltInClets.RegisterAll` through v1.0.
-- Keep `Clet.SourceGen` as a placeholder. Don't delete it — it stays as a parking spot for the v2 reopen.
-- Treat the `[Clet("alias", typeof(TResult))]` attribute sketched in §4.5 as illustrative only; the shipped code uses plain `IClet<TValue>` interface implementation.
-- **At v2, if and when third-party clets become a goal**, the TG-side asks (A–E above) become a co-design topic with TG core. Use this section as the starting checklist; don't restart from blank.
-
-**What this rules in for v1.x:** small mechanical refinements that keep moving toward the auto-discovered shape without committing to it. Examples worth considering:
-
-- Audit whether `Options` declarations could share a small builder helper to cut duplication across the 15 clets without changing the contract.
-- Make the §4.3.2 wire-format table generated from `IClet.ResultType` plus a small per-clet override list, so the table can't drift from code.
-- Ship a contract test that asserts every registered clet's wire format matches §4.3.2 exactly, so a clet-side change to a `RunAsync` is caught at PR review even today.
-
-These pay down the boilerplate without locking us into a TG-side metadata commitment we haven't asked for yet.
-
-### 11.6 Open questions specific to this section
-
-- **Q11.1** Is the v2 third-party-clets story still wanted, or has it been quietly dropped? If dropped, even the v2 reopen of D-004 may not pay off.
-- **Q11.2** If TG core is unwilling to host `[Shellable]` and friends, would a `Terminal.Gui.Shellable` companion package (clet-team-owned, depended on by both TG and clet) be acceptable to TG core? That changes the integration shape significantly.
-- **Q11.3** Wire-format auto-derivation: is there a path where `IValue<T>` plus a small set of conventions covers 90% of clets, with the remaining 10% (Select's index-to-label, PickFile's list-or-string) overriding via `ToWire`? Worth a prototype before committing to the full A–E ask.
-- **Q11.4** Schema-lock policy under auto-discovery: does adding a new `[Shellable]` View on TG develop trigger a clet wire-format change? If so, that's a TG → clet coupling that didn't exist before. Probably handled by golden-file tests, but the policy needs writing down.
+- Is the v2 third-party-clets story still wanted?
+- Would TG core accept `[Shellable]` and friends, or must they live in a companion package?
+- Can `IValue<T>` plus conventions cover 90% of clets, with overrides for the rest?
+- Does adding a `[Shellable]` View on TG develop trigger a clet wire-format change?
 
 ## Appendix A: Threat Model Summary
 
-(Full document published with v0.5; sketch only here.)
+Full document published at `docs/threat-model.md`.
 
 - **Untrusted inputs:** `--initial`, env vars, stdin content, fixture file paths, `--title`, clet-specific options.
-- **Sanitization:** All output to stdout/stderr passes through a terminal-escape filter (strip C0/C1 control sequences except those we generate). User-controlled display strings (`--title`, prompt labels) sanitized at the View boundary.
-- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` flag for the user to opt in; off by default for AI agent use.
-- **File access:** `pick-file` and `pick-directory` honor the OS sandbox/permission model; no privilege escalation.
-- **Plugin loading:** None in v1.0. (Closes the entire LoadFrom-based attack surface.)
+- **Sanitization:** All output passes through a terminal-escape filter (strip C0/C1 except generated ones). User-controlled display strings sanitized at the View boundary.
+- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` for opt-in; off by default for AI agent use. See [D-017](decisions.md).
+- **File access:** `pick-file` and `pick-directory` honor OS sandbox/permission model.
+- **Plugin loading:** None in v1.0.
 
 ## Appendix B: Cross-References
 
