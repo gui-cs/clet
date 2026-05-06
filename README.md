@@ -228,5 +228,6 @@ Every push to `develop` triggers a matching `clet` prerelease push to NuGet (ver
 
 ## Further reading
 
+- [Demo scripts](demos/README.md) — runnable examples showing how to chain clets in scripts
 - [Press release & customer voices](specs/press-release.md)
 - [Implementation spec](specs/clet-spec.md)
