@@ -165,6 +165,7 @@ internal sealed class MarkdownClet : IViewerClet
             // Show URL in status bar as a clickable link
             statusLink.Text = e.Url;
             statusLink.Url = e.Url;
+            statusShortcut.MouseHighlightStates = MouseState.In;
             e.Handled = true;
         };
 
@@ -272,6 +273,7 @@ internal sealed class MarkdownClet : IViewerClet
                 fileSizeShortcut.Title = FormatFileSize (System.Text.Encoding.UTF8.GetByteCount (sanitized));
                 statusLink.Text = options.Title ?? "(inline)";
                 statusLink.Url = string.Empty;
+                statusShortcut.MouseHighlightStates = MouseState.None;
             }
 
         };
