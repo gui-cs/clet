@@ -73,6 +73,12 @@ gui-cs/Terminal.Gui                           gui-cs/clet
 
 All of (3)+(4) is plain Terminal.Gui hosting against TG's public API. The clet itself is a Terminal.Gui View. Nothing in TG core knows about clets; nothing in clets requires private TG API.
 
+### 2.1 Ownership
+
+**TG core** (rendering, drivers, Views, keybindings) → `gui-cs/Terminal.Gui` maintainers.  
+**CLI host, registry, JSON envelope, packaging, clets** → `gui-cs/clet` maintainers.  
+**Cross-repo bugs** file in `gui-cs/clet` first; the clet maintainer reproduces, isolates, and escalates upstream if the root cause is in TG core. A `clet` repro makes the upstream report self-contained.
+
 ## 3. Terminal.Gui Changes Required
 
 Most of what an early draft of this spec assumed would need to change in TG is already done or already tracked, including:
