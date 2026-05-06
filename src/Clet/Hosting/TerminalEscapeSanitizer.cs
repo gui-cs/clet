@@ -137,9 +137,9 @@ internal static class TerminalEscapeSanitizer
                         }
                         else if (next >= '@' && next <= '_')
                         {
-                            // C1 7-bit pair (ESC @, ESC [, ... ESC _)
-                            // ESC [ was handled above; everything else is dangerous (OSC = ESC ], etc.)
-                            // Strip the pair
+                            // C1 7-bit pair (ESC @ through ESC _, excluding ESC [ which was handled above).
+                            // Includes dangerous sequences like OSC (ESC ]), DCS (ESC P), etc.
+                            // Strip the pair.
                             i++;
                         }
                         else
@@ -197,9 +197,9 @@ internal static class TerminalEscapeSanitizer
             {
                 char next = s [i + 1];
 
-                // ESC ] is OSC — dangerous
-                // ESC @ through ESC _ excluding ESC [ — C1 pairs (dangerous)
-                if (next != '[' && next >= '@' && next <= '_')
+                // ESC ] is OSC — dangerous. Other C1 pairs (ESC @ through ESC _) excluding
+                // ESC [ (which is CSI, handled separately in SanitizeRenderedOutput) are also dangerous.
+                if (next >= '@' && next <= '_' && next != '[')
                 {
                     return true;
                 }
