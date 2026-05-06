@@ -71,7 +71,7 @@ public class FileAccessPolicySmokeTests
     public async Task MdAllowedExtension_InCwd_Succeeds ()
     {
         // Create a .md file and run from its directory
-        string tmpDir = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ()}");
+        string tmpDir = Path.Join (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ()}");
         Directory.CreateDirectory (tmpDir);
         string mdFile = Path.Combine (tmpDir, "test.md");
         File.WriteAllText (mdFile, "# Hello World");
