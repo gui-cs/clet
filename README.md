@@ -131,7 +131,7 @@ Run `clet list` to see what's available in your installed version.
 
 **Q: Theming?**
 
-Every clet inherits the active Terminal.Gui theme automatically. To customize, create `~/.tui/config.json` (or `$XDG_CONFIG_HOME/tui/config.json`):
+Every clet inherits the active Terminal.Gui theme automatically. To customize, create `~/.tui/clet.config.json`:
 
 ```json
 {
@@ -155,7 +155,7 @@ All clets render with the `Base` color scheme, so customizing `Base` controls ev
 
 **Q: Key bindings?**
 
-Key bindings are also configured via `~/.tui/config.json`:
+Key bindings are also configured via `~/.tui/clet.config.json`:
 
 ```json
 {
