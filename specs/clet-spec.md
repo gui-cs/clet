@@ -78,7 +78,7 @@ All of (3)+(4) is plain Terminal.Gui hosting against TG's public API. The clet i
 Most of what an early draft of this spec assumed would need to change in TG is already done or already tracked, including:
 
 - **Inline rendering** is shipping today and exercised by `md`, the inline examples, and `gui-cs/ai`.
-- **AOT compatibility** is tracked in TG core; remaining issues surface most efficiently by building `clet` and running it. The §6.6 publish tests are the discovery mechanism.
+- **AOT compatibility** is tracked in TG core; remaining issues surface most efficiently by building `clet` and running it. The AOT publish tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.7) are the discovery mechanism.
 - **`ConfigurationManager`** path-based loading is broadly used and tested.
 - **`Markdown` View** is vetted for the read-only, dismissable, themed shape clet needs.
 - **Terminal-driver inline-capable detection** is already in place.
@@ -309,7 +309,7 @@ internal sealed record CletOptionDescriptor (
 
 **Cancel is decoupled from TG.** On cancel, clet emits `{"schemaVersion":1,"status":"cancelled"}` and nothing else — no `value`, no `code`, no partial result — regardless of whether `IValue<T>.Value` is readable on the underlying View at the moment of cancellation. This is the contract clet promises to AI-agent consumers; TG's eventual answer to #5157's "disposition of `IValue<T>.Value` on cancellation" question is a TG-internal concern.
 
-Schema is published in this repo under `docs/json-schema.md` and pinned in `Json/SchemaV1.cs`. Contract tests (§6.4) validate every emitted line against this schema.
+Schema is published in this repo under `docs/json-schema.md` and pinned in `Json/SchemaV1.cs`. JSON contract tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.5) validate every emitted line against this schema.
 
 ### 4.3.1 Schema versioning policy
 
@@ -613,146 +613,16 @@ clet's published version is the dispatch payload's `tg_version`, **verbatim incl
 
 The csproj also declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between `tg_version` in the package label and what's actually linked. See [D-020](decisions.md#d-020).
 
-## 6. Testing Plan
+## 6. Testing
 
-The user asked for thorough; this section is detailed accordingly. Eight test layers, each with a clear "what does this catch" purpose. All tests live in `gui-cs/clet/tests/`. `Markdown` View rendering quality is tested in TG core, not here (#5156).
+Full testing strategy lives in [`tests/SPEC.md`](../tests/SPEC.md). Summary:
 
-### 6.0 When each layer runs
+- **Nine test layers**, each with a clear "what does this catch" purpose. Three harness families: in-process logic (no `Application.Init`), in-process UI (`IApplication` + `InputInjection` + `Driver.Contents` snapshots, frame-stepped), process-level (TUIcast over PTY).
+- The **four-terminal manual matrix** ([#23](https://github.com/gui-cs/clet/issues/23)) is the v0.5 gate.
+- The **JSON contract tests** are the schema-lock guard (`SchemaV1`).
+- The **smoke tests** are the release gate; they're identical to the §5.3 release-pipeline smoke gate so a green PR run is byte-equivalent evidence the release will be green.
 
-Two harnesses, two questions, two cost profiles. Keep them separate; don't merge.
-
-- **In-process (xUnit + TG `InputInjection`)** answers *"is the View logic right?"* — runs in milliseconds, asserts on internal `IValue<T>` state, no Node toolchain. Layers §6.1, §6.2, §6.4, §6.7.
-- **Process-level (TUIcast over PTY)** answers *"does the deployed binary behave right?"* — covers argument parsing, stdout JSON, exit codes, signal handling, AOT trim divergence. Slower (~1–2s per case). Layers §5.3, §6.3, §6.6.
-
-Tier matrix:
-
-| Trigger                       | Layers run                                                |
-|-------------------------------|-----------------------------------------------------------|
-| Inner loop (laptop)           | §6.1, §6.2                                                |
-| PR CI                         | §6.1, §6.2, §6.3 (subset: happy path per clet), §6.4, §6.7 |
-| Nightly                       | All of PR CI, plus full §6.3, §6.6, §6.8 dry-run          |
-| Pre-release / release gate    | Full §6.3, §6.6, §5.3 smoke gate, §6.5 manual matrix      |
-
-The legitimate worry that `InputInjection`-driven tests can drift from AOT behavior is addressed by §6.6 (AOT publish tests run the full §6.3 smoke matrix against the AOT binary). Don't double-pay it by routing §6.2 through TUIcast — the wall-clock cost is real and the marginal coverage is near zero.
-
-### 6.1 Unit tests (`tests/Clet.UnitTests`)
-
-**What this catches:** Logic bugs in the registry, options, parsing, JSON serialization, exit code mapping.
-
-**Coverage target:** 90%+ for `src/Clet/Abstractions`, `src/Clet/Registry`, `src/Clet/Json`.
-
-**Cases:**
-- `CletRegistry`:
-  - Register/resolve by primary alias, by secondary alias.
-  - Conflict on duplicate alias raises `InvalidOperationException`.
-  - `All` is stable in iteration order.
-- `CletRunOptions`:
-  - Default values.
-  - `Fullscreen` flag round-trips correctly.
-- `IParsable<T>` integration:
-  - String → int, decimal, DateTime, TimeSpan via reflection-free hooks.
-  - Bad input → `CletRunResult { Status = Error, ErrorCode = "validation" }`.
-- `CletJsonOutput`:
-  - Round-trip every result variant.
-  - Output matches `SchemaV1` byte-for-byte for canonical inputs (golden files).
-  - No properties leak: cancelled envelopes contain only `schemaVersion` and `status`; viewer success envelopes contain only `schemaVersion` and `status`; no envelope ever emits a wire-format `type` field (the field was dropped at v0.5; result types are advertised once via `clet list --json`, not on every result).
-- Exit code mapping:
-  - Each `CletRunStatus` and error code maps to the documented exit.
-- Cancellation:
-  - `CletRunResult.Cancelled` propagates through every layer.
-
-**Per-clet behavior tests** (one fixture per clet; 15 total):
-- Register, resolve, advertise correct `Kind` and `ResultType`.
-- Default options round-trip.
-- Initial-value parsing with valid input.
-- Initial-value rejection with invalid input.
-- (Where applicable) options: `--root`, `--filter`, `--multi`, etc., each tested in isolation.
-
-**Patterns:** xUnit v3, `[Fact]` and `[Theory]`. No `Application.Init`. Each test file leads with `// Claude - Opus 4.7` per `CLAUDE.md`.
-
-### 6.2 Integration tests (`tests/Clet.IntegrationTests`)
-
-**What this catches:** TG hosting bugs (init/teardown, cancellation, rendering) that unit tests can't see because they don't run a real run loop.
-
-**Cases:**
-- Run each clet end-to-end against a scripted input/output stream.
-- Cancellation token cancels mid-run; verify final result and clean shutdown.
-- Timeout fires; verify `Status = Cancelled` and exit 130.
-- Theme override per invocation; verify View's effective scheme.
-- Inline vs alt-screen mode; verify driver state transitions.
-
-**Test harness:** `IApplication` instance per test, keystrokes synthesized via Terminal.Gui's `InputInjection` mechanism (the canonical TG-side hook for posting key/mouse events into a running loop), captured render output (snapshot to string). In-process injection is the right tool here — there is no subprocess to drive — and complements the process-level TUIcast harness used by §5.3 and §6.3.
-
-**Snapshot infrastructure: reuse TG's, don't roll our own.** TG already maintains snapshot-rendering helpers, and #5156 adds golden-file rendering for the `Markdown` View. Clet integration tests consume that same harness. If the harness is missing a hook clet needs, file against TG core; do not fork. Two parallel snapshot stacks would drift within a release.
-
-### 6.3 Process/smoke tests (`tests/Clet.SmokeTests`)
-
-**What this catches:** Bugs that only appear when `clet` runs as a real process (argument parsing, stdout/stderr wiring, exit codes, signal handling).
-
-**Cases:** Identical to §5.3 release-pipeline smoke tests (every clet boots, returns valid JSON, exits with correct code). Run on every PR to `gui-cs/clet`, every TG-triggered release build, and nightly against the latest TG develop branch.
-
-**Tooling:** TUIcast in deterministic-script mode (same driver as §5.3). The xUnit fixture shells out to TUIcast with a per-clet keystroke script, captures the resulting JSON from the spawned `clet` process's stdout, and asserts on exit code + envelope shape. Using the same driver as the release gate means a green CI run is byte-equivalent evidence that the release gate will be green; we do not maintain two parallel smoke harnesses.
-
-**Scope guardrail.** §6.3 covers exactly one happy path per clet plus the cancellation case. Bug repros, option-matrix coverage, and behavior variants go in §6.2 (in-process, fast). Without this rule, every regression PR adds a TUIcast case, the release gate hits 30 minutes by v0.7, and the smoke layer becomes the integration layer at process-level cost.
-
-**Scripts as data, not code.** Per-clet keystroke scripts live as text files under `tests/Clet.SmokeTests/scripts/<alias>.txt` (one line per script, TUIcast comma-separated keystroke syntax). The xUnit fixture loads the file by alias; it does not embed scripts in C# string literals. A contributor can add a smoke case by editing data, and any script can be re-run locally with `npx tuicast --binary ./clet --script-file scripts/<alias>.txt` without rebuilding the test project.
-
-**Asciinema artifacts.** TUIcast captures every smoke run as a `.cast`. Successful runs discard the cast (artifact-store noise); failed runs upload it as a workflow artifact for forensic replay. Retention follows GitHub Actions' default (90 days). If we ever need longer for a specific incident, copy the artifact to the issue manually.
-
-### 6.4 JSON contract tests (`tests/Clet.ContractTests`)
-
-**What this catches:** Schema drift; promises to AI agent consumers being broken silently.
-
-**Cases:**
-- Every line emitted by every clet across the full input matrix validates against `SchemaV1`.
-- Schema additions in v1.x are confirmed additive only (a v1.0 consumer can still parse v1.x output).
-- `clet list --json` validates against its own list schema.
-
-**Tooling:** `JsonSchema.Net` for validation. The schema file is the source of truth; tests read it, not a copy.
-
-### 6.5 Cross-terminal manual matrix
-
-**What this catches:** Driver-specific rendering bugs that automated tests can't reproduce reliably (cursor save/restore, alt-screen toggles, mouse).
-
-**Matrix:**
-
-|                  | macOS Terminal | iTerm2 | Windows Terminal | GNOME Terminal |
-|------------------|:--------------:|:------:|:----------------:|:--------------:|
-| `clet text`      |       ☐        |   ☐    |        ☐         |       ☐        |
-| `clet pick-file` |       ☐        |   ☐    |        ☐         |       ☐        |
-| `clet md`        |       ☐        |   ☐    |        ☐         |       ☐        |
-| Theme switch     |       ☐        |   ☐    |        ☐         |       ☐        |
-| Mouse click      |       ☐        |   ☐    |        ☐         |       ☐        |
-| Inline restore   |       ☐        |   ☐    |        ☐         |       ☐        |
-
-Run before every minor release (v1.0, v1.1, ...). Captured in a release checklist issue ([#23](https://github.com/gui-cs/clet/issues/23) tracks the first pass for v0.5). This is the v0.5 milestone gate.
-
-### 6.6 AOT publish tests
-
-**What this catches:** Trim warnings, runtime AOT failures, regressions in AOT-compatibility of TG core. With no separate AOT audit (the original §3 entry was dropped because TG core already tracks AOT work), these tests are the primary discovery mechanism for AOT issues; failures here are filed as issues against `gui-cs/Terminal.Gui` with a minimal repro.
-
-**Cases:**
-- CI publishes the AOT binary on every PR to `gui-cs/clet` and on the nightly TG-develop run.
-- Zero trim warnings tolerated; warnings fail the build.
-- Smoke tests (§6.3) run against the AOT binary, not just the JIT'd debug build.
-- AOT failures discovered during `gui-cs/clet` builds are filed against `gui-cs/Terminal.Gui` with a minimal repro.
-
-### 6.7 Performance tests (`tests/Clet.PerfTests`)
-
-**What this catches:** Cold-start regressions that erode the "feels instant" property AI agents need.
-
-**Cases:**
-- `clet --version` cold start: <100ms macOS arm64, <150ms Windows x64.
-- `clet list --json` cold start: same budgets.
-- Tracked over time; regression alerts at +25% on a 7-day rolling baseline.
-
-### 6.8 Release pipeline dry-run tests
-
-**What this catches:** Workflow regressions that would otherwise only surface during a real TG release (when the cost is high).
-
-**Cases:**
-- Weekly cron: simulate a `repository_dispatch` with a fake version. Build, smoke-test, generate manifests, but stop short of publish.
-- Verify all template files render correctly, all artifact uploads succeed, all checksums match.
+References to specific layers from elsewhere in this spec name them rather than numbering — see `tests/SPEC.md` for the up-to-date numbering.
 
 ## 7. Milestones
 
@@ -762,7 +632,7 @@ Schedule follows TG releases, not a calendar; no dates here.
 |-----------|----------|---------------|
 | **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | `gui-cs/clet` repo bootstrapped; abstractions, registry, JSON, source generator in place; `select` clet (replicating `Examples/InlineSelect`) working in unit + integration tests. **No runnable binary yet** — see v0.11. |
 | **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable `clet` binary. CLI host (`Program.Main`, `CommandLineRoot`, `AliasDispatcher`, `OutputFormatter`, `ExitCodes`) per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Plain-text help; Markdown-rendered help defers to v0.5. Process-level smoke harness on Linux x64 (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — see [decisions log D-007](decisions.md)). |
-| **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish (§6.6) green on `gui-cs/clet` CI. TUIcast keystroke harness wired up. |
+| **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish green on `gui-cs/clet` CI ([`tests/SPEC.md`](../tests/SPEC.md) §2.7). TUIcast keystroke harness wired up. |
 | **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming locked; JSON schema locked; exit-code table locked; inline rendering verified on the four-terminal matrix; v1.0 input and viewer lists locked; `Markdown` View integration verified end-to-end including link safety; threat model published; `dotnet tool install -g Terminal.Gui.clet` packs and installs locally (mdv pattern, see D-019); **continuous-release loop wired up and proven on the develop channel** — every TG develop NuGet drives a clet prerelease push (D-020, supersedes the earlier "TG dep on a release tag" criterion). The release-tag trigger proof and the Homebrew/WinGet draft manifests **moved to v0.9 RC** — both are gated on a real TG release cut. |
 | **v0.75 alpha** | [#33](https://github.com/gui-cs/clet/issues/33) | Friends-and-family alpha. ≥5 external testers have installed via a published channel and run a non-trivial flow; ≥3 alpha-feedback Issues filed by non-maintainers (alpha feedback = GitHub Issues, no Discussions); README points testers at the Issues tracker; ≥2 of the 4 target terminals driven by someone other than the maintainer; both stable and `--prerelease` install paths exercised end-to-end; maintainer dogfooding `clet` (not `dotnet run`) in real workflows for ≥2 weeks; ≥1 AI agent harness consuming `clet --json` for a non-toy task; all P0 alpha bugs resolved or explicitly deferred to v0.9. **Not v0.9 RC** — the four-terminal matrix run, full smoke-gate coverage, and the rollback runbook exercise are still v0.9 gates. |
 | **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing in CI. **Release workflow proven against a real TG release cut** (release-tag half of D-020; develop half closed at v0.5). **Homebrew formula + WinGet manifest in working-draft form** (§5.4; D-012 build-from-source acceptable for first release). One real release cycle exercised end-to-end. Rollback runbook (`docs/runbooks/release-rollback.md`) exercised once. Alpha-feedback (v0.75) P1/P2 bugs triaged; ones marked for v0.9 are resolved here. |
@@ -772,13 +642,13 @@ Schedule follows TG releases, not a calendar; no dates here.
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------:|-------:|------------|
-| AOT issue surfaces during `gui-cs/clet` build or smoke test | Medium | Medium | §6.6 catches before publish; file against TG core; if blocking on a release, fall back to self-contained single-file (~30MB) and document. |
+| AOT issue surfaces during `gui-cs/clet` build or smoke test | Medium | Medium | AOT publish tests ([`tests/SPEC.md`](../tests/SPEC.md) §2.7) catch before publish; file against TG core; if blocking on a release, fall back to self-contained single-file (~30MB) and document. |
 | `FileDialog` typed-result refactor (§3.2) breaks downstream callers | Low | Medium | Coordinate with TG core team; flag as breaking in release notes; fix in-tree callers as part of the PR. |
-| Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + §6.8 dry-runs catch most issues pre-publish; `docs/runbooks/release-rollback.md` documents the response when a regression slips the gate and a published artifact must be withdrawn. |
+| Native installer pipeline (Homebrew/WinGet) ops cost | Medium | Medium | §5.3 smoke gate + release-pipeline dry-runs ([`tests/SPEC.md`](../tests/SPEC.md) §2.9) catch most issues pre-publish; `docs/runbooks/release-rollback.md` documents the response when a regression slips the gate and a published artifact must be withdrawn. |
 | Markdown View quality regression vs `glow` | Low | Medium | TG-side golden-file corpus (#5156); quarterly comparison run. |
 | ~~TG `develop` carries #5157/#5158 but no release tag yet; clet pins to a `Terminal.Gui` `*-develop.*` preview NuGet~~ | ~~High~~ | ~~Low~~ | **Resolved by D-020.** csproj uses `<PackageReference Version="$(TerminalGuiVersion)" />` defaulting to a known-good develop build; the release workflow overrides this from the dispatch payload. There is no longer a "pinned develop" — the pair is whatever was dispatched. |
 | Develop publishes per TG merge create NuGet version sprawl | Medium | Low | NuGet handles the volume (TG itself does this); prerelease semantics keep develop builds off `latest`. NuGet versions are immutable so cleanup isn't possible — but isn't needed either. |
-| First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | §6.8 weekly dry-runs catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
+| First real `repository_dispatch` release fails mid-publish (one or more channels published before the failure) | Medium | High | Weekly release-pipeline dry-runs ([`tests/SPEC.md`](../tests/SPEC.md) §2.9) catch workflow regressions; `docs/runbooks/release-rollback.md` walks through the per-channel withdrawal procedure (Homebrew tap revert, WinGet manifest removal PR, NuGet unlist). Runbook exercised once before v0.9 RC. |
 | Naming concerns about "clet" surfacing in support channels | Low | Low | Acknowledge in docs; outlast. |
 
 ## 9. Open Questions
@@ -803,7 +673,7 @@ A suggested sequence (linear, not parallelizable until v0.3 except where noted):
 
 2. **`gui-cs/clet` repo bootstrapped:** solution layout, abstractions, registry, JSON, source generator. CI on push (build, unit tests).
 3. **First clet: `select`.** A direct port of `Examples/InlineSelect/Program.cs` to a `SelectClet : IClet<int?>` using `RunnableWrapper<OptionSelector, int?>`. End-to-end through unit + integration tests + a manual run from a real shell. This proves the entire pipeline (registry, alias dispatch, output formatter, exit codes, JSON schema) on the simplest non-trivial clet shape.
-4. **CLI host.** Program.Main, System.CommandLine, alias dispatch, output formatter. Smoke test harness (§6.3) running on a single RID.
+4. **CLI host.** Program.Main, System.CommandLine, alias dispatch, output formatter. Smoke test harness ([`tests/SPEC.md`](../tests/SPEC.md) §2.4) running on a single RID.
 5. **Second wave of clets:** `text`, `confirm`, `int`, `decimal`. These exercise `IParsable<T>`-based initial-value parsing across the most common scalar types.
 6. **Third wave:** `multi-select`, `range`, `date`, `time`, `duration`, `color`, `attribute-picker`. Covers more `IValue<T>` shapes and the more complex Views.
 7. **Fourth wave:** `pick-directory`, `pick-file`. #5158 has landed on TG `develop` (§3.2); `FileDialog` typed result is `IReadOnlyList<string>?` (string for single-select wire format, array of strings for `--multi`, per §4.3.2).
