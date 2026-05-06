@@ -205,6 +205,49 @@ public class CommandLineRootTests
     }
 
     [Fact]
+    public async Task Alias_RowsMissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "--rows"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--rows", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_RowsInvalidValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "--rows", "bad"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--rows", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_RowsZeroValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "--rows", "0"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+    }
+
+    [Fact]
+    public async Task Alias_ShortRowsFlag_MissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "-r"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--rows", stderr.ToString ());
+    }
+
+    [Fact]
     public async Task Alias_InitialExceeds64KiB_ExitsWithValidationError ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();

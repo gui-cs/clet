@@ -6,8 +6,8 @@
 
 `clet` auto-publishes to channels on **two triggers** (D-020):
 
-- **TG release tag** (stable channel): NuGet `Terminal.Gui.clet` (latest), Homebrew (gui-cs tap), WinGet (`microsoft/winget-pkgs`).
-- **TG develop NuGet publish** (develop channel): NuGet `Terminal.Gui.clet` prerelease only (off `latest`; opt-in via `--prerelease`).
+- **Stable channel** (push to `main`, no `-` suffix in version): NuGet `clet` (latest), Homebrew (gui-cs tap), WinGet (`microsoft/winget-pkgs`).
+- **Develop channel** (push to `develop`, or TG develop dispatch): NuGet `clet` prerelease only (off `latest`; opt-in via `--prerelease`). See [D-024](../../specs/decisions.md) for the package id.
 
 When the §5.3 smoke gate fails, the workflow halts and nothing reaches users — that case is an *aborted* release, not a *bad* release, and is out of scope for this runbook. This runbook covers the case where the gate let something through (a regression it didn't cover, a manifest bug, a signing failure mid-publish) and one or more channels carry a broken `clet`. **§2.4 covers the develop channel, which has different blast radius and SLAs.**
 
@@ -57,14 +57,14 @@ If you are not sure, rollback. Re-publishing later is cheap; pulling back a bad 
 
 **While the PR is pending,** consider posting a GitHub Release note on `gui-cs/clet` warning Windows users not to upgrade.
 
-### 2.3 NuGet (`Clet.Tool`)
+### 2.3 NuGet (`clet`)
 
 **What happens to users:** Existing installs continue to work. New installs of the unlisted version still resolve **if the user pins the version explicitly** — unlist hides from search/default-resolve, it does not hard-delete. New `dotnet tool install -g clet` (no version pin) resolves to the next-newest *listed* version.
 
 **Steps:**
 
 1. Sign in to `https://www.nuget.org` with the gui-cs account.
-2. Navigate to `Manage Packages → Clet.Tool → <bad-version>`.
+2. Navigate to `Manage Packages → clet → <bad-version>`.
 3. Click **Unlist** and confirm. (`dotnet nuget delete` is a list-only op, equivalent — use the web UI for the audit trail.)
 4. Verify: `dotnet tool search clet` should not surface the bad version.
 5. **Do not request a hard-delete from NuGet support** unless there's a security/IP reason. Hard-delete breaks `dotnet restore` for anyone who pinned, and removes the audit trail.

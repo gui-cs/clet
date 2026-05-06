@@ -20,6 +20,8 @@ public class BuiltInCletsTests
     [Theory]
     [InlineData ("select")]
     [InlineData ("text")]
+    [InlineData ("multiline-text")]
+    [InlineData ("mt")]
     [InlineData ("int")]
     [InlineData ("decimal")]
     [InlineData ("confirm")]
@@ -58,11 +60,11 @@ public class BuiltInCletsTests
     }
 
     [Fact]
-    public void RegisterAll_Registers15Clets ()
+    public void RegisterAll_Registers16Clets ()
     {
         CletRegistry registry = new ();
         BuiltInClets.RegisterAll (registry);
 
-        Assert.Equal (15, registry.All.Count);
+        Assert.Equal (16, registry.All.Count);
     }
 }
