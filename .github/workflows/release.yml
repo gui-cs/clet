@@ -184,10 +184,10 @@ jobs:
         run: dotnet build --no-restore -c Release -p:TerminalGuiVersion=${{ env.TG_VERSION }} -p:Version=${{ env.CLET_VERSION }}
 
       - name: Unit Tests
-        run: dotnet run --project tests/Clet.UnitTests --no-build -c Release
+        run: dotnet exec tests/Clet.UnitTests/bin/Release/net10.0/Clet.UnitTests.dll
 
       - name: Integration Tests
-        run: dotnet run --project tests/Clet.IntegrationTests --no-build -c Release
+        run: dotnet exec tests/Clet.IntegrationTests/bin/Release/net10.0/Clet.IntegrationTests.dll
 
       - name: Publish AOT
         run: >
@@ -200,7 +200,7 @@ jobs:
           -o publish/${{ matrix.rid }}
 
       - name: Smoke Tests
-        run: dotnet run --project tests/Clet.SmokeTests --no-build -c Release
+        run: dotnet exec tests/Clet.SmokeTests/bin/Release/net10.0/Clet.SmokeTests.dll
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
