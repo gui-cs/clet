@@ -112,4 +112,17 @@ public class CletSmokeTests
         Assert.Contains ("input-too-large", stdout);
         Assert.Contains ("\"status\":\"error\"", stdout);
     }
+
+    [Fact]
+    public async Task MdOversizedStdin_ExitsWithValidationError ()
+    {
+        string oversized = new ('x', 8 * 1024 * 1024 + 1);
+
+        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (
+            ["md", "--json"], stdin: oversized);
+
+        Assert.Equal (65, exit);
+        Assert.Contains ("input-too-large", stdout);
+        Assert.Contains ("\"status\":\"error\"", stdout);
+    }
 }

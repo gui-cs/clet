@@ -10,11 +10,11 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Context.** Appendix A of the spec names `--initial`, env vars, and stdin as untrusted inputs but specified no length caps. An agent piping a 4 GB log into `clet md -` would OOM the binary with no error message or exit code — just a dead process. Issue #38.
 
-**Decision.** Cap `--initial` at 64 KiB (enforced in `CommandLineRoot` argument parsing). Cap `clet md` stdin at 8 MiB (enforced in `MarkdownClet`'s content resolver). On exceed: exit 65 (validation), error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Both caps are documented in spec §4.7 and Appendix A.
+**Decision.** Cap `--initial` at 64 K characters (enforced in `CommandLineRoot` argument parsing). Cap `clet md` stdin at 8 M characters (enforced in `MarkdownClet`'s content resolver). On exceed: exit 65 (validation), error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Both caps are documented in spec §4.7 and Appendix A. Caps are measured in .NET `char` count (UTF-16 code units), not bytes — this is faster and provides a solid OOM-protection bound even though the actual byte footprint varies with encoding. Per-clet options (`cletOptions` values) are not yet capped; tracked as a follow-up.
 
 **Status.** Active.
 
-**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (MaxInitialBytes constant + guard), `src/Clet/Clets/Viewer/MarkdownClet.cs` (MaxStdinBytes + length-limited read), `specs/clet-spec.md` §4.7 + Appendix A.
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (MaxInitialChars constant + guard), `src/Clet/Clets/Viewer/MarkdownClet.cs` (MaxStdinChars + length-limited read), `specs/clet-spec.md` §4.7 + Appendix A.
 
 ## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
 
