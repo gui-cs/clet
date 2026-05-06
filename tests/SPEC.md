@@ -156,7 +156,7 @@ Run before every minor release (v1.0, v1.1, ...). Captured in a release checklis
 **What this catches:** Cold-start regressions that erode the "feels instant" property AI agents need.
 
 **Cases:**
-- `clet --version` cold start: <100ms macOS arm64, <150ms Windows x64.
+- `clet --version` cold start: <100ms macOS arm64, <100ms linux-x64, <150ms Windows x64.
 - `clet list --json` cold start: same budgets.
 - Tracked over time; regression alerts at +25% on a 7-day rolling baseline.
 

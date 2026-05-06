@@ -37,8 +37,7 @@ internal sealed class CommandLineRoot
                 return ExitCodes.Ok;
 
             case "--version":
-                stdout.WriteLine ($"clet {GetVersion ()}");
-                stdout.WriteLine ($"Terminal.Gui {GetTerminalGuiVersion ()}");
+                stdout.WriteLine ($"{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
 
                 return ExitCodes.Ok;
 
@@ -371,9 +370,20 @@ internal sealed class CommandLineRoot
 
     private static string GetVersion ()
     {
-        Version? version = typeof (Program).Assembly.GetName ().Version;
+        string? informational = typeof (Program).Assembly
+            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
+            .FirstOrDefault ()
+            ?.InformationalVersion;
 
-        return version?.ToString (3) ?? "0.0.0";
+        if (!string.IsNullOrWhiteSpace (informational))
+        {
+            int plus = informational.IndexOf ('+');
+
+            return plus >= 0 ? informational [..plus] : informational;
+        }
+
+        return typeof (Program).Assembly.GetName ().Version?.ToString (3) ?? "0.0.0";
     }
 
     private static string GetTerminalGuiVersion ()
