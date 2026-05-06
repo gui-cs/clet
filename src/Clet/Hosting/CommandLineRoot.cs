@@ -324,7 +324,22 @@ internal sealed class CommandLineRoot
     {
         earlyExit = null;
 
-        if (alias is not null && alias != "help")
+        if (alias == "help")
+        {
+            string helpMd = "# clet help\n\nNavigating clet's built-in help system.\n\n";
+            string? helpExtra = MarkdownHelpRenderer.ReadEmbeddedHelp ("help.md");
+
+            if (helpExtra is not null)
+            {
+                helpMd += helpExtra;
+            }
+
+            helpMd += "\n\n---\n\n[Back to overview](clet:help)\n";
+
+            return (helpMd, "clet help");
+        }
+
+        if (alias is not null)
         {
             if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
             {
@@ -352,14 +367,6 @@ internal sealed class CommandLineRoot
         string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
         string markdown = rawMarkdown.Replace ("{{CLET_TABLE}}", cletTable);
         markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
-
-        // Append help-specific examples if available
-        string? helpExtra = MarkdownHelpRenderer.ReadEmbeddedHelp ("help.md");
-
-        if (helpExtra is not null)
-        {
-            markdown += "\n\n" + helpExtra;
-        }
 
         return (markdown, "clet");
     }
