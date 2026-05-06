@@ -24,8 +24,8 @@ Works for humans and AI agents alike.
 | `attribute-picker` | Prompts for text attributes (foreground, background, style) and returns a JSON object. | |
 | `pick-file`, `file` | Opens a file picker dialog and returns the selected file path(s). | `--multi`, `--root`, `--filter` |
 | `pick-directory`, `dir` | Opens a directory picker dialog and returns the selected directory path. | `--root` |
-| `range` | Prompts for a numeric range (low..high) and returns a JSON object. | `--step` |
-| `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. | `--theme`, `args...` |
+| `linear-range` | Presents a linear range selector (single, multi, or bounded range) over labelled options. | `--mode`, `--options`, `--range-kind`, `args...` |
+| `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. | `--theme`, `--cat`, `args...` |
 
 ## Install
 

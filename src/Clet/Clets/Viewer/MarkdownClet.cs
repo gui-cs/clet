@@ -123,7 +123,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         Shortcut lineCountShortcut = new () { Title = "0 lines", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut fileSizeShortcut = new () { Title = "0 B", MouseHighlightStates = MouseState.None, Enabled = false };
-        Shortcut statusShortcut = new (Key.Empty, "Ready", null);
+        Shortcut statusShortcut = new (Key.Empty, "Ready", null) { MouseHighlightStates = MouseState.None };
 
         // --- MarkdownView event wiring ---
 
@@ -232,8 +232,10 @@ internal sealed class MarkdownClet : IViewerClet
             }
             else if (!string.IsNullOrEmpty (content))
             {
-                markdownView.Text = content;
-                statusShortcut.Title = "(inline)";
+                string sanitized = TerminalEscapeSanitizer.Sanitize (content)!;
+                markdownView.Text = sanitized;
+                fileSizeShortcut.Title = FormatFileSize (System.Text.Encoding.UTF8.GetByteCount (sanitized));
+                statusShortcut.Title = options.Title ?? "(inline)";
             }
 
         };
@@ -256,7 +258,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         void LoadFile (string filePath)
         {
-            string fileContent = File.ReadAllText (filePath);
+            string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (filePath))!;
             markdownView.Text = fileContent;
 
             FileInfo fileInfo = new (filePath);

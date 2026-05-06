@@ -128,13 +128,13 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
-## D-011: `range` is integer-only at v0.3 (Superseded by D-029)
+## D-011: `range` is integer-only at v0.3 (Superseded by D-032)
 
 **Context.** Spec §4.3.2 defines the `range` value shape as `{"low": <T>, "high": <T>}` where `<T>` is the scalar of the underlying numeric/date/time type.
 
 **Decision.** At v0.3, `T = int` only. The `RangeClet` uses two `NumericUpDown<int>` controls. Decimal range and date/time range are deferred until demand exists — adding them later is a new clet alias or a generic type parameter, not a breaking change to the existing wire format.
 
-**Status.** Superseded by [D-029](#d-029-replace-range-clet-with-linear-range-backed-by-terminalguis-linearranget-active-supersedes-d-011). The `range` clet itself is gone; `linear-range` replaces it with an option-label string type, so the integer-only constraint no longer applies.
+**Status.** Superseded by D-032. The `range` clet itself is gone; `linear-range` replaces it with an option-label string type, so the integer-only constraint no longer applies.
 
 **Pointers.** *(Files referenced here have been removed; see D-029.)*
 
@@ -411,33 +411,61 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 
 ---
 
-## D-029: Replace `range` clet with `linear-range` backed by Terminal.Gui's `LinearRange<T>` (Active, supersedes D-011)
+## D-029: Release workflow uses `env:`-bound variables + allowlist validation for user-supplied inputs (Active)
 
-**Context.** The original `range` clet wrapped a hand-rolled `RangeView` (`NumericUpDown<int>` × 2 + a `..` label) and emitted `{"low": <int>, "high": <int>}` per spec §4.3.2. It worked, but the UX was poor — two independent spinners with no visual sense of the range relationship — and it duplicated functionality TG was about to ship in a more honest shape via [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204) (the `LinearRange<T>` `IValue` refactor).
+**Context.** `.github/workflows/release.yml` originally interpolated `${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}` and `${{ github.event.inputs.version_override }}` directly into a `run: bash` script. GitHub Actions evaluates `${{ }}` expressions before the shell parses the script, so shell quoting in YAML does not help — this is the canonical `actions/script-injection` CodeQL pattern. The job runs with `contents: write` + `issues: write` and the downstream `publish-nuget` job consumes `secrets.NUGET_API_KEY`.
 
-**Decision.** Delete `RangeClet`, `RangeView`, and their tests. Add `LinearRangeClet` (alias `linear-range`) backed by `Terminal.Gui.Views.LinearRange<string>`, taking a comma-separated option list and an optional `--kind closed|left-bounded|right-bounded` (default `closed`). Wire format changes from `{low, high}` to `{kind, start, end}` (with `start`/`end` conditionally present per kind). [D-011](#d-011-range-is-integer-only-at-v03-active) (the "int only at v0.3" deferral for `range`) is **superseded** — `linear-range` is option-label string-typed, so the integer-only constraint no longer applies.
+**Decision.** All user-controlled expressions in the `Compute version` step are bound to step-level `env:` variables (`TG_VERSION_INPUT`, `VERSION_OVERRIDE`, `EVENT_NAME`) and only referenced as `$VAR` in the `run:` script. Additionally, `TG_VERSION_INPUT` and `VERSION_OVERRIDE` are validated against an allowlist regex (`^[0-9A-Za-z._+*-]+$`) before use; the step exits 2 immediately if validation fails. `github.event_name` (runner-set, not attacker-controllable) is also moved to `env:` for defense-in-depth.
 
-**Why:**
+**Why not a third-party action?** The logic is simple bash; adding a new action dependency for this pattern would be a larger attack surface than the single-step env binding. The regex covers every version string shape in use: SemVer (`1.2.3`), prerelease (`1.2.3-alpha.1`, `2.0.2-develop.37`), floating wildcard (`2.0.2-develop.*`), and the `+` build-metadata suffix.
 
-1. **Better UX.** `LinearRange<T>` renders as a single horizontal/vertical track with discrete option stops; the user moves endpoints along it. This is the visual the `range` concept always wanted.
-2. **Honest type model.** `LinearRange<T>` exposes `IValue<LinearRangeSpan<T>>` where `LinearRangeSpan` already carries `Kind` (`None | LeftBounded | RightBounded | Closed`) plus `Start`/`End`. Mapping that to the wire format is a direct projection — no `ResultExtractor` lambda, no synthetic tuple.
-3. **Doesn't duplicate TG.** The hand-rolled `RangeView` was 47 lines of custom layout that TG now ships properly. Carrying our own version forward was tech debt.
-4. **Wire-format change is honest.** The old `{low, high}` shape had no way to express `LeftBounded` or `RightBounded` — clipping to `Closed` only was a lossy hedge. The new `{kind, start, end}` shape is the natural encoding of `LinearRangeSpan<T>`.
+**Status.** Active.
 
-**How to apply:**
-
-- `src/Clet/Clets/Input/LinearRangeClet.cs` — new clet.
-- `src/Clet/Clets/Input/RangeClet.cs`, `src/Clet/Clets/Input/RangeView.cs` — deleted.
-- `src/Clet/Registry/BuiltInClets.cs` — `RangeClet` registration replaced with `LinearRangeClet`.
-- `tests/Clet.UnitTests/{RangeCletTests,RangeViewTests}.cs` — deleted; replaced by `LinearRangeCletTests.cs`.
-- `tests/Clet.IntegrationTests/RangeCletIntegrationTests.cs` — deleted; replaced by `LinearRangeCletIntegrationTests.cs`.
-- `tests/Clet.UnitTests/BuiltInCletsTests.cs` — `[InlineData("range")]` → `[InlineData("linear-range")]`.
-- Spec §4.3.2 — `range` row replaced with `linear-range` row carrying the new wire shape.
-- README — `range` removed from the v1.0 Input list; `linear-range` added.
-- D-011 status updated to "Superseded by D-029."
-
-**Status.** Active. Supersedes [D-011](#d-011-range-is-integer-only-at-v03-active). **Depends on Terminal.Gui PR #5204 merging.** Until that PR lands and a TG develop NuGet ships with `LinearRange<T> : IValue<LinearRangeSpan<T>>`, this clet builds against a local TG worktree (csproj `<ProjectReference>` instead of `<PackageReference>`) — same TEMP pattern used for PR #5153. The clet PR is held in draft until the TG dependency lands.
-
-**Pointers.** `src/Clet/Clets/Input/LinearRangeClet.cs`, spec §4.3.2, README v1.0 input list, [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204), TG `Terminal.Gui/Views/LinearRange/LinearRangeT.cs` and `LinearRangeSpan.cs`.
+**Pointers.** `.github/workflows/release.yml` (`Compute version` step), `docs/threat-model.md` ("Release pipeline" section), issue #37.
 
 ---
+
+## D-030: Terminal escape sanitization at the clet layer, not relying on TG (Active)
+
+**Context.** `docs/threat-model.md` "Terminal escape sanitization" originally claimed that TG's cell model prevented escape injection. While TG's `TextField` and `OptionSelector` do render cell-by-cell, the `Markdown` view (used by `clet md`) passes content through a richer pipeline where raw escape bytes in fenced code blocks or inline content could survive to the terminal. The `MarkdownHelpRenderer.RenderToAnsi` `--cat` path writes rendered ANSI directly to stdout, giving smuggled escapes a direct path to the user's terminal. Relying on a `2.0.2-develop.*` preview library for security filtering is unacceptable.
+
+**Decision.** Implement `TerminalEscapeSanitizer` (single internal helper) that strips ESC (`\x1b`), BEL (`\x07`), 8-bit CSI (`\x9b`), 8-bit OSC (`\x9d`), and all C1 7-bit pairs (`\x1b@` through `\x1b_`) from user content. Apply at three call sites:
+1. `MarkdownClet` — inline content before `markdownView.Text = content`.
+2. `MarkdownClet.LoadFile` — file content before `markdownView.Text = fileContent`.
+3. `MarkdownHelpRenderer.RenderToAnsi` — input sanitization before rendering, plus a final output pass (`SanitizeRenderedOutput`) that strips dangerous sequences while preserving the renderer's own CSI/SGR sequences.
+
+This is clet's own defense. TG's cell model is treated as defense-in-depth, not relied upon. Future TG version bumps cannot silently regress this protection.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Hosting/TerminalEscapeSanitizer.cs`, `src/Clet/Clets/Viewer/MarkdownClet.cs`, `src/Clet/Hosting/MarkdownHelpRenderer.cs`, `docs/threat-model.md` ("Terminal escape sanitization" section), `specs/clet-spec.md` Appendix A, issue #38.
+
+---
+
+## D-031: SurfaceOnly link policy locked at v0.5; `--allow-link-open` deferred (Active)
+
+**Context.** D-017 established the SurfaceOnly default for `clet md` links. At v0.5 we lock this behavior: the `LinkClicked` handler sets `e.Handled = true` and shows the URL in the status bar; no `Process.Start` or `ShellExecute` exists in `src/`. Spec Appendix A previously mentioned `--allow-link-open` as if it were available — it is not wired up.
+
+**Decision.** The closed-by-default SurfaceOnly policy is locked for v1.0. No `--allow-link-open` flag ships. The flag name is reserved for a future v1.x release that will require explicit user acceptance of documented risks (arbitrary URL scheme handling, potential data exfiltration). Spec Appendix A updated to state "deferred — not wired in v1.0." Integration tests verify the invariant.
+
+**Status.** Active.
+
+**Pointers.** D-017, `src/Clet/Clets/Viewer/MarkdownClet.cs` (LinkClicked handler), `docs/threat-model.md` (Markdown link policy section), `specs/clet-spec.md` (Appendix A), `tests/Clet.IntegrationTests/MarkdownCletIntegrationTests.cs` (link safety tests).
+
+---
+
+## D-032: Replace `range` clet with `linear-range` backed by Terminal.Gui's `LinearRange<T>` (Active, supersedes D-011)
+
+**Context.** The original `range` clet wrapped a hand-rolled `RangeView` (`NumericUpDown<int>` × 2 + a `..` label) and emitted `{"low": <int>, "high": <int>}` per spec §4.3.2. It worked, but the UX was poor — two independent spinners with no visual sense of the range relationship — and it duplicated functionality TG shipped via [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204) (the `LinearRange<T>` `IValue` refactor).
+
+**Decision.** Delete `RangeClet`, `RangeView`, and their tests. Add `LinearRangeClet` (alias `linear-range`) backed by the `LinearRange<T>` view family, with three modes controlled by `--mode single|multi|range` (default `single`). Wire format changes from `{low, high}` to a mode-dependent JSON object:
+
+- `--mode single` → `{"mode":"single", "value":"<label>", "index":<N>}`
+- `--mode multi` → `{"mode":"multi", "values":[...], "indices":[...]}`
+- `--mode range` → `{"mode":"range", "kind":"closed|left|right|none", "start":"<label>", "end":"<label>", "startIndex":<N>, "endIndex":<M>}` (fields conditional on kind)
+
+Additional options: `--orientation horizontal|vertical`, `--range-kind closed|left|right` (default `closed`, only for `--mode range`), `--allow-empty`, `--hide-legends`.
+
+**Status.** Active. Supersedes [D-011](#d-011-range-is-integer-only-at-v03-active).
+
+**Pointers.** `src/Clet/Clets/Input/LinearRangeClet.cs`, spec §4.3.2, README, [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204).

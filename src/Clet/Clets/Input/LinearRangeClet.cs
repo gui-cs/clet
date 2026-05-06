@@ -16,6 +16,7 @@
 // Cancel / error envelopes follow the existing clet contract; the JSON envelope itself
 // is built by the host (Hosting/JSON layer), so RunAsync only returns the typed payload.
 
+using System.Text;
 using System.Text.Json.Nodes;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;

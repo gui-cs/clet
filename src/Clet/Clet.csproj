@@ -36,9 +36,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- TEMP: local TG worktree (PR #5204 LinearRange<T> IValue refactor). REVERT to PackageReference before merge. -->
-    <ProjectReference Include="..\..\..\pr-5204-linear-range\Terminal.Gui\Terminal.Gui.csproj" />
-    <!-- <PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" /> -->
+    <PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />
   </ItemGroup>
 
   <ItemGroup>

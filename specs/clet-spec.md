@@ -235,7 +235,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias.
 | `duration`                    | string, ISO-8601 duration (`PT1H30M`)                        |
 | `color`                       | string, `#RRGGBB` (lowercase hex)                            |
 | `attribute-picker`            | object, `{"fg": "#RRGGBB", "bg": "#RRGGBB", "style": "..."}` |
-| `linear-range`                | object, `{"kind": "closed", "start": <T>, "end": <T>}` for closed; `{"kind": "left-bounded", "end": <T>}` and `{"kind": "right-bounded", "start": <T>}` for the bounded forms. `<T>` is the option-label string. See [D-029](decisions.md). |
+| `linear-range`                | object, shape depends on `--mode`. Single: `{"mode":"single","value":"<label>","index":N}`. Multi: `{"mode":"multi","values":[...],"indices":[...]}`. Range: `{"mode":"range","kind":"closed\|left\|right\|none",...}` with start/end fields conditional on kind. See [D-032](decisions.md). |
 
 ### 4.4 Registration
 
@@ -467,8 +467,8 @@ Full document published at `docs/threat-model.md`.
 
 - **Untrusted inputs:** `--initial`, env vars, stdin content, fixture file paths, `--title`, clet-specific options.
 - **Input-size caps:** `--initial` is capped at 64 K characters; `clet md` stdin is capped at 8 M characters. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Per-clet options are not yet capped; tracked as a follow-up.
-- **Sanitization:** All output to stdout/stderr passes through a terminal-escape filter (strip C0/C1 control sequences except those we generate). User-controlled display strings (`--title`, prompt labels) sanitized at the View boundary.
-- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` flag for the user to opt in; off by default for AI agent use.
+- **Sanitization:** A `TerminalEscapeSanitizer` strips ESC, BEL, 8-bit CSI/OSC, and C1 7-bit pairs from all user-supplied content before it reaches the terminal driver or Terminal.Gui views. Applied at `MarkdownClet` (inline + file content) and `MarkdownHelpRenderer.RenderToAnsi` (input + rendered output). clet does not rely on TG to filter terminal escapes (D-030).
+- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` flag deferred — not wired in v1.0; safe-by-default for AI agent use. See D-017, D-031.
 - **File access:** `pick-file` and `pick-directory` honor the OS sandbox/permission model; no privilege escalation.
 - **Plugin loading:** None in v1.0. (Closes the entire LoadFrom-based attack surface.)
 

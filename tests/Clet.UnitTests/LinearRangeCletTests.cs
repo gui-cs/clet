@@ -12,15 +12,28 @@ public class LinearRangeCletTests
         Assert.Equal ("linear-range", clet.PrimaryAlias);
         Assert.Contains ("linear-range", clet.Aliases);
         Assert.Equal (CletKind.Input, clet.Kind);
+        Assert.Equal (typeof (System.Text.Json.Nodes.JsonObject), clet.ResultType);
     }
 
     [Fact]
-    public void Options_IncludesOptionsAndKind ()
+    public void Options_IncludesModeAndOptions ()
     {
         LinearRangeClet clet = new ();
 
+        Assert.Contains (clet.Options, o => o.Name == "mode");
         Assert.Contains (clet.Options, o => o.Name == "options");
-        Assert.Contains (clet.Options, o => o.Name == "kind");
+        Assert.Contains (clet.Options, o => o.Name == "orientation");
+        Assert.Contains (clet.Options, o => o.Name == "range-kind");
+        Assert.Contains (clet.Options, o => o.Name == "allow-empty");
+        Assert.Contains (clet.Options, o => o.Name == "hide-legends");
+    }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsTrue ()
+    {
+        LinearRangeClet clet = new ();
+
+        Assert.True (clet.AcceptsPositionalArgs);
     }
 
     [Fact]
@@ -31,36 +44,12 @@ public class LinearRangeCletTests
 
         using CancellationTokenSource cts = new ();
 
-        // Validation fires before the TUI loop; null IApplication is fine.
         CletRunResult<System.Text.Json.Nodes.JsonObject?> result = await clet.RunAsync (
             null!, null, options, cts.Token);
 
         Assert.Equal (CletRunStatus.Error, result.Status);
         Assert.Equal ("validation", result.ErrorCode);
         Assert.Contains ("requires --options", result.ErrorMessage ?? "");
-    }
-
-    [Fact]
-    public async Task RunAsync_UnknownKind_ReturnsValidationError ()
-    {
-        LinearRangeClet clet = new ();
-        CletRunOptions options = new ()
-        {
-            CletOptions = new Dictionary<string, string>
-            {
-                ["options"] = "a,b,c",
-                ["kind"] = "diagonal",
-            },
-        };
-
-        using CancellationTokenSource cts = new ();
-
-        CletRunResult<System.Text.Json.Nodes.JsonObject?> result = await clet.RunAsync (
-            null!, null, options, cts.Token);
-
-        Assert.Equal (CletRunStatus.Error, result.Status);
-        Assert.Equal ("validation", result.ErrorCode);
-        Assert.Contains ("unknown --kind", result.ErrorMessage ?? "");
     }
 
     [Fact]

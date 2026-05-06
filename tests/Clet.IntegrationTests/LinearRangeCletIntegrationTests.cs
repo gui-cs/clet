@@ -28,7 +28,7 @@ public class LinearRangeCletIntegrationTests
     }
 
     [Fact]
-    public async Task RunAsync_WithStopAfterFirstIteration_ReturnsOkOrNoResult ()
+    public async Task RunAsync_SingleMode_WithStopAfterFirstIteration_ReturnsOk ()
     {
         using IApplication app = Application.Create ();
         app.Init ("ansi");
@@ -37,7 +37,11 @@ public class LinearRangeCletIntegrationTests
         LinearRangeClet clet = new ();
         CletRunOptions options = new ()
         {
-            CletOptions = new Dictionary<string, string> { ["options"] = "10,20,30,40,50" },
+            CletOptions = new Dictionary<string, string>
+            {
+                ["options"] = "10,20,30,40,50",
+                ["mode"] = "single",
+            },
         };
 
         using CancellationTokenSource cts = new ();
@@ -45,14 +49,11 @@ public class LinearRangeCletIntegrationTests
         CletRunResult<System.Text.Json.Nodes.JsonObject?> result = await clet.RunAsync (
             app, null, options, cts.Token);
 
-        // Without user input, the result is either Ok (with empty/initial selection)
-        // or NoResult (if the LinearRange ended up with Kind=None). Both are acceptable
-        // shapes for this integration test — we're verifying lifecycle, not content.
-        Assert.True (result.Status is CletRunStatus.Ok or CletRunStatus.NoResult);
+        Assert.Equal (CletRunStatus.Ok, result.Status);
     }
 
     [Fact]
-    public async Task RunAsync_WithInitialAndKind_StopsCleanly ()
+    public async Task RunAsync_RangeMode_WithInitial_StopsCleanly ()
     {
         using IApplication app = Application.Create ();
         app.Init ("ansi");
@@ -64,7 +65,8 @@ public class LinearRangeCletIntegrationTests
             CletOptions = new Dictionary<string, string>
             {
                 ["options"] = "S,M,L,XL",
-                ["kind"] = "closed",
+                ["mode"] = "range",
+                ["range-kind"] = "closed",
             },
         };
 
@@ -73,6 +75,6 @@ public class LinearRangeCletIntegrationTests
         CletRunResult<System.Text.Json.Nodes.JsonObject?> result = await clet.RunAsync (
             app, "S..L", options, cts.Token);
 
-        Assert.True (result.Status is CletRunStatus.Ok or CletRunStatus.NoResult);
+        Assert.Equal (CletRunStatus.Ok, result.Status);
     }
 }
