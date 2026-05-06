@@ -3,7 +3,7 @@
 ### Single selection (default)
 
 ```sh
-clet linear-range "Free" "Pro" "Team" "Enterprise"
+clet range "Free" "Pro" "Team" "Enterprise"
 # or
 clet range --options "Free,Pro,Team,Enterprise"
 ```
@@ -16,7 +16,7 @@ JSON output:
 ### Multi selection
 
 ```sh
-clet range --mode multi "Read" "Write" "Execute"
+clet range --mode multi --options "Read,Write,Execute"
 ```
 
 JSON output:
@@ -35,6 +35,24 @@ clet range --mode range --initial "M..XL" "S" "M" "L" "XL" "XXL"
 JSON output:
 ```json
 {"schemaVersion":1,"status":"ok","value":{"mode":"range","kind":"closed","start":"M","end":"XL","startIndex":1,"endIndex":3}}
+```
+
+### Numeric range
+
+Generate numeric options in the shell — labels are strings, so any
+sequence works:
+
+```sh
+# Pick a value from 0.0 to 10.0 in 0.1 increments:
+clet range $(seq 0 0.1 10.0)
+
+# Select a sub-range:
+clet range --mode range $(seq 0 0.1 10.0)
+```
+
+```powershell
+# PowerShell equivalent:
+clet range (0..100 | ForEach-Object { $_ / 10 })
 ```
 
 ### Range kinds
