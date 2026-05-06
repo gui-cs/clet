@@ -1,4 +1,4 @@
-![clet hero](https://github.com/user-attachments/assets/947d37af-81e9-430c-8d96-364387e923f1)
+![clet hero](docs/images/hero.png)
 
 **One binary. Every prompt. JSON out. Go home.**
 
