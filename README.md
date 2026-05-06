@@ -83,7 +83,7 @@ Exit codes: `0` success · `2` usage error · `130` cancelled (SIGINT convention
 
 clet is in **friends-and-family alpha** ([milestone tracker](https://github.com/gui-cs/clet/issues/33)). If something doesn't work, looks wrong, or is just confusing, **[file an issue](https://github.com/gui-cs/clet/issues/new)**. Include:
 
-- `clet --version` output (the `clet` line and the `Terminal.Gui` line).
+- `clet --version` output (e.g. `1.0.0-alpha (Terminal.Gui 2.0.2-develop.37)`).
 - Your terminal + OS (e.g. "Windows Terminal on Windows 11", "iTerm2 on macOS 15").
 - What you ran, what you expected, what happened.
 
