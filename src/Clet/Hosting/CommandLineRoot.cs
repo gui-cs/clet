@@ -67,6 +67,7 @@ internal sealed class CommandLineRoot
         string? title = null;
         bool jsonOutput = false;
         bool fullscreen = false;
+        bool cat = false;
         TimeSpan? timeout = null;
         int? rows = null;
         Dictionary<string, string> cletOptions = new (StringComparer.OrdinalIgnoreCase);
@@ -86,6 +87,13 @@ internal sealed class CommandLineRoot
             if (arg is "--fullscreen" or "-f")
             {
                 fullscreen = true;
+
+                continue;
+            }
+
+            if (arg == "--cat")
+            {
+                cat = true;
 
                 continue;
             }
@@ -192,6 +200,7 @@ internal sealed class CommandLineRoot
         {
             JsonOutput = jsonOutput,
             Fullscreen = fullscreen,
+            Cat = cat,
             Timeout = timeout,
             Title = title,
             Rows = rows,

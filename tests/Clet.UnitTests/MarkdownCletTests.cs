@@ -53,13 +53,15 @@ public class MarkdownCletTests
     }
 
     [Fact]
-    public void Options_ContainsTheme ()
+    public void Options_ContainsThemeAndCat ()
     {
         MarkdownClet clet = new ();
 
-        Assert.Single (clet.Options);
+        Assert.Equal (2, clet.Options.Count);
         Assert.Equal ("theme", clet.Options [0].Name);
         Assert.False (clet.Options [0].Required);
+        Assert.Equal ("cat", clet.Options [1].Name);
+        Assert.False (clet.Options [1].Required);
     }
 
     [Fact]

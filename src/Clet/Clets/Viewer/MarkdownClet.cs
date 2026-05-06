@@ -25,6 +25,9 @@ internal sealed class MarkdownClet : IViewerClet
         new ("theme", "t", typeof (string),
             $"Syntax-highlighting theme. Available: {string.Join (", ", Enum.GetNames<ThemeName> ())}",
             false, nameof (ThemeName.DarkPlus)),
+        new ("cat", null, typeof (bool),
+            "Render markdown to stdout without launching the TUI viewer.",
+            false, "false"),
     ];
 
     public bool AcceptsPositionalArgs => true;
