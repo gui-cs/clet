@@ -138,7 +138,11 @@ internal sealed class FileAccessPolicy
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException
+                                       or UnauthorizedAccessException
+                                       or SecurityException
+                                       or NotSupportedException
+                                       or PathTooLongException)
             {
                 return $"Refused: could not probe '{fi.Name}' for binary content: {ex.Message}";
             }
