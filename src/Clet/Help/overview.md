@@ -17,6 +17,7 @@
 | `--json`, `-j` | Emit result as a JSON envelope |
 | `--timeout` `<duration>` | Auto-cancel after duration (e.g. `30s`, `1m`, `500ms`) |
 | `--fullscreen`, `-f` | Force fullscreen rendering (default for viewers) |
+| `--output`, `-o` `<path>` | Write result to a file instead of stdout |
 
 ## JSON Output
 

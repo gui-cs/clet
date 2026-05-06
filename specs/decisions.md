@@ -396,3 +396,17 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 **Status.** Active.
 
 **Pointers.** `src/Clet/Abstractions/CletRunOptions.cs` (`Cat` property), `src/Clet/Hosting/CommandLineRoot.cs` (parsing), `src/Clet/Hosting/AliasDispatcher.cs` (`ResolveViewerContent` + render bypass), spec §4.7.
+
+---
+
+## D-028: `--output <path>` writes result to a file instead of stdout (Active)
+
+**Context.** Terminal.Gui renders to stdout. Any form of stdout redirection (`$()`, `|`, `>`) hides the TUI — the user sees nothing (gui-cs/Terminal.Gui#5207). Until TG supports rendering to `/dev/tty` when stdout is redirected, clet needs a workaround to let scripts capture the result while keeping the TUI visible.
+
+**Decision.** Add `--output <path>` / `-o <path>` as a built-in CLI flag. When set, `OutputFormatter` writes the result (plain text or JSON) to the specified file path instead of stdout. stdout remains fully available for TUI rendering. If the file cannot be written, an error is emitted to stderr and the process exits with code 2 (usage error).
+
+**Rationale.** This is a minimal, composable workaround: the user picks the file path, the result goes there, and stdout stays for TUI. It works equally well in bash (`clet select --json --output /tmp/r.json`) and PowerShell. The flag is host-level (not clet-specific) because it controls where the *result* goes, not how the clet behaves.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Abstractions/CletRunOptions.cs` (`OutputPath` property), `src/Clet/Hosting/CommandLineRoot.cs` (parsing), `src/Clet/Hosting/OutputFormatter.cs` (file write logic), `src/Clet/Hosting/AliasDispatcher.cs` (error handling), spec §4.7.
