@@ -57,10 +57,6 @@ jobs:
         run: |
           # --- Determine TG version ---
           TG_VERSION="${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}"
-          if [ -z "$TG_VERSION" ]; then
-            TG_VERSION=$(sed -n 's/.*<TerminalGuiVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
-          fi
-          echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
 
           # --- Determine channel (main vs develop) ---
           BRANCH="${GITHUB_REF_NAME}"
@@ -74,6 +70,22 @@ jobs:
             CHANNEL="develop"
           fi
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+
+          # --- Resolve TG version ---
+          # Dispatch/manual: use the explicitly provided version.
+          # Develop channel with no explicit version: float to latest TG develop package
+          #   (e.g. "2.0.2-develop.37" → "2.0.2-develop.*", resolved by dotnet restore).
+          # Main channel with no explicit version: use the csproj pin (known-good).
+          if [ -z "$TG_VERSION" ]; then
+            CSPROJ_TG=$(sed -n 's/.*<TerminalGuiVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
+            if [ "$CHANNEL" = "develop" ]; then
+              TG_VERSION="${CSPROJ_TG%.*}.*"
+              echo "::notice::Floating TG version: $TG_VERSION (from csproj pin $CSPROJ_TG)"
+            else
+              TG_VERSION="$CSPROJ_TG"
+            fi
+          fi
+          echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
 
           # --- Determine clet version ---
           if [ -n "${{ github.event.inputs.version_override }}" ]; then
