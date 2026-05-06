@@ -43,10 +43,16 @@ internal sealed class DecimalClet : IClet<decimal?>
             spinner.Increment = step;
         }
 
-        if (initial is not null
-            && decimal.TryParse (initial, CultureInfo.InvariantCulture, out decimal initialValue))
+        if (initial is not null)
         {
-            spinner.Value = initialValue;
+            if (decimal.TryParse (initial, CultureInfo.InvariantCulture, out decimal initialValue))
+            {
+                spinner.Value = initialValue;
+            }
+            else
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for decimal. Expected a decimal number (e.g. 3.14, -1.5)." };
+            }
         }
 
         RunnableWrapper<NumericUpDown<decimal>, decimal?> wrapper = new (spinner)

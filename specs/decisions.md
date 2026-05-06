@@ -6,6 +6,20 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-022: Invalid `--initial` value must error, not silently fall back (Active)
+
+**Context.** All typed clets (`color`, `int`, `decimal`, `date`, `time`, `duration`, `confirm`, `range`) accepted an `--initial` string and used `TryParse` to set the widget's initial value. If `TryParse` returned `false`, the code silently continued with the widget's default value — the user got no feedback that their input was ignored. Reported in [issue #issue](https://github.com/gui-cs/clet/issues/). Example: `clet color -i 42` opened the color picker showing black (the default) instead of reporting that `42` is not a valid color.
+
+**Decision.** If `--initial` is provided but fails to parse, the clet returns immediately with `CletRunStatus.Error`, `ErrorCode = "usage"`, exit code 2, and a message that names the invalid value and enumerates the accepted formats. The TUI is never opened. Silently ignoring a bad `--initial` is a violation of the principle of least surprise and hides user mistakes.
+
+**Why not validate at the `CommandLineRoot` level?** The host doesn't know each clet's accepted format — that knowledge lives in the clet implementation. Pushing the check down to `RunAsync` keeps the format constraint co-located with the parser, and the early return pattern (before any `app.RunAsync` call) is already established by the pre-cancellation check at the top of each `RunAsync`.
+
+**Selection-based clets excluded.** `select` and `multi-select` use `--initial` as a label-to-index lookup against the runtime-supplied option list. A non-matching label silently produces no pre-selection; this is intentional and reasonable since the available labels are not known until runtime.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Clets/Input/{Color,Int,Decimal,Date,Time,Duration,Confirm,Range}Clet.cs`. Spec §4.5 "Initial-value parsing" updated with the error behavior clause. Integration tests added for each affected clet.
+
 ## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
 
 **Context.** The original PR/FAQ pitched clet as a way to expose any Terminal.Gui View with `IValue<T>` to the shell automatically. v1.0 ships 15 hand-written clets instead. Spec §11 lays out what we learned, what full auto-discovery would require on both the TG side (a `[Shellable]` attribute or marker, wire-format declaration, initial-value parser, per-View option surface) and the clet side (a real source generator), and the cross-cutting cost (TG core would need to host clet-shaped opinions, schema-lock would couple to TG's `[Shellable]` surface).

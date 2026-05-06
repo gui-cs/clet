@@ -30,10 +30,16 @@ internal sealed class TimeClet : IClet<string?>
 
         TimeEditor editor = new ();
 
-        if (initial is not null
-            && TimeSpan.TryParse (initial, CultureInfo.InvariantCulture, out TimeSpan initialTime))
+        if (initial is not null)
         {
-            editor.Value = initialTime;
+            if (TimeSpan.TryParse (initial, CultureInfo.InvariantCulture, out TimeSpan initialTime))
+            {
+                editor.Value = initialTime;
+            }
+            else
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for time. Expected a time (e.g. 14:30:00)." };
+            }
         }
 
         RunnableWrapper<TimeEditor, TimeSpan?> wrapper = new (editor)

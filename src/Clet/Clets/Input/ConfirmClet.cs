@@ -47,6 +47,10 @@ internal sealed class ConfirmClet : IClet<bool?>
             {
                 selector.Value = 1;
             }
+            else
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for confirm. Expected true, false, yes, or no." };
+            }
         }
 
         string title = options.CletOptions?.TryGetValue ("prompt", out string? promptValue) == true && promptValue is not null

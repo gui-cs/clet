@@ -56,4 +56,23 @@ public class ConfirmCletIntegrationTests
 
         Assert.Equal (CletRunStatus.Ok, result.Status);
     }
+
+    [Fact]
+    public async Task RunAsync_WithInvalidInitialValue_ReturnsUsageError ()
+    {
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+
+        ConfirmClet clet = new ();
+        CletRunOptions options = new ();
+
+        using CancellationTokenSource cts = new ();
+
+        CletRunResult<bool?> result = await clet.RunAsync (app, "maybe", options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Error, result.Status);
+        Assert.Equal ("usage", result.ErrorCode);
+        Assert.NotNull (result.ErrorMessage);
+        Assert.Contains ("maybe", result.ErrorMessage);
+    }
 }

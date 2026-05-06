@@ -39,10 +39,17 @@ internal sealed class RangeClet : IClet<JsonObject?>
             rangeView.Increment = step;
         }
 
-        if (initial is not null && TryParseRange (initial, out int low, out int high))
+        if (initial is not null)
         {
-            rangeView.LowValue = low;
-            rangeView.HighValue = high;
+            if (TryParseRange (initial, out int low, out int high))
+            {
+                rangeView.LowValue = low;
+                rangeView.HighValue = high;
+            }
+            else
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for range. Expected format 'low..high' (e.g. 1..10)." };
+            }
         }
 
         RunnableWrapper<RangeView, (int Low, int High)?> wrapper = new (rangeView)

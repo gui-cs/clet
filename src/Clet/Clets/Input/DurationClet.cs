@@ -33,16 +33,27 @@ internal sealed class DurationClet : IClet<string?>
 
         if (initial is not null)
         {
+            bool initialParsed = false;
+
             try
             {
                 TimeSpan parsed = XmlConvert.ToTimeSpan (initial);
                 editor.Value = parsed;
+                initialParsed = true;
             }
             catch (FormatException)
+            {
+            }
+
+            if (!initialParsed)
             {
                 if (TimeSpan.TryParse (initial, CultureInfo.InvariantCulture, out TimeSpan fallback))
                 {
                     editor.Value = fallback;
+                }
+                else
+                {
+                    return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for duration. Expected an ISO-8601 duration (e.g. PT1H30M) or timespan (e.g. 1:30:00)." };
                 }
             }
         }

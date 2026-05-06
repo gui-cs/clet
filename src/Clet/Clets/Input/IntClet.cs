@@ -39,10 +39,16 @@ internal sealed class IntClet : IClet<int?>
             spinner.Increment = step;
         }
 
-        if (initial is not null
-            && int.TryParse (initial, CultureInfo.InvariantCulture, out int initialValue))
+        if (initial is not null)
         {
-            spinner.Value = initialValue;
+            if (int.TryParse (initial, CultureInfo.InvariantCulture, out int initialValue))
+            {
+                spinner.Value = initialValue;
+            }
+            else
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for int. Expected an integer (e.g. 42, -10)." };
+            }
         }
 
         RunnableWrapper<NumericUpDown<int>, int?> wrapper = new (spinner)

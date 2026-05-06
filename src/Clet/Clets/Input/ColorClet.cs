@@ -30,9 +30,16 @@ internal sealed class ColorClet : IClet<string?>
         picker.Style.ShowColorName = true;
         picker.ApplyStyleChanges ();
 
-        if (initial is not null && Color.TryParse (initial, null, out Color parsed))
+        if (initial is not null)
         {
-            picker.SelectedColor = parsed;
+            if (Color.TryParse (initial, null, out Color parsed))
+            {
+                picker.SelectedColor = parsed;
+            }
+            else
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for color. Expected a hex color (#rrggbb), named color, or RGB value." };
+            }
         }
 
         RunnableWrapper<ColorPicker, Color?> wrapper = new (picker)

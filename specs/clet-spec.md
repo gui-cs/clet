@@ -410,6 +410,14 @@ This is the standard .NET parsing contract; we don't invent a new interface. Mos
 
 For types where `IParsable` doesn't fit (collections like `List<string>`, multi-select results, free-form structured input), the clet registers a parser delegate as part of `[Clet]` registration. AOT-clean either way (static-abstract dispatch is an interface call resolved at link time).
 
+**Invalid `--initial` value.** If `--initial` is provided but cannot be parsed, the clet returns an error result — status `error`, code `"usage"`, exit code 2 — without opening the TUI. Silently falling back to the default value is not acceptable (see D-022). The error message names the invalid value and enumerates the expected format:
+
+```
+error: usage: invalid --initial value '42' for color. Expected a hex color (#rrggbb), named color, or RGB value.
+```
+
+This applies to all typed clets (`color`, `int`, `decimal`, `date`, `time`, `duration`, `confirm`, `range`). Selection-based clets (`select`, `multi-select`) use `--initial` for label pre-selection; a non-matching label silently produces no pre-selection (reasonable since the label set is runtime-supplied).
+
 ### 4.6 `Program.Main` outline
 
 ```csharp

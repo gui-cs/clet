@@ -56,4 +56,23 @@ public class ColorCletIntegrationTests
 
         Assert.Equal (CletRunStatus.Ok, result.Status);
     }
+
+    [Fact]
+    public async Task RunAsync_WithInvalidInitialValue_ReturnsUsageError ()
+    {
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+
+        ColorClet clet = new ();
+        CletRunOptions options = new ();
+
+        using CancellationTokenSource cts = new ();
+
+        CletRunResult<string?> result = await clet.RunAsync (app, "not-a-color", options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Error, result.Status);
+        Assert.Equal ("usage", result.ErrorCode);
+        Assert.NotNull (result.ErrorMessage);
+        Assert.Contains ("not-a-color", result.ErrorMessage);
+    }
 }

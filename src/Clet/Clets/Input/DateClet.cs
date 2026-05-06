@@ -30,10 +30,16 @@ internal sealed class DateClet : IClet<string?>
 
         DatePicker picker = new ();
 
-        if (initial is not null
-            && DateTime.TryParse (initial, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime initialDate))
+        if (initial is not null)
         {
-            picker.Value = initialDate;
+            if (DateTime.TryParse (initial, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime initialDate))
+            {
+                picker.Value = initialDate;
+            }
+            else
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "usage", ErrorMessage = $"invalid --initial value '{initial}' for date. Expected a date (e.g. 2024-01-15)." };
+            }
         }
 
         RunnableWrapper<DatePicker, DateTime?> wrapper = new (picker)

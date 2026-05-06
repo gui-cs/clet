@@ -56,4 +56,23 @@ public class IntCletIntegrationTests
 
         Assert.Equal (CletRunStatus.Ok, result.Status);
     }
+
+    [Fact]
+    public async Task RunAsync_WithInvalidInitialValue_ReturnsUsageError ()
+    {
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+
+        IntClet clet = new ();
+        CletRunOptions options = new ();
+
+        using CancellationTokenSource cts = new ();
+
+        CletRunResult<int?> result = await clet.RunAsync (app, "not-an-int", options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Error, result.Status);
+        Assert.Equal ("usage", result.ErrorCode);
+        Assert.NotNull (result.ErrorMessage);
+        Assert.Contains ("not-an-int", result.ErrorMessage);
+    }
 }
