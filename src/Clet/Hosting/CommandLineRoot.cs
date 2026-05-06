@@ -45,7 +45,9 @@ internal sealed class CommandLineRoot
                 return ExitCodes.Ok;
 
             case "help":
-                return WriteAliasHelp (args, stdout, stderr);
+                string? helpAlias = args.Length >= 2 ? args [1] : null;
+
+                return await DispatchHelp (helpAlias, cancellationToken, stdout, stderr);
 
             case "list":
                 return WriteList (args, stdout);
@@ -218,28 +220,54 @@ internal sealed class CommandLineRoot
         return await _dispatcher.DispatchAsync (alias, initial, options, cancellationToken, stdout, stderr);
     }
 
-    private int WriteAliasHelp (string[] args, TextWriter stdout, TextWriter stderr)
+    private async Task<int> DispatchHelp (
+        string? alias,
+        CancellationToken cancellationToken,
+        TextWriter stdout,
+        TextWriter stderr)
     {
-        if (args.Length < 2)
-        {
-            WriteRootHelp (stdout);
+        string markdown;
+        string title;
 
-            return ExitCodes.Ok;
+        if (alias is not null)
+        {
+            if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
+            {
+                stderr.WriteLine ($"error: unknown alias '{alias}'. Try 'clet list' to see available clets.");
+
+                return ExitCodes.UsageError;
+            }
+
+            markdown = MarkdownHelpRenderer.BuildAliasHelpMarkdown (clet);
+            title = $"clet help {clet.PrimaryAlias}";
+        }
+        else
+        {
+            string? rawMarkdown = MarkdownHelpRenderer.ReadEmbeddedHelp ("overview.md");
+
+            if (rawMarkdown is null)
+            {
+                stdout.WriteLine ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents");
+                stdout.WriteLine ();
+                stdout.WriteLine ("Usage: clet <alias> [options]");
+                stdout.WriteLine ("       clet list [--json]");
+                stdout.WriteLine ("       clet help <alias>");
+
+                return ExitCodes.Ok;
+            }
+
+            string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
+            markdown = rawMarkdown.Replace ("{{CLET_TABLE}}", cletTable);
+            markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
+            title = "clet";
         }
 
-        string alias = args [1];
-
-        if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
+        CletRunOptions options = new ()
         {
-            stderr.WriteLine ($"error: unknown alias '{alias}'. Try 'clet list' to see available clets.");
+            Title = title,
+        };
 
-            return ExitCodes.UsageError;
-        }
-
-        string markdown = MarkdownHelpRenderer.BuildAliasHelpMarkdown (clet);
-        MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
-
-        return ExitCodes.Ok;
+        return await _dispatcher.DispatchAsync ("md", markdown, options, cancellationToken, stdout, stderr);
     }
 
     private int WriteList (string[] args, TextWriter stdout)

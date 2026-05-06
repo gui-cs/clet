@@ -48,16 +48,13 @@ public class CletSmokeTests
         Assert.Contains ("\"kind\":\"input\"", trimmed);
     }
 
-    [Fact]
-    public async Task HelpAlias_KnownAlias_PrintsAliasHelp ()
-    {
-        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (["help", "select"]);
-
-        Assert.Equal (0, exit);
-        Assert.Empty (stderr);
-        Assert.Contains ("select", stdout);
-        Assert.Contains ("--options", stdout);
-    }
+    // `clet help <alias>` and `clet help` now route through the interactive md viewer
+    // (PR #76). The viewer doesn't exit without a keystroke, so it can't be exercised
+    // by Process.Start-style smoke tests — that needs the TUIcast keystroke harness
+    // deferred to v0.3 per spec §6.3. The successful-dispatch path is covered by the
+    // CommandLineRootTests.HelpAlias_KnownAlias_DispatchesHelpViewer unit test (which
+    // uses a pre-cancelled token to short-circuit the viewer). The unknown-alias path
+    // still smoke-tests cleanly because it returns UsageError *before* dispatching.
 
     [Fact]
     public async Task HelpAlias_UnknownAlias_ExitsWithUsageError ()
@@ -77,17 +74,6 @@ public class CletSmokeTests
         Assert.Empty (stderr);
         Assert.Contains ("\"alias\":\"md\"", stdout);
         Assert.Contains ("\"kind\":\"viewer\"", stdout);
-    }
-
-    [Fact]
-    public async Task HelpAlias_Md_PrintsMdHelp ()
-    {
-        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (["help", "md"]);
-
-        Assert.Equal (0, exit);
-        Assert.Empty (stderr);
-        Assert.Contains ("md", stdout);
-        Assert.Contains ("Markdown", stdout);
     }
 
     [Fact (Skip = "Requires real TG run loop with cancellation; v0.3 TUIcast harness will drive this against the AOT'd binary.")]
