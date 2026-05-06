@@ -129,6 +129,13 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.LinkClicked += (_, e) =>
         {
+            // Open http/https links in the default browser — they're safe
+            if (e.Url.StartsWith ("http://", StringComparison.OrdinalIgnoreCase)
+                || e.Url.StartsWith ("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                Link.OpenUrl (e.Url);
+            }
+
             statusShortcut.Title = e.Url;
             e.Handled = true;
         };
