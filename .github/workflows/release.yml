@@ -54,14 +54,30 @@ jobs:
       - name: Compute version
         id: version
         shell: bash
+        env:
+          TG_VERSION_INPUT: ${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}
+          VERSION_OVERRIDE: ${{ github.event.inputs.version_override }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          # --- Validate user-supplied version inputs (prevent script injection) ---
+          # Empty TG_VERSION_INPUT is allowed; the script falls back to the csproj pin below.
+          VERSION_PATTERN='^[0-9A-Za-z._+*-]+$'
+          if [ -n "$TG_VERSION_INPUT" ] && ! [[ "$TG_VERSION_INPUT" =~ $VERSION_PATTERN ]]; then
+            echo "::error::tg_version input contains invalid characters: $TG_VERSION_INPUT"
+            exit 2
+          fi
+          if [ -n "$VERSION_OVERRIDE" ] && ! [[ "$VERSION_OVERRIDE" =~ $VERSION_PATTERN ]]; then
+            echo "::error::version_override input contains invalid characters: $VERSION_OVERRIDE"
+            exit 2
+          fi
+
           # --- Determine TG version ---
-          TG_VERSION="${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}"
+          TG_VERSION="$TG_VERSION_INPUT"
 
           # --- Determine channel (main vs develop) ---
           BRANCH="${GITHUB_REF_NAME}"
           # For repository_dispatch, default to develop; for workflow_dispatch, use current branch
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
             BRANCH="develop"
           fi
           if [ "$BRANCH" = "main" ]; then
@@ -88,8 +104,8 @@ jobs:
           echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
 
           # --- Determine clet version ---
-          if [ -n "${{ github.event.inputs.version_override }}" ]; then
-            CLET_VERSION="${{ github.event.inputs.version_override }}"
+          if [ -n "$VERSION_OVERRIDE" ]; then
+            CLET_VERSION="$VERSION_OVERRIDE"
             echo "clet_version=$CLET_VERSION" >> "$GITHUB_OUTPUT"
             echo "## Version Resolution" >> "$GITHUB_STEP_SUMMARY"
             echo "- clet version: \`$CLET_VERSION\` (manual override)" >> "$GITHUB_STEP_SUMMARY"
@@ -185,11 +201,11 @@ jobs:
 
       - name: Unit Tests
         shell: bash
-        run: dotnet run --project tests/Clet.UnitTests --no-build -c Release
+        run: dotnet exec tests/Clet.UnitTests/bin/Release/net10.0/Clet.UnitTests.dll
 
       - name: Integration Tests
         shell: bash
-        run: dotnet run --project tests/Clet.IntegrationTests --no-build -c Release
+        run: dotnet exec tests/Clet.IntegrationTests/bin/Release/net10.0/Clet.IntegrationTests.dll
 
       - name: Publish AOT
         run: >
@@ -202,7 +218,7 @@ jobs:
           -o publish/${{ matrix.rid }}
 
       - name: Smoke Tests
-        run: dotnet run --project tests/Clet.SmokeTests --no-build -c Release
+        run: dotnet exec tests/Clet.SmokeTests/bin/Release/net10.0/Clet.SmokeTests.dll
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
