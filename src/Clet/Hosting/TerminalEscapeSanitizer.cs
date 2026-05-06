@@ -1,4 +1,5 @@
 using System.Text;
+using System.Linq;
 
 namespace Clet;
 
@@ -169,15 +170,7 @@ internal static class TerminalEscapeSanitizer
 
     private static bool ContainsDangerousBytes (string s)
     {
-        foreach (char c in s)
-        {
-            if (c is '\x1b' or '\x07' or '\x9b' or '\x9d')
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return s.Any (c => c is '\x1b' or '\x07' or '\x9b' or '\x9d');
     }
 
     private static bool ContainsDangerousOutputBytes (string s)
