@@ -65,6 +65,7 @@ internal sealed class CommandLineRoot
         string alias = args [0];
         string? initial = null;
         string? title = null;
+        string? outputPath = null;
         bool jsonOutput = false;
         bool fullscreen = false;
         bool cat = false;
@@ -158,6 +159,20 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
+            if (arg is "--output" or "-o")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    stderr.WriteLine ("error: --output requires a file path.");
+
+                    return ExitCodes.UsageError;
+                }
+
+                outputPath = args [++i];
+
+                continue;
+            }
+
             if (arg is "--rows" or "-r")
             {
                 if (i + 1 >= args.Length)
@@ -201,6 +216,7 @@ internal sealed class CommandLineRoot
             JsonOutput = jsonOutput,
             Fullscreen = fullscreen,
             Cat = cat,
+            OutputPath = outputPath,
             Timeout = timeout,
             Title = title,
             Rows = rows,

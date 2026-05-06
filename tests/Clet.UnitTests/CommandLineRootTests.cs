@@ -396,4 +396,26 @@ public class CommandLineRootTests
         Assert.Equal (ExitCodes.UsageError, exit);
         Assert.Contains ("--cat requires content", stderr.ToString ());
     }
+
+    [Fact]
+    public async Task Alias_OutputMissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "--output"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--output", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_ShortOutputMissingValue_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["select", "-o"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("--output", stderr.ToString ());
+    }
 }

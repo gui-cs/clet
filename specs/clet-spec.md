@@ -259,7 +259,7 @@ See `src/Clet/Hosting/Program.cs`. The host creates a `CancellationTokenSource`,
 ### 4.7 CLI surface
 
 ```
-clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--cat] [--rows <n>] [--<opt> <value>]...
+clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--cat] [--rows <n>] [--output <path>] [--<opt> <value>]...
 clet list [--json]
 clet help <alias>
 clet --help
@@ -276,9 +276,11 @@ clet --version
   ╚═╝╩═╝╚═╝ ╩
 ```
 
-**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, `--fullscreen`, and `--cat` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`, `md`); clets that do not consume positional args reject them with a usage error (exit 2) before the clet runs. See [D-025](decisions.md) for the `AcceptsPositionalArgs` design and [D-014](decisions.md) for why `--title` is a host flag.
+**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, `--fullscreen`, `--cat`, `--rows`, and `--output` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`, `md`); clets that do not consume positional args reject them with a usage error (exit 2) before the clet runs. See [D-025](decisions.md) for the `AcceptsPositionalArgs` design and [D-014](decisions.md) for why `--title` is a host flag.
 
 **`--cat` (non-interactive rendering).** When `--cat` is passed to a viewer clet (currently `md`), content is rendered as ANSI-formatted text directly to stdout — no alt-screen, no interactive session. Useful for piping (`clet md --cat README.md | less -R`), CI logs, and AI agents. Content is resolved from file arguments, `--initial`, or stdin, same as the normal viewer path. If no content is available, exits with usage error (exit 2). See [D-027](decisions.md).
+
+**`--output <path>` / `-o <path>` (file output).** Writes the clet's result (plain text or JSON) to the specified file instead of stdout. When `--output` is set, nothing is written to stdout by `OutputFormatter` — stdout stays fully available for TUI rendering. This works around the Terminal.Gui limitation where stdout redirection (`$()`, `|`, `>`) swallows the TUI (see gui-cs/Terminal.Gui#5207). If the file cannot be written, an error is emitted to stderr and the process exits with code 2. See [D-028](decisions.md).
 
 **Input-size caps.** `--initial` is capped at 64 K characters (code units). `clet md` stdin is capped at 8 M characters. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. These caps prevent OOM from untrusted piped input (see Appendix A). Per-clet options (`--<name> <value>`) are not yet capped; tracked as a follow-up.
 
