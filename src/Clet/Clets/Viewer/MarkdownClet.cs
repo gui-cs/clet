@@ -142,7 +142,12 @@ internal sealed class MarkdownClet : IViewerClet
 
         Shortcut lineCountShortcut = new () { Title = "0 lines", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut fileSizeShortcut = new () { Title = "0 B", MouseHighlightStates = MouseState.None, Enabled = false };
-        Shortcut statusShortcut = new (Key.Empty, "Ready", null) { MouseHighlightStates = MouseState.None };
+
+        // Status link — shows the current filename or a clickable URL when the user
+        // hovers/clicks a hyperlink in the markdown. Clicking the link in the status
+        // bar opens it in the default browser.
+        Link statusLink = new () { Text = "Ready", CanFocus = false };
+        Shortcut statusShortcut = new () { CommandView = statusLink, MouseHighlightStates = MouseState.None };
 
         // --- MarkdownView event wiring ---
 
@@ -157,8 +162,9 @@ internal sealed class MarkdownClet : IViewerClet
                 return;
             }
 
-            // SurfaceOnly: show URL in status bar, don't open
-            statusShortcut.Title = e.Url;
+            // Show URL in status bar as a clickable link
+            statusLink.Text = e.Url;
+            statusLink.Url = e.Url;
             e.Handled = true;
         };
 
@@ -264,7 +270,8 @@ internal sealed class MarkdownClet : IViewerClet
                 string sanitized = TerminalEscapeSanitizer.Sanitize (content)!;
                 markdownView.Text = sanitized;
                 fileSizeShortcut.Title = FormatFileSize (System.Text.Encoding.UTF8.GetByteCount (sanitized));
-                statusShortcut.Title = options.Title ?? "(inline)";
+                statusLink.Text = options.Title ?? "(inline)";
+                statusLink.Url = string.Empty;
             }
 
         };
@@ -295,7 +302,8 @@ internal sealed class MarkdownClet : IViewerClet
 
             FileInfo fileInfo = new (fullPath);
             fileSizeShortcut.Title = FormatFileSize (fileInfo.Length);
-            statusShortcut.Title = Path.GetFileName (fullPath);
+            statusLink.Text = Path.GetFileName (fullPath);
+            statusLink.Url = string.Empty;
         }
     }
 
