@@ -45,9 +45,24 @@ internal sealed class CommandLineRoot
                 return ExitCodes.Ok;
 
             case "help":
-                string? helpAlias = args.Length >= 2 ? args [1] : null;
+            {
+                string? helpAlias = null;
+                bool helpCat = false;
 
-                return await DispatchHelp (helpAlias, cancellationToken, stdout, stderr);
+                for (int i = 1; i < args.Length; i++)
+                {
+                    if (args [i] is "--cat")
+                    {
+                        helpCat = true;
+                    }
+                    else
+                    {
+                        helpAlias = args [i];
+                    }
+                }
+
+                return await DispatchHelp (helpAlias, helpCat, cancellationToken, stdout, stderr);
+            }
 
             case "list":
                 return WriteList (args, stdout);
@@ -63,6 +78,15 @@ internal sealed class CommandLineRoot
         TextWriter stderr)
     {
         string alias = args [0];
+
+        // Support `clet <alias> help`, `clet <alias> --help`, `clet <alias> -h`
+        if (args.Length >= 2 && args [1] is "help" or "--help" or "-h")
+        {
+            bool helpCat = Array.Exists (args, a => a == "--cat");
+
+            return await DispatchHelp (alias, helpCat, cancellationToken, stdout, stderr);
+        }
+
         string? initial = null;
         string? title = null;
         string? outputPath = null;
@@ -247,6 +271,7 @@ internal sealed class CommandLineRoot
 
     private async Task<int> DispatchHelp (
         string? alias,
+        bool cat,
         CancellationToken cancellationToken,
         TextWriter stdout,
         TextWriter stderr)
@@ -285,6 +310,13 @@ internal sealed class CommandLineRoot
             markdown = rawMarkdown.Replace ("{{CLET_TABLE}}", cletTable);
             markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
             title = "clet";
+        }
+
+        if (cat)
+        {
+            MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
+
+            return ExitCodes.Ok;
         }
 
         CletRunOptions options = new ()
