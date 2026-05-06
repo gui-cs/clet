@@ -59,7 +59,7 @@ public class FileAccessPolicySmokeTests
             return; // Skip on Windows — different path structure
         }
 
-        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (
+        (int exit, _, string stderr) = await CletProcess.RunAsync (
             ["md", "--cat", "/etc/*.conf"]);
 
         // Should be refused due to being outside cwd + disallowed extension
