@@ -83,6 +83,10 @@ Exit codes:
 
 > 🎬 *Recording coming soon.*
 
+Here's `clet file`
+
+<img width="709" height="395" alt="image" src="https://github.com/user-attachments/assets/9ed8a6e4-2d00-4636-92b4-f07d20e1b250" />
+
 ## Alpha feedback
 
 clet is in **friends-and-family alpha** ([milestone tracker](https://github.com/gui-cs/clet/issues/33)). If something doesn't work, looks wrong, or is just confusing, **[file an issue](https://github.com/gui-cs/clet/issues/new)**. Include:
@@ -163,6 +167,8 @@ Or, you can pick from a built-in Terminal.Gui Theme. This example picks the `And
   "Theme": "Anders"
 }
 ```
+
+<img width="576" height="131" alt="image" src="https://github.com/user-attachments/assets/df36bca2-25b5-4904-af51-5a9de9e9be35" />
 
 All clets render with the `Base` color scheme, so customizing `Base` controls every clet's appearance. See the [Terminal.Gui Configuration docs](https://gui-cs.github.io/Terminal.Gui/docs/configuration.html) for the full schema.
 
