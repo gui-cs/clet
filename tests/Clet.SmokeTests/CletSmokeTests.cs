@@ -102,6 +102,13 @@ public class CletSmokeTests
     [Fact]
     public async Task OversizedInitial_ExitsWithValidationError ()
     {
+        // Windows has a ~32K command-line length limit; the 64K --initial arg exceeds it.
+        // The logic is covered by the unit test (Alias_InitialExceeds64KiB_ExitsWithValidationError).
+        if (OperatingSystem.IsWindows ())
+        {
+            return;
+        }
+
         string oversized = new ('x', 64 * 1024 + 1);
 
         (int exit, string stdout, string stderr) = await CletProcess.RunAsync (
