@@ -35,12 +35,29 @@ internal sealed class HelpClet : IViewerClet
         }
 
         string? alias = options.Arguments?.FirstOrDefault ();
+
+        // Validate alias early — unknown aliases should error, not render
+        if (alias is not null and not "help" && !_registry.TryResolve (alias, out _))
+        {
+            return new ()
+            {
+                Status = CletRunStatus.Error,
+                ErrorCode = "usage",
+                ErrorMessage = $"Unknown alias '{alias}'. Try 'clet list' to see available clets.",
+            };
+        }
+
         (string markdown, string title) = BuildHelpContent (alias);
 
         // --cat mode: render to stdout and exit
         if (options.Cat)
         {
-            MarkdownHelpRenderer.RenderToAnsi (markdown, Console.Out);
+            // Strip clet:help links — they only work in the TUI viewer.
+            // Convert [text](clet:help:x) → text
+            string catMarkdown = System.Text.RegularExpressions.Regex.Replace (
+                markdown, @"\[([^\]]+)\]\(clet:help[^)]*\)", "$1");
+
+            MarkdownHelpRenderer.RenderToAnsi (catMarkdown, Console.Out);
 
             return new () { Status = CletRunStatus.Ok };
         }

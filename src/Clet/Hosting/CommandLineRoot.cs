@@ -61,7 +61,8 @@ internal sealed class CommandLineRoot
 
         // Support `clet <alias> help`, `clet <alias> --help`, `clet <alias> -h`
         // Rewrite as `clet help <alias> [--cat]` and re-dispatch.
-        if (args.Length >= 2 && args [1] is "help" or "--help" or "-h")
+        // Skip when alias is already "help" to avoid infinite recursion.
+        if (alias != "help" && args.Length >= 2 && args [1] is "help" or "--help" or "-h")
         {
             List<string> helpArgs = ["help", alias];
 
