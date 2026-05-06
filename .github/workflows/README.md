@@ -54,7 +54,7 @@ resolve-version → build (3 RIDs) → tag → publish-nuget
 
 **Tagging:** Every successful build is tagged (`v1.0.0-alpha.3`, `v1.0.0-develop.5`, etc.) so future runs can find the latest build number.
 
-**NuGet:** Both channels publish. Prerelease versions (`-alpha`, `-develop`) are hidden from default `dotnet tool install`; consumers opt in with `--prerelease`.
+**NuGet:** Both channels publish to package id `clet` (see [D-024](../../specs/decisions.md)). Prerelease versions (`-alpha`, `-develop`) are hidden from default `dotnet tool install -g clet`; consumers opt in with `--prerelease`.
 
 **Homebrew / WinGet:** Only on stable main releases (version has no `-` suffix). Both are placeholders until `gui-cs/homebrew-tap` exists and WinGet tooling is wired (D-012).
 

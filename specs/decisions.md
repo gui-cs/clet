@@ -6,6 +6,24 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-024: Package id is bare `clet` (Active)
+
+**Context.** [D-019](#d-019-distribute-clet-as-a-single-project-dotnet-tool-mdv-pattern-active) chose `PackageId=Terminal.Gui.clet` to mirror the [`gui-cs/mdv`](https://github.com/gui-cs/mdv) `Terminal.Gui.mdv` precedent and to keep the gui-cs origin obvious in NuGet search. We've since confirmed the bare `clet` id is unclaimed on nuget.org (verified via the flat-container API and the search index, both empty as of 2026-05-06), and the maintainer has scoped a NuGet API key to a single package id (`clet`) for tighter blast radius. The shorter id matches the tool command name (`dotnet tool install -g clet` is already what users type — and now what they search for too).
+
+**Decision.** Switch `<PackageId>` in `src/Clet/Clet.csproj` from `Terminal.Gui.clet` to `clet`. Install command becomes `dotnet tool install -g clet` (and `--prerelease` for the develop channel). Existing `Terminal.Gui.clet.*` versions on nuget.org are unlisted by the maintainer; the package id is freed but the historical versions remain restorable via explicit `--version` for anyone pinned to them (NuGet immutability).
+
+**Why:** Three reasons.
+
+1. **Discoverability and ergonomics.** `clet` is what the tool *is*; `Terminal.Gui.clet` was a hedge for discoverability when we weren't sure the bare id was available. With the bare id confirmed unclaimed and the tool command already named `clet`, the namespace prefix earned no extra signal.
+2. **API key scope.** The maintainer's NuGet API key is now scoped to package id `clet` only — narrower blast radius than a key with broader push rights.
+3. **Aligns with how users already think about it.** README, spec §10, and CLAUDE.md all refer to "the `clet` binary" / "the `clet` command." The package id matching that is one less name to keep track of.
+
+**How to apply:** csproj edit. README install snippets, spec §5.4 / §7 v0.5 row / §10 step 10, decisions log D-019/D-020 references, runbook §2.3 NuGet section, and `.github/workflows/README.md` all updated in the same PR. D-019 *Decision* paragraph annotated to point at this entry; the rest of D-019 (single-csproj `PackAsTool`, no separate `Clet.Tool` project, `ToolCommandName=clet`) remains active.
+
+**Status.** Active. Supersedes the package-id choice in D-019; the rest of D-019 stays in force.
+
+**Pointers.** `src/Clet/Clet.csproj` (`<PackageId>clet</PackageId>`). README "Install" / FAQ. Spec §5.4, §7 v0.5 row, §10 step 10. `docs/runbooks/release-rollback.md` §2.3. `.github/workflows/README.md` "NuGet" section.
+
 ## D-023: Two-branch versioning — main (alpha/stable) + develop (Supersedes D-022)
 
 **Context.** D-022 established independent versioning but treated `main` as the only branch. With the release workflow triggering on every push to `main`, merging any code change became an accidental release. TG itself uses a two-branch model (`main` for releases, `develop` for daily work) and we should mirror it.
@@ -63,7 +81,7 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 
 1. **Two dispatch types.** TG fires `tg-released` on release tags and `tg-develop-published` on every develop NuGet publish. Both carry `client_payload.tg_version`. clet's workflow accepts both.
 2. **Channel from version suffix.** `tg_version` containing `-` ⇒ develop channel; otherwise ⇒ release channel. No separate `channel` field needed — the version string already carries the signal, and SemVer prerelease semantics line up with NuGet's listing rules.
-3. **Per-channel publishing.** NuGet runs on both channels; Homebrew and WinGet run on release only. NuGet's prerelease semantics ensure `dotnet tool install -g Terminal.Gui.clet` resolves to stable; `--prerelease` opts into develop.
+3. **Per-channel publishing.** NuGet runs on both channels; Homebrew and WinGet run on release only. NuGet's prerelease semantics ensure `dotnet tool install -g clet` resolves to stable; `--prerelease` opts into develop.
 4. **clet version = TG version verbatim.** No version negotiation, no compatibility matrix; the workflow passes `-p:Version=${{ env.TG_VERSION }}` to pack/publish.
 5. **Replace the hard-pinned `<PackageReference>` with an MSBuild variable.** `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`, with `<TerminalGuiVersion>` defaulted in the same `PropertyGroup` to a known-good develop build for local development. The workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls exactly the TG version named by the dispatch — no version drift between the package label and what's linked.
 
@@ -79,11 +97,11 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 
 **Context.** Spec §5.4 originally hand-waved at "the `Clet.Tool` project (which references `Clet` and packages the build output as a global tool)" — but no such project exists in the repo, and there is no need for one. The sibling [`gui-cs/mdv`](https://github.com/gui-cs/mdv) viewer ships as a single-csproj global tool: `<PackAsTool>true</PackAsTool>` + `<ToolCommandName>mdv</ToolCommandName>` + `<PackageId>Terminal.Gui.mdv</PackageId>` directly on the executable's csproj. Install command is `dotnet tool install -g Terminal.Gui.mdv`. clet should adopt the same pattern: a single csproj that produces both the AOT single-file binary (for Homebrew/WinGet) and a `dotnet tool` package (for the cross-platform `dotnet tool install` path).
 
-**Decision.** Add `PackAsTool`, `ToolCommandName=clet`, and `PackageId=Terminal.Gui.clet` directly to `src/Clet/Clet.csproj`. Pack the README and LICENSE into the NuGet package via `<None Include="..." Pack="true" PackagePath="/" />`. No separate `Clet.Tool` project. The AOT binary continues to be produced by `dotnet publish -c Release` against the same csproj — `PackAsTool` only affects `dotnet pack` output, not `dotnet publish`. End users on any platform with the .NET SDK can install via `dotnet tool install -g Terminal.Gui.clet` and invoke `clet` from PATH. The package id is namespaced under `Terminal.Gui.` to match the mdv precedent and to make the gui-cs origin obvious in NuGet search.
+**Decision.** Add `PackAsTool`, `ToolCommandName=clet`, and a `PackageId` directly to `src/Clet/Clet.csproj`. Pack the README and LICENSE into the NuGet package via `<None Include="..." Pack="true" PackagePath="/" />`. No separate `Clet.Tool` project. The AOT binary continues to be produced by `dotnet publish -c Release` against the same csproj — `PackAsTool` only affects `dotnet pack` output, not `dotnet publish`. End users on any platform with the .NET SDK can install via `dotnet tool install -g <package-id>` and invoke `clet` from PATH. *(The original choice of `PackageId=Terminal.Gui.clet` to match the `Terminal.Gui.mdv` precedent has been superseded by [D-024](#d-024-package-id-is-bare-clet-active) — the bare `clet` id is now used.)*
 
 **Why:** mdv has already proven the single-csproj approach works for a Terminal.Gui-based tool, and a separate `Clet.Tool` project would add a layer of indirection (project reference, build orchestration, second csproj to keep in sync) that earns nothing. The spec's earlier "Clet.Tool project" phrasing was aspirational — never built.
 
-**How to apply:** §5.4 ".NET tool (NuGet)" describes this packaging in concrete terms (properties to set, exact `dotnet pack` / `dotnet tool install` commands). README install hint is updated to `dotnet tool install -g Terminal.Gui.clet`. v0.5 milestone exit criterion (§7) requires `dotnet pack` + local `dotnet tool install` to work end-to-end before the channels-live exit criteria for v1.0 GA.
+**How to apply:** §5.4 ".NET tool (NuGet)" describes this packaging in concrete terms (properties to set, exact `dotnet pack` / `dotnet tool install` commands). The current install hint is `dotnet tool install -g clet` (per D-024). v0.5 milestone exit criterion (§7) requires `dotnet pack` + local `dotnet tool install` to work end-to-end before the channels-live exit criteria for v1.0 GA.
 
 **Pointers.** Spec §5.4, §7 v0.5 row, §10 step 10. README "Install" section. The `mdv.csproj` reference: <https://github.com/gui-cs/mdv/blob/main/mdv.csproj>.
 
