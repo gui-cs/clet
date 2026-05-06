@@ -103,6 +103,16 @@ NativeAOT publishing (`PublishAot=true`) further closes this surface: AOT binari
 - Contract tests (unit + smoke) validate every envelope shape: `ok`, `cancelled`, `error`, `no-result`.
 - `schemaVersion: 1` is locked for clet 1.x; additive-only changes per §4.3.1.
 
+## Release pipeline
+
+### Script injection via workflow inputs
+
+**Threat:** GitHub Actions interpolates `${{ github.event.* }}` expressions directly into `run:` scripts *before* the shell parses them. An attacker who controls a `repository_dispatch` payload (e.g. a compromised Terminal.Gui PAT) or a `workflow_dispatch` input (e.g. a compromised maintainer account) can inject arbitrary shell commands. The `resolve-version` job runs with `contents: write` + `issues: write` and the downstream `publish-nuget` job uses `secrets.NUGET_API_KEY`, making successful injection high-impact (backdoored NuGet package, exfiltrated secrets).
+
+**Mitigation (D-029):** All user-controlled expressions (`github.event.client_payload.tg_version`, `github.event.inputs.tg_version`, `github.event.inputs.version_override`) are bound to step-level `env:` variables and only referenced as `$VAR` inside the `run:` script — the standard GitHub hardening pattern. Additionally, both inputs are validated against a strict allowlist regex (`^[0-9A-Za-z._+*-]+$`) before use; the step exits 2 if validation fails. See [GitHub's hardening guide](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#good-practices-for-mitigating-script-injection-attacks).
+
+**What is not user-controlled:** `github.event_name` is runner-set metadata (not attacker-controllable), but it is also moved into `env:` for defense-in-depth.
+
 ## Out of scope for v1.0
 
 - **Network access:** clet makes no network calls. No telemetry, no update checks, no remote content fetching.
