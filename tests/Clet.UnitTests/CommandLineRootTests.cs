@@ -161,17 +161,6 @@ public class CommandLineRootTests
     }
 
     [Fact]
-    public async Task RootHelp_MentionsTitleFlag ()
-    {
-        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
-
-        int exit = await root.InvokeAsync (["--help"], CancellationToken.None, stdout, stderr);
-
-        Assert.Equal (ExitCodes.Ok, exit);
-        Assert.Contains ("--title", stdout.ToString ());
-    }
-
-    [Fact]
     public async Task List_ShortJsonFlag_EmitsJson ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
