@@ -131,7 +131,41 @@ Run `clet list` to see what's available in your installed version.
 
 **Q: Theming?**
 
-Whatever theme is set in your TG `ConfigurationManager` applies to every clet automatically.
+Every clet inherits the active Terminal.Gui theme automatically. To customize, create `~/.tui/config.json` (or `$XDG_CONFIG_HOME/tui/config.json`):
+
+```json
+{
+  "Theme": "MyTheme",
+  "Themes": {
+    "MyTheme": {
+      "ColorSchemes": {
+        "Base": {
+          "Normal":    { "Foreground": "#E0E0E0", "Background": "#1E1E1E" },
+          "Focus":     { "Foreground": "#FFFFFF", "Background": "#264F78" },
+          "HotNormal": { "Foreground": "#569CD6", "Background": "#1E1E1E" },
+          "HotFocus":  { "Foreground": "#9CDCFE", "Background": "#264F78" }
+        }
+      }
+    }
+  }
+}
+```
+
+All clets render with the `Base` color scheme, so customizing `Base` controls every clet's appearance. See the [Terminal.Gui Configuration docs](https://gui-cs.github.io/Terminal.Gui/docs/configuration.html) for the full schema.
+
+**Q: Key bindings?**
+
+Key bindings are also configured via `~/.tui/config.json`:
+
+```json
+{
+  "Key.Bindings": {
+    "Application.QuitKey": "Ctrl+Q"
+  }
+}
+```
+
+This changes the quit/dismiss key for all clets. `clet md` shows the active quit key in the status bar automatically.
 
 **Q: Do I need .NET installed?**
 
