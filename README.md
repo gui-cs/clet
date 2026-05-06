@@ -25,7 +25,7 @@ Works for humans and AI agents alike.
 | `pick-file`, `file` | Opens a file picker dialog and returns the selected file path(s). | `--multi`, `--root`, `--filter` |
 | `pick-directory`, `dir` | Opens a directory picker dialog and returns the selected directory path. | `--root` |
 | `range` | Prompts for a numeric range (low..high) and returns a JSON object. | `--step` |
-| `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. | `--theme`, `args...` |
+| `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. | `--theme`, `--cat`, `args...` |
 
 ## Install
 
