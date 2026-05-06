@@ -79,6 +79,22 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         int width,
         int height)
     {
+        // Always FullScreen in the harness — even for input clets that ship Inline in
+        // production. AppModel is process-global; leaving it implicit makes snapshots
+        // order-dependent between tests, and Inline mode renders into a small region
+        // below the cursor that doesn't fill the screen size we set, so snapshots come
+        // out mostly empty. FullScreen gives the full Driver.Contents grid for
+        // deterministic assertions. Tests that specifically need to verify Inline
+        // rendering behavior would need a separate harness mode (not on the v0.5 list).
+        Application.AppModel = AppModel.FullScreen;
+
+        // Note: not setting `DisableRealDriverIO=1` here, even though MarkdownHelpRenderer
+        // does for the print-mode help pipeline. The interactive Markdown View under TG
+        // currently regresses with that flag set. We achieve test determinism instead by
+        // explicitly pinning the screen size via SetScreenSize below — that's the property
+        // the reviewer's suggestion was after (deterministic in headless CI). Revisit if
+        // we ever see CI flakes that trace back to driver capability probes.
+
         IApplication app = Application.Create ();
         app.Init (DriverRegistry.Names.ANSI);
         app.Driver?.SetScreenSize (width, height);
@@ -97,12 +113,17 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         // Run the clet on a background task — its app.RunAsync owns the loop thread.
         Task<CletRunResult<T>> task = Task.Run (async () => await run (app, cts.Token));
 
-        // Wait until the View has actually been drawn (Driver.Contents has non-space cells).
-        // The first Iteration event can fire before the layout/draw pass completes — Views that
-        // depend on Dim.Fill() (TextField, Markdown) need a second pass before their content
-        // shows up, while statically-sized Views (SelectClet's OptionSelector) render in one.
-        // Waiting on "non-empty contents" is more robust than counting iterations.
-        const int maxStartupIterations = 20;
+        // Wait until the rendered contents are *stable* across consecutive iterations.
+        // "Stable" = same hash for two iterations in a row, after at least one non-empty
+        // frame. A simple "first non-empty" check trips on partial layout — the StatusBar
+        // is drawn before the Markdown body, so we'd capture mid-render. Stability is the
+        // signal that the View finished its layout/draw cascade.
+        const int maxStartupIterations = 50;
+        int previousHash = 0;
+        bool sawNonEmpty = false;
+        int stableCount = 0;
+        const int stableThreshold = 2;
+
         for (int i = 0; i < maxStartupIterations; i++)
         {
             TaskCompletionSource tcs = new (TaskCreationOptions.RunContinuationsAsynchronously);
@@ -116,9 +137,31 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
                 break;
             }
 
-            if (HasNonSpaceContent (app.Driver?.Contents))
+            (int hash, bool nonEmpty) = HashContents (app.Driver?.Contents);
+
+            if (!sawNonEmpty)
             {
-                break;
+                if (nonEmpty)
+                {
+                    sawNonEmpty = true;
+                    previousHash = hash;
+                    stableCount = 1;
+                }
+                continue;
+            }
+
+            if (hash == previousHash)
+            {
+                stableCount++;
+                if (stableCount >= stableThreshold)
+                {
+                    break;
+                }
+            }
+            else
+            {
+                previousHash = hash;
+                stableCount = 1;
             }
         }
 
@@ -131,29 +174,38 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         return harness;
     }
 
-    private static bool HasNonSpaceContent (Cell [,]? contents)
+    /// <summary>
+    ///     Returns a content-hash for the cell grid plus a flag indicating whether the grid
+    ///     has any non-space glyphs. Used by the startup-stability detector and not part of
+    ///     the public API.
+    /// </summary>
+    private static (int Hash, bool NonEmpty) HashContents (Cell [,]? contents)
     {
         if (contents is null)
         {
-            return false;
+            return (0, false);
         }
 
         int rows = contents.GetLength (0);
         int cols = contents.GetLength (1);
+        int hash = 17;
+        bool nonEmpty = false;
 
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < cols; c++)
             {
                 string g = contents [r, c].Grapheme;
+                hash = unchecked (hash * 31 + (string.IsNullOrEmpty (g) ? 0 : g.GetHashCode ()));
+
                 if (!string.IsNullOrEmpty (g) && g != " ")
                 {
-                    return true;
+                    nonEmpty = true;
                 }
             }
         }
 
-        return false;
+        return (hash, nonEmpty);
     }
 
     private void OnIteration (object? sender, EventArgs<IApplication?> _)
@@ -331,7 +383,27 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
 
     private static string ResolveGoldenPath (string fileName)
     {
-        // Goldens travel with the test binary (CopyToOutputDirectory). Resolve relative to the assembly.
+        // For reads, the bin directory works (CopyToOutputDirectory ships goldens with the
+        // test binary). But for `CLET_REGEN_GOLDENS=1` writes, we must target the source tree
+        // so the regenerated file actually shows up in `git status`. The csproj bakes the
+        // source path in via `<AssemblyMetadata Include="GoldensSourcePath" />` and we read
+        // it back with AssemblyMetadataAttribute.
+        bool regen = Environment.GetEnvironmentVariable ("CLET_REGEN_GOLDENS") == "1";
+
+        if (regen)
+        {
+            string? sourcePath = typeof (CletUIHarness<T>).Assembly
+                .GetCustomAttributes (typeof (System.Reflection.AssemblyMetadataAttribute), false)
+                .Cast<System.Reflection.AssemblyMetadataAttribute> ()
+                .FirstOrDefault (a => a.Key == "GoldensSourcePath")
+                ?.Value;
+
+            if (!string.IsNullOrEmpty (sourcePath))
+            {
+                return Path.Combine (sourcePath, fileName);
+            }
+        }
+
         string assemblyDir = Path.GetDirectoryName (typeof (CletUIHarness<T>).Assembly.Location)!;
         return Path.Combine (assemblyDir, "Goldens", fileName);
     }
@@ -361,7 +433,16 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
             if (!_cletTask.IsCompleted)
             {
                 _cts.Cancel ();
-                try { await _cletTask; } catch { /* best-effort drain */ }
+
+                try
+                {
+                    await _cletTask;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected on cancellation. Anything else surfaces — a swallowed
+                    // exception from the clet under test would mask real failures.
+                }
             }
         }
         finally
