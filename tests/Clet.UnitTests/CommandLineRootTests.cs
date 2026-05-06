@@ -44,8 +44,7 @@ public class CommandLineRootTests
 
         Assert.Equal (ExitCodes.Ok, exit);
         string output = stdout.ToString ();
-        Assert.Matches (@"(?m)^clet \d+\.\d+\.\d+\s*$", output);
-        Assert.Matches (@"(?m)^Terminal\.Gui \S+\s*$", output);
+        Assert.Matches (@"^\d+\.\d+\.\d+(-\S+)? \(Terminal\.Gui \S+\)\s*$", output);
     }
 
     [Fact]
