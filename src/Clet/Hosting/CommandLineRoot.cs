@@ -6,6 +6,9 @@ namespace Clet;
 
 internal sealed class CommandLineRoot
 {
+    /// <summary>64 K character cap on --initial to prevent OOM from untrusted input.</summary>
+    internal const int MaxInitialChars = 64 * 1024;
+
     private readonly ICletRegistry _registry;
     private readonly AliasDispatcher _dispatcher;
 
@@ -63,6 +66,7 @@ internal sealed class CommandLineRoot
         bool jsonOutput = false;
         bool fullscreen = false;
         TimeSpan? timeout = null;
+        int? rows = null;
         Dictionary<string, string> cletOptions = new (StringComparer.OrdinalIgnoreCase);
         List<string> positionalArgs = [];
 
@@ -116,6 +120,17 @@ internal sealed class CommandLineRoot
 
                 initial = args [++i];
 
+                // Cap --initial at 64 K characters to prevent OOM from untrusted input
+                if (initial.Length > MaxInitialChars)
+                {
+                    BoxedCletResult tooLarge = new (
+                        CletRunStatus.Error, null, "input-too-large",
+                        $"--initial value exceeds the 64 K character limit ({initial.Length} characters).");
+                    OutputFormatter.Write (tooLarge, jsonOutput, stdout, stderr);
+
+                    return ExitCodes.FromResult (tooLarge);
+                }
+
                 continue;
             }
 
@@ -129,6 +144,27 @@ internal sealed class CommandLineRoot
                 }
 
                 title = args [++i];
+
+                continue;
+            }
+
+            if (arg is "--rows" or "-r")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    stderr.WriteLine ("error: --rows requires a value.");
+
+                    return ExitCodes.UsageError;
+                }
+
+                if (!int.TryParse (args [++i], out int parsedRows) || parsedRows < 1)
+                {
+                    stderr.WriteLine ($"error: invalid --rows value '{args [i]}'. Must be a positive integer.");
+
+                    return ExitCodes.UsageError;
+                }
+
+                rows = parsedRows;
 
                 continue;
             }
@@ -156,6 +192,7 @@ internal sealed class CommandLineRoot
             Fullscreen = fullscreen,
             Timeout = timeout,
             Title = title,
+            Rows = rows,
             CletOptions = cletOptions,
             Arguments = positionalArgs.Count > 0 ? positionalArgs : null,
         };

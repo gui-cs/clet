@@ -221,6 +221,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias.
 | Alias                         | `value` shape                                                |
 |-------------------------------|--------------------------------------------------------------|
 | `text`                        | string                                                       |
+| `multiline-text`              | string (newlines preserved as `\n`)                          |
 | `int`                         | integer                                                      |
 | `decimal`                     | number (JSON number; consumer decides float vs decimal)      |
 | `confirm`                     | boolean                                                      |
@@ -258,7 +259,7 @@ See `src/Clet/Hosting/Program.cs`. The host creates a `CancellationTokenSource`,
 ### 4.7 CLI surface
 
 ```
-clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--<opt> <value>]...
+clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--rows <n>] [--<opt> <value>]...
 clet list [--json]
 clet help <alias>
 clet --help
@@ -276,6 +277,8 @@ clet --version
 ```
 
 **Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`, `md`); clets that do not consume positional args reject them with a usage error (exit 2) before the clet runs. See [D-025](decisions.md) for the `AcceptsPositionalArgs` design and [D-014](decisions.md) for why `--title` is a host flag.
+
+**Input-size caps.** `--initial` is capped at 64 K characters (code units). `clet md` stdin is capped at 8 M characters. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. These caps prevent OOM from untrusted piped input (see Appendix A). Per-clet options (`--<name> <value>`) are not yet capped; tracked as a follow-up.
 
 **Defaults.** Input clets render inline. Viewer clets (`md`) render fullscreen. `--fullscreen` forces fullscreen for input clets; it's a no-op for viewers.
 
@@ -459,10 +462,11 @@ The original PR/FAQ pitched clet as exposing **any** `IValue<T>` View to the she
 Full document published at `docs/threat-model.md`.
 
 - **Untrusted inputs:** `--initial`, env vars, stdin content, fixture file paths, `--title`, clet-specific options.
-- **Sanitization:** All output passes through a terminal-escape filter (strip C0/C1 except generated ones). User-controlled display strings sanitized at the View boundary.
-- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` for opt-in; off by default for AI agent use. See [D-017](decisions.md).
-- **File access:** `pick-file` and `pick-directory` honor OS sandbox/permission model.
-- **Plugin loading:** None in v1.0.
+- **Input-size caps:** `--initial` is capped at 64 K characters; `clet md` stdin is capped at 8 M characters. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Per-clet options are not yet capped; tracked as a follow-up.
+- **Sanitization:** All output to stdout/stderr passes through a terminal-escape filter (strip C0/C1 control sequences except those we generate). User-controlled display strings (`--title`, prompt labels) sanitized at the View boundary.
+- **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` flag for the user to opt in; off by default for AI agent use.
+- **File access:** `pick-file` and `pick-directory` honor the OS sandbox/permission model; no privilege escalation.
+- **Plugin loading:** None in v1.0. (Closes the entire LoadFrom-based attack surface.)
 
 ## Appendix B: Cross-References
 
