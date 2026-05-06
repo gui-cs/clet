@@ -140,7 +140,7 @@ internal sealed class FileAccessPolicy
             }
             catch (Exception ex) when (ex is IOException
                                        or UnauthorizedAccessException
-                                       or SecurityException
+                                       or System.Security.SecurityException
                                        or NotSupportedException
                                        or PathTooLongException)
             {
