@@ -27,6 +27,7 @@ internal sealed class FileAccessPolicy
 
     private readonly string _workingDirectory;
     private readonly HashSet<string> _allowedFiles;
+    private readonly List<string> _allowedDirs;
     private readonly bool _allowBinary;
 
     public FileAccessPolicy (string workingDirectory, IReadOnlyList<string>? allowedFiles, bool allowBinary)
@@ -34,12 +35,22 @@ internal sealed class FileAccessPolicy
         _workingDirectory = Path.GetFullPath (workingDirectory);
         _allowBinary = allowBinary;
         _allowedFiles = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
+        _allowedDirs = [];
 
         if (allowedFiles is not null)
         {
             foreach (string f in allowedFiles)
             {
-                _allowedFiles.Add (Path.GetFullPath (f));
+                string full = Path.GetFullPath (f);
+
+                if (Directory.Exists (full))
+                {
+                    _allowedDirs.Add (full);
+                }
+                else
+                {
+                    _allowedFiles.Add (full);
+                }
             }
         }
     }
@@ -52,8 +63,8 @@ internal sealed class FileAccessPolicy
     {
         string fullPath = Path.GetFullPath (filePath);
 
-        // Explicitly allowed files bypass extension and cwd checks
-        if (_allowedFiles.Contains (fullPath))
+        // Explicitly allowed files/directories bypass extension and cwd checks
+        if (_allowedFiles.Contains (fullPath) || _allowedDirs.Any (dir => IsUnderDirectory (fullPath, dir)))
         {
             return CheckSizeAndBinary (fullPath);
         }

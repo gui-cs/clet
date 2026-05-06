@@ -91,6 +91,56 @@ public class FileAccessPolicyTests
     }
 
     [Fact]
+    public void AllowFile_WithDirectory_AllowsFilesUnderThatDirectory ()
+    {
+        string allowedDir = Path.Combine (Path.GetTempPath (), $"clet-allow-dir-{Guid.NewGuid ()}");
+        string cwd = Path.Combine (Path.GetTempPath (), $"clet-test-cwd-{Guid.NewGuid ()}");
+        Directory.CreateDirectory (allowedDir);
+        Directory.CreateDirectory (cwd);
+        string file = Path.Combine (allowedDir, "README.md");
+        File.WriteAllText (file, "# hello");
+
+        try
+        {
+            FileAccessPolicy policy = new (cwd, allowedFiles: [allowedDir], allowBinary: false);
+            string? error = policy.CheckFile (file);
+
+            Assert.Null (error);
+        }
+        finally
+        {
+            File.Delete (file);
+            Directory.Delete (allowedDir, recursive: true);
+            Directory.Delete (cwd, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AllowFile_WithDirectory_RejectsFilesOutsideThatDirectory ()
+    {
+        string allowedDir = Path.Combine (Path.GetTempPath (), $"clet-allow-dir2-{Guid.NewGuid ()}");
+        string cwd = Path.Combine (Path.GetTempPath (), $"clet-test-cwd2-{Guid.NewGuid ()}");
+        Directory.CreateDirectory (allowedDir);
+        Directory.CreateDirectory (cwd);
+        string outsideFile = Path.Combine (Path.GetTempPath (), $"outside-{Guid.NewGuid ()}.md");
+        File.WriteAllText (outsideFile, "# outside");
+
+        try
+        {
+            FileAccessPolicy policy = new (cwd, allowedFiles: [allowedDir], allowBinary: false);
+            string? error = policy.CheckFile (outsideFile);
+
+            Assert.NotNull (error);
+        }
+        finally
+        {
+            File.Delete (outsideFile);
+            Directory.Delete (allowedDir, recursive: true);
+            Directory.Delete (cwd, recursive: true);
+        }
+    }
+
+    [Fact]
     public void BinaryFile_IsRefused_WhenAllowBinaryFalse ()
     {
         string cwd = Path.GetTempPath ();
