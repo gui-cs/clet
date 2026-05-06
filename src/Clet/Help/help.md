@@ -21,3 +21,9 @@ clet select -h
 clet help select --cat
 clet select help --cat
 ```
+
+## Reporting Problems
+
+Found a bug or have a suggestion? [File an issue on GitHub](https://github.com/gui-cs/clet/issues/new).
+
+Include `clet --version` output, your terminal and OS, and what you ran vs. what happened.
