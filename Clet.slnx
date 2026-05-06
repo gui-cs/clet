@@ -4,4 +4,5 @@
   <Project Path="tests/Clet.UnitTests/Clet.UnitTests.csproj" />
   <Project Path="tests/Clet.IntegrationTests/Clet.IntegrationTests.csproj" />
   <Project Path="tests/Clet.SmokeTests/Clet.SmokeTests.csproj" />
+  <Project Path="tests/Clet.UITests/Clet.UITests.csproj" />
 </Solution>
