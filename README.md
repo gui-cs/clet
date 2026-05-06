@@ -16,7 +16,7 @@ dotnet tool install -g clet   # any platform with .NET SDK
 
 ### Pre-Release
 
-Tracks Terminal.Gui's `develop` channel — a new clet prerelease lands on NuGet for every TG develop publish. See [D-020](specs/decisions.md#d-020).
+Tracks Terminal.Gui's `develop` channel — a new clet prerelease lands on NuGet for every TG develop publish.
 
 ```sh
 dotnet tool install -g clet --prerelease
@@ -73,7 +73,11 @@ clet list --json
 # → {"schemaVersion":1,"clets":[{"alias":"select","kind":"input","resultType":"string",...},...]}
 ```
 
-Exit codes: `0` success · `2` usage error · `130` cancelled (SIGINT convention).
+Exit codes: 
+
+- `0` success
+- `2` usage error
+- `130` cancelled (SIGINT convention).
 
 ### Demo
 
@@ -86,8 +90,6 @@ clet is in **friends-and-family alpha** ([milestone tracker](https://github.com/
 - `clet --version` output (e.g. `1.0.0-alpha (Terminal.Gui 2.0.2-develop.37)`).
 - Your terminal + OS (e.g. "Windows Terminal on Windows 11", "iTerm2 on macOS 15").
 - What you ran, what you expected, what happened.
-
-No Discussions, no separate forum — Issues is the only feedback channel during alpha. The faster the loop, the better the v1.0.
 
 ## FAQ
 
@@ -115,11 +117,21 @@ Both share theming, keybindings, mouse support, and the JSON envelope.
 
 **Q: Exit codes?**
 
-`0` success · `1` no-result · `2` usage error · `130` cancelled (SIGINT convention).
+- `0` success
+- `1` no-result
+- `2` usage error
+- `130` cancelled (SIGINT convention).
 
 **Q: Cancellation and timeouts?**
 
 Esc and Ctrl-C cancel input clets; `q`, Esc, and Ctrl-C dismiss viewer clets. `--timeout <duration>` (e.g. `--timeout 30s`) cancels automatically — useful for AI agent scripts.
+
+**Q: What if I don't like what keys do what?
+
+See [Terminal.Gui Configuration Manager](https://gui-cs.github.io/Terminal.Gui/docs/config.html). All key bindings are completely configurable. E.g. you'll create a `~/.tui/clet.config.json` like this:
+
+```json
+```
 
 **Q: Which clets ship in v1.0?**
 
@@ -169,13 +181,13 @@ This changes the quit/dismiss key for all clets. `clet md` shows the active quit
 
 **Q: Do I need .NET installed?**
 
-**No** for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
+**No** - for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
 
-**Yes** for `dotnet tool install -g clet`.
+**Yes** - for `dotnet tool install -g clet`.
 
 **Q: What's the `--prerelease` channel?**
 
-Every push to `develop` triggers a matching `clet` prerelease push to NuGet (versioned `1.x.y-develop.NN` per D-023). Stable users see no churn — `dotnet tool install -g clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship stable main releases. If you want the bleeding edge, pass `--prerelease`. See [D-020](specs/decisions.md), [D-023](specs/decisions.md), and [D-024](specs/decisions.md) for the rationale.
+Every push to `develop` triggers a matching `clet` prerelease push to NuGet (versioned `1.x.y-develop.NN`). Stable users see no churn — `dotnet tool install -g clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship stable main releases. If you want the bleeding edge, pass `--prerelease`. 
 
 **Q: How do I report a bug or give feedback during alpha?**
 
@@ -185,5 +197,3 @@ Every push to `develop` triggers a matching `clet` prerelease push to NuGet (ver
 
 - [Press release & customer voices](specs/press-release.md)
 - [Implementation spec](specs/clet-spec.md)
-- [Design decisions log](specs/decisions.md)
-- [Release rollback runbook](docs/runbooks/release-rollback.md)
