@@ -115,9 +115,24 @@ internal sealed class HelpClet : IViewerClet
 
     private (string Markdown, string Title) BuildHelpContent (string? alias)
     {
-        if (alias is "help" or null)
+        if (alias is null)
         {
             return BuildOverview ();
+        }
+
+        if (alias is "help")
+        {
+            string helpMd = "# clet help\n\nNavigating clet's built-in help system.\n\n";
+            string? helpExtra = MarkdownHelpRenderer.ReadEmbeddedHelp ("help.md");
+
+            if (helpExtra is not null)
+            {
+                helpMd += helpExtra;
+            }
+
+            helpMd += "\n\n---\n\n[Back to overview](clet:help)\n";
+
+            return (helpMd, "clet help");
         }
 
         if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
