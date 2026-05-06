@@ -20,6 +20,8 @@ internal static class MarkdownHelpRenderer
     /// </summary>
     public static void RenderToAnsi (string markdown, TextWriter output)
     {
+        // Sanitize input markdown to remove terminal escape sequences from untrusted content
+        markdown = TerminalEscapeSanitizer.Sanitize (markdown)!;
         // The ANSI driver emits Unicode box-drawing glyphs (U+2500 range) plus the
         // ASCII-art logo. On Windows, Console.OutputEncoding defaults to the OEM code
         // page; Windows Terminal then interprets those bytes as broken UTF-8 and
@@ -108,7 +110,13 @@ internal static class MarkdownHelpRenderer
 
             app.Driver?.ClearContents ();
             markdownView.Draw ();
-            target.WriteLine (app.Driver?.ToAnsi ());
+
+            string rendered = app.Driver?.ToAnsi () ?? string.Empty;
+
+            // Final pass: strip any user-payload escape sequences that survived through TG rendering
+            // while preserving the renderer's own SGR sequences.
+            rendered = TerminalEscapeSanitizer.SanitizeRenderedOutput (rendered);
+            target.WriteLine (rendered);
         }
         finally
         {
