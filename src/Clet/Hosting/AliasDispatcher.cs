@@ -167,7 +167,11 @@ internal sealed class AliasDispatcher
                     {
                         contents.Add (File.ReadAllText (file));
                     }
-                    catch (Exception ex)
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        stderr.WriteLine ($"Warning: Could not read file '{file}': {ex.Message}");
+                    }
+                    catch (IOException ex)
                     {
                         stderr.WriteLine ($"Warning: Could not read file '{file}': {ex.Message}");
                     }
