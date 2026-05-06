@@ -42,9 +42,15 @@ The trust boundary is between the shell/agent layer and the clet CLI host. Every
 
 ### Terminal escape sanitization
 
-**Threat:** An attacker passes terminal escape sequences (C0/C1 control codes) in `--title`, `--initial`, or positional arguments to manipulate the terminal state (cursor repositioning, window title injection, clipboard access via OSC 52).
+**Threat:** An attacker passes terminal escape sequences (C0/C1 control codes) in `--title`, `--initial`, positional arguments, or markdown content (via `clet md`) to manipulate the terminal state (cursor repositioning, window title injection, clipboard access via OSC 52, hyperlink spoofing via OSC 8).
 
-**Mitigation:** Terminal.Gui's View layer renders text through its own attribute/cell model, not by passing raw strings to the terminal. User-supplied strings become `Text` properties on Views (`TextField`, `OptionSelector`, etc.), which are rendered cell-by-cell with explicit attributes. Control characters in user strings are displayed as glyphs (or ignored), not interpreted as escape sequences.
+**Mitigation:** clet implements a defense-in-depth approach:
+
+1. **Input sanitization (TerminalEscapeSanitizer):** All user-supplied content is stripped of dangerous terminal control sequences *before* it reaches Terminal.Gui. The sanitizer removes ESC (`\x1b`), BEL (`\x07`), 8-bit CSI (`\x9b`), 8-bit OSC (`\x9d`), and C1 7-bit pairs (`\x1b@` through `\x1b_`). This filter runs at every code path that hands user content to the renderer:
+   - `MarkdownClet`: inline content and file-loaded content are sanitized before assignment to `markdownView.Text`.
+   - `MarkdownHelpRenderer.RenderToAnsi`: input markdown is sanitized before rendering, and a second pass on the rendered ANSI output strips any user-payload escape sequences that survived through TG rendering (while preserving the renderer's own SGR/cursor sequences).
+
+2. **TG's cell model (defense-in-depth):** Terminal.Gui's View layer renders text through its own attribute/cell model. User-supplied strings become `Text` properties on Views, which are rendered cell-by-cell with explicit attributes. However, clet does **not** rely on TG to filter terminal escapes — the `TerminalEscapeSanitizer` is clet's own defense, applied before content reaches TG (see D-030).
 
 **For JSON output (`--json`):** The `OutputFormatter` writes to stdout via `SchemaV1.ToJson()`, which uses `System.Text.Json` source-generated serialization. JSON string escaping handles control characters per RFC 8259 (e.g. `\u001b` for ESC). No raw user input reaches stdout unescaped.
 
