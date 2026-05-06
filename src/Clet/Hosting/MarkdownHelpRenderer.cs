@@ -192,8 +192,8 @@ internal static class MarkdownHelpRenderer
         StringBuilder sb = new ();
         sb.AppendLine ("## Available Clets");
         sb.AppendLine ();
-        sb.AppendLine ("| Alias | Description |");
-        sb.AppendLine ("|-------|-------------|");
+        sb.AppendLine ("| Alias | Description | Options |");
+        sb.AppendLine ("|-------|-------------|---------|");
 
         foreach (IClet clet in registry.All)
         {
@@ -201,10 +201,29 @@ internal static class MarkdownHelpRenderer
                 ? $"`{clet.PrimaryAlias}`"
                 : string.Join (", ", clet.Aliases.Select (a => $"`{a}`"));
 
-            sb.AppendLine ($"| {aliases} | {clet.Description} |");
+            string options = BuildOptionsColumn (clet);
+
+            sb.AppendLine ($"| {aliases} | {clet.Description} | {options} |");
         }
 
         return sb.ToString ();
+    }
+
+    private static string BuildOptionsColumn (IClet clet)
+    {
+        List<string> parts = new ();
+
+        foreach (CletOptionDescriptor opt in clet.Options)
+        {
+            parts.Add ($"`--{opt.Name}`");
+        }
+
+        if (clet.AcceptsPositionalArgs)
+        {
+            parts.Add ("`args...`");
+        }
+
+        return parts.Count == 0 ? "" : string.Join (", ", parts);
     }
 
     private static string ResultTypeName (Type type)

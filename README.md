@@ -8,24 +8,24 @@ Works for humans and AI agents alike.
 
 ## Available Clets
 
-| Alias | Description |
-| --- | --- |
-| `select` | Presents a list of options and returns the text of the selected item. |
-| `text` | Prompts for free-form text input and returns the entered string. |
-| `multiline-text`, `mt` | Prompts for multi-line text input and returns the entered string. |
-| `int` | Prompts for an integer value using a numeric spinner. |
-| `decimal` | Prompts for a decimal value using a numeric spinner. |
-| `confirm` | Prompts for a yes/no confirmation and returns a boolean. |
-| `date` | Prompts for a date and returns an ISO-8601 date string (YYYY-MM-DD). |
-| `time` | Prompts for a time and returns an ISO-8601 time string (HH:MM:SS). |
-| `duration` | Prompts for a duration and returns an ISO-8601 duration string (e.g. PT1H30M). |
-| `color` | Prompts for a color and returns a hex string (#rrggbb). |
-| `multi-select` | Presents a list of options with checkboxes and returns the selected texts. |
-| `attribute-picker` | Prompts for text attributes (foreground, background, style) and returns a JSON object. |
-| `pick-file`, `file` | Opens a file picker dialog and returns the selected file path(s). |
-| `pick-directory`, `dir` | Opens a directory picker dialog and returns the selected directory path. |
-| `range` | Prompts for a numeric range (low..high) and returns a JSON object. |
-| `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. |
+| Alias | Description | Options |
+| --- | --- | --- |
+| `select` | Presents a list of options and returns the text of the selected item. | `--options`, `args...` |
+| `text` | Prompts for free-form text input and returns the entered string. | |
+| `multiline-text`, `mt` | Prompts for multi-line text input and returns the entered string. | |
+| `int` | Prompts for an integer value using a numeric spinner. | `--step` |
+| `decimal` | Prompts for a decimal value using a numeric spinner. | `--step` |
+| `confirm` | Prompts for a yes/no confirmation and returns a boolean. | `--prompt` |
+| `date` | Prompts for a date and returns an ISO-8601 date string (YYYY-MM-DD). | |
+| `time` | Prompts for a time and returns an ISO-8601 time string (HH:MM:SS). | |
+| `duration` | Prompts for a duration and returns an ISO-8601 duration string (e.g. PT1H30M). | |
+| `color` | Prompts for a color and returns a hex string (#rrggbb). | |
+| `multi-select` | Presents a list of options with checkboxes and returns the selected texts. | `--options`, `args...` |
+| `attribute-picker` | Prompts for text attributes (foreground, background, style) and returns a JSON object. | |
+| `pick-file`, `file` | Opens a file picker dialog and returns the selected file path(s). | `--multi`, `--root`, `--filter` |
+| `pick-directory`, `dir` | Opens a directory picker dialog and returns the selected directory path. | `--root` |
+| `range` | Prompts for a numeric range (low..high) and returns a JSON object. | `--step` |
+| `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. | `--theme`, `args...` |
 
 ## Install
 
