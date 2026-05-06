@@ -347,7 +347,7 @@ After all matrix jobs and smoke tests pass. Channel determines which publish ste
 | Develop | `tg-develop-published` / push / dispatch | prerelease | — | — |
 | Release | `tg-released`          | stable | build-from-source | manifest PR |
 
-**.NET tool** (NuGet) — follows the [mdv](https://github.com/gui-cs/mdv) pattern: `<PackAsTool>true</PackAsTool>`, `<ToolCommandName>clet</ToolCommandName>`, `<PackageId>Terminal.Gui.clet</PackageId>` on `src/Clet/Clet.csproj`. Install: `dotnet tool install -g Terminal.Gui.clet`. See [D-019](decisions.md).
+**.NET tool** (NuGet) — follows the [mdv](https://github.com/gui-cs/mdv) pattern: `<PackAsTool>true</PackAsTool>`, `<ToolCommandName>clet</ToolCommandName>`, `<PackageId>clet</PackageId>` on `src/Clet/Clet.csproj`. Install: `dotnet tool install -g clet`. See [D-019](decisions.md) (packaging) and [D-024](decisions.md) (package id).
 
 **Homebrew tap** (`gui-cs/homebrew-tap`) — release channel only. Build-from-source formula per [D-012](decisions.md).
 
@@ -386,7 +386,7 @@ Schedule follows TG releases, not a calendar.
 | **v0.1 alpha** | [#2](https://github.com/gui-cs/clet/issues/2) | Repo bootstrapped; abstractions, registry, JSON in place; `select` clet working in unit + integration tests. No runnable binary — see v0.11. |
 | **v0.11** | [#9](https://github.com/gui-cs/clet/issues/9) | Runnable binary. CLI host per §4.6/§4.7. `clet --help` / `--version` / `help <alias>` / `list --json` / `<alias> --json` work end-to-end. Process-level smoke harness (Process.Start-based; TUIcast keystroke harness deferred to v0.3 — [D-007](decisions.md)). |
 | **v0.3 alpha** | [#3](https://github.com/gui-cs/clet/issues/3) | All 14 input clets functional. JSON schema drafted. AOT publish green. TUIcast keystroke harness wired up. |
-| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming/schema/exit-codes locked; inline rendering verified on four-terminal matrix; `Markdown` View integration verified; threat model published (`docs/threat-model.md`); `dotnet tool install -g Terminal.Gui.clet` works locally ([D-019](decisions.md)); continuous-release loop proven on develop channel ([D-020](decisions.md)). Release-tag trigger proof and Homebrew/WinGet draft manifests moved to v0.9 RC. |
+| **v0.5 beta** | [#4](https://github.com/gui-cs/clet/issues/4) | Naming/schema/exit-codes locked; inline rendering verified on four-terminal matrix; `Markdown` View integration verified; threat model published (`docs/threat-model.md`); `dotnet tool install -g clet` works locally ([D-019](decisions.md), [D-024](decisions.md)); continuous-release loop proven on develop channel ([D-020](decisions.md)). Release-tag trigger proof and Homebrew/WinGet draft manifests moved to v0.9 RC. |
 | **v0.75 alpha** | [#33](https://github.com/gui-cs/clet/issues/33) | Friends-and-family alpha. >=5 external testers; >=3 Issues filed by non-maintainers; maintainer dogfooding for >=2 weeks; >=1 AI agent harness consuming `--json`; all P0 alpha bugs resolved or deferred. |
 | **v0.9 RC** | [#5](https://github.com/gui-cs/clet/issues/5) | All §6 test layers passing. Release workflow proven against a real TG release. Homebrew formula + WinGet manifest in working-draft form. One real release cycle exercised. Rollback runbook exercised once. |
 | **v1.0 GA** | [#6](https://github.com/gui-cs/clet/issues/6) | Tied to TG v2 GA. Brew, WinGet, NuGet channels live. Documentation published. |
