@@ -200,9 +200,11 @@ jobs:
         run: dotnet build --no-restore -c Release -p:TerminalGuiVersion=${{ env.TG_VERSION }} -p:Version=${{ env.CLET_VERSION }}
 
       - name: Unit Tests
+        shell: bash
         run: dotnet exec tests/Clet.UnitTests/bin/Release/net10.0/Clet.UnitTests.dll
 
       - name: Integration Tests
+        shell: bash
         run: dotnet exec tests/Clet.IntegrationTests/bin/Release/net10.0/Clet.IntegrationTests.dll
 
       - name: Publish AOT

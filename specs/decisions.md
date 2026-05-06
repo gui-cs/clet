@@ -427,7 +427,24 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 
 ---
 
-## D-030: `clet md` file-access confinement policy (Active)
+## D-030: Terminal escape sanitization at the clet layer, not relying on TG (Active)
+
+**Context.** `docs/threat-model.md` "Terminal escape sanitization" originally claimed that TG's cell model prevented escape injection. While TG's `TextField` and `OptionSelector` do render cell-by-cell, the `Markdown` view (used by `clet md`) passes content through a richer pipeline where raw escape bytes in fenced code blocks or inline content could survive to the terminal. The `MarkdownHelpRenderer.RenderToAnsi` `--cat` path writes rendered ANSI directly to stdout, giving smuggled escapes a direct path to the user's terminal. Relying on a `2.0.2-develop.*` preview library for security filtering is unacceptable.
+
+**Decision.** Implement `TerminalEscapeSanitizer` (single internal helper) that strips ESC (`\x1b`), BEL (`\x07`), 8-bit CSI (`\x9b`), 8-bit OSC (`\x9d`), and all C1 7-bit pairs (`\x1b@` through `\x1b_`) from user content. Apply at three call sites:
+1. `MarkdownClet` — inline content before `markdownView.Text = content`.
+2. `MarkdownClet.LoadFile` — file content before `markdownView.Text = fileContent`.
+3. `MarkdownHelpRenderer.RenderToAnsi` — input sanitization before rendering, plus a final output pass (`SanitizeRenderedOutput`) that strips dangerous sequences while preserving the renderer's own CSI/SGR sequences.
+
+This is clet's own defense. TG's cell model is treated as defense-in-depth, not relied upon. Future TG version bumps cannot silently regress this protection.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Hosting/TerminalEscapeSanitizer.cs`, `src/Clet/Clets/Viewer/MarkdownClet.cs`, `src/Clet/Hosting/MarkdownHelpRenderer.cs`, `docs/threat-model.md` ("Terminal escape sanitization" section), `specs/clet-spec.md` Appendix A, issue #38.
+
+---
+
+## D-031: `clet md` file-access confinement policy (Active)
 
 **Context.** `clet md FILE` is an arbitrary file-read primitive. In agent contexts, positional arguments may be attacker-influenced via indirect prompt injection. An attacker could instruct an agent to run `clet md /home/$USER/.aws/credentials`, exfiltrating file content through the rendered ANSI output or `--cat` stdout. Glob patterns (`clet md '/etc/*.conf'`) amplify this to directory enumeration. Issue #38 documents the full threat surface.
 
