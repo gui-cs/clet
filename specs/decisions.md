@@ -10,13 +10,15 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Context.** The original spec (§1, §5.6, §7) tied clet's version 1:1 to Terminal.Gui's. D-020 point 4 made this explicit: "clet version = TG version verbatim." That made sense when clet was conceived as a TG satellite moving in lockstep. It's now clear this was a bad idea: clet has its own wire contract (`schemaVersion: 1`) that versioning should reflect; TG releases on its own cadence; and the develop NuGet builds (`2.0.0-develop.X`) polluted the package history with TG's version numbers.
 
-**Decision.** clet maintains its own SemVer starting at `1.0.0`. Major bumps = schema version bumps (per §4.3.1). Minor bumps = new clets or significant CLI additions. Patch = bug fixes. TG version is surfaced in `--version` output (`X.Y.Z (Terminal.Gui A.B.C)`) for diagnostics but does not drive clet's version number. D-020 point 4 ("clet version = TG version verbatim") is superseded by this entry; the rest of D-020 (two dispatch types, channel from suffix, per-channel publishing, MSBuild variable for TG version) remains active.
+**Decision.** clet maintains its own SemVer starting at `1.0.0`. Major bumps = schema version bumps (per §4.3.1). Minor bumps = new clets or significant CLI additions. Patch = bug fixes, including new TG builds. TG version is surfaced in `--version` output (`X.Y.Z (Terminal.Gui A.B.C)`) for diagnostics but does not drive clet's version number. D-020 point 4 ("clet version = TG version verbatim") is superseded by this entry; the rest of D-020 (two dispatch types, channel from suffix, per-channel publishing, MSBuild variable for TG version) remains active.
+
+**Release triggers and auto-increment.** The release workflow (`.github/workflows/release.yml`) fires on three triggers: (1) TG dispatch (`tg-released` / `tg-develop-published`), (2) push to main that changes `src/` or `tests/`, and (3) manual `workflow_dispatch`. On each trigger the workflow reads the base version from `Clet.csproj`, finds the latest `vMAJOR.MINOR.*` tag, and increments patch by one. For develop-channel builds (TG version contains `-`), the prerelease suffix is appended (e.g. `1.0.1-develop.37`). A git tag (`v*`) on HEAD overrides the computed version entirely, allowing maintainers to force a minor/major bump.
 
 **Why:** With `schemaVersion: 1` as the public API surface, clet's major version should reflect schema stability, not TG's release cadence. Starting at `1.0.0` aligns with the JSON contract already locked. The develop-build NuGet pollution made the cost concrete. The pre-release `2.0.0-develop.X` builds will be unlisted on nuget.org.
 
 **Status.** Active. Supersedes D-020 point 4.
 
-**Pointers.** Spec §1, §4.7 (`--version` format), §5.6 (versioning), §4.3.1 (schema versioning policy). `src/Clet/Clet.csproj` (`<Version>`). `src/Clet/Hosting/CommandLineRoot.cs` (GetVersion + GetTerminalGuiVersion combined output).
+**Pointers.** Spec §1, §4.7 (`--version` format), §5.6 (versioning), §4.3.1 (schema versioning policy). `src/Clet/Clet.csproj` (`<Version>`). `src/Clet/Hosting/CommandLineRoot.cs` (GetVersion + GetTerminalGuiVersion combined output). `.github/workflows/release.yml` (auto-increment logic).
 
 ## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
 
@@ -50,7 +52,7 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Status.** Active. Pending TG-side work: a `notify-clet.yml` workflow on `gui-cs/Terminal.Gui` that fires both dispatches with a `CLET_DISPATCH_PAT` (tracked as a separate TG-side issue).
 
-**Pointers.** Spec §5.1, §5.4, §5.5, §5.6, §7, §8. `src/Clet/Clet.csproj` (`<TerminalGuiVersion>` + variable PackageReference). `.github/workflows/release-on-tg-release.yml` (renamed to `release-on-tg.yml`).
+**Pointers.** Spec §5.1, §5.4, §5.5, §5.6, §7, §8. `src/Clet/Clet.csproj` (`<TerminalGuiVersion>` + variable PackageReference). `.github/workflows/release.yml` (renamed from `release-on-tg.yml` per D-022).
 
 ## D-019: Distribute clet as a single-project `dotnet tool` (mdv pattern) (Active)
 

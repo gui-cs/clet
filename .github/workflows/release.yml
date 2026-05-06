@@ -1,0 +1,272 @@
+name: Release
+
+# Triggers:
+#   1. repository_dispatch from gui-cs/Terminal.Gui (tg-released or tg-develop-published)
+#   2. Push to main that changes code (src/ or tests/)
+#   3. Manual workflow_dispatch for rollback patches and dry-runs
+#
+# Versioning (D-022):
+#   - clet maintains its own SemVer (read from Clet.csproj <Version>).
+#   - Each release increments the patch: 1.0.0 → 1.0.1 → 1.0.2 ...
+#   - TG dispatches produce a prerelease suffix when TG version contains '-':
+#     e.g. 1.0.1-develop.37
+#   - A git tag (v*) on main overrides the computed version entirely.
+#   - See specs/decisions.md D-022 and D-020 for rationale.
+on:
+  repository_dispatch:
+    types: [tg-released, tg-develop-published]
+  push:
+    branches: [main]
+    paths: ['src/**', 'tests/**']
+  workflow_dispatch:
+    inputs:
+      tg_version:
+        description: 'Terminal.Gui version to build against (e.g. 2.1.0, 2.0.2-develop.37). Leave empty to use csproj default.'
+        required: false
+      version_override:
+        description: 'Override clet version (e.g. 1.1.0). Leave empty for auto-increment patch.'
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  resolve-version:
+    runs-on: ubuntu-latest
+    outputs:
+      clet_version: ${{ steps.version.outputs.clet_version }}
+      tg_version: ${{ steps.version.outputs.tg_version }}
+      is_develop: ${{ steps.version.outputs.is_develop }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          # Determine TG version: dispatch payload > workflow input > csproj default
+          TG_VERSION="${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}"
+          if [ -z "$TG_VERSION" ]; then
+            TG_VERSION=$(grep -oP '(?<=<TerminalGuiVersion.*>)[^<]+' src/Clet/Clet.csproj | head -1)
+          fi
+          echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
+
+          # Determine if this is a develop channel build
+          if [[ "$TG_VERSION" == *-* ]]; then
+            echo "is_develop=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_develop=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Determine clet version
+          # Priority: version_override input > git tag on HEAD > auto-increment patch
+          if [ -n "${{ github.event.inputs.version_override }}" ]; then
+            CLET_VERSION="${{ github.event.inputs.version_override }}"
+          elif git describe --tags --exact-match HEAD 2>/dev/null | grep -qP '^v\d'; then
+            CLET_VERSION=$(git describe --tags --exact-match HEAD | sed 's/^v//')
+          else
+            # Read base version from csproj (strip any prerelease suffix for patch math)
+            BASE_VERSION=$(grep -oP '(?<=<Version>)[^<]+' src/Clet/Clet.csproj | head -1)
+            BASE_VERSION=${BASE_VERSION%%-*}  # strip prerelease suffix if any
+            MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+            MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+            PATCH=$(echo "$BASE_VERSION" | cut -d. -f3)
+
+            # Find the latest tag matching this major.minor and increment patch
+            LATEST_TAG=$(git tag --list "v${MAJOR}.${MINOR}.*" --sort=-v:refname | head -1)
+            if [ -n "$LATEST_TAG" ]; then
+              LATEST_PATCH=$(echo "$LATEST_TAG" | sed 's/^v//' | sed 's/-.*//' | cut -d. -f3)
+              PATCH=$((LATEST_PATCH + 1))
+            fi
+
+            CLET_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          # For develop channel, append prerelease suffix
+          if [[ "$TG_VERSION" == *-* ]]; then
+            # Extract the develop build number from TG version (e.g. "37" from "2.0.2-develop.37")
+            DEV_SUFFIX=$(echo "$TG_VERSION" | sed 's/[^-]*-//')
+            CLET_VERSION="${CLET_VERSION}-${DEV_SUFFIX}"
+          fi
+
+          echo "clet_version=$CLET_VERSION" >> "$GITHUB_OUTPUT"
+          echo "## Version Resolution" >> "$GITHUB_STEP_SUMMARY"
+          echo "- clet version: \`$CLET_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- TG version: \`$TG_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: resolve-version
+    strategy:
+      # One bad RID shouldn't kill the others — surface all failures in one run.
+      fail-fast: false
+      matrix:
+        include:
+          - rid: osx-arm64
+            runner: macos-14
+          - rid: linux-x64
+            runner: ubuntu-22.04
+          - rid: win-x64
+            runner: windows-2022
+          # linux-arm64 and win-arm64 need GitHub's native ARM runners
+          # (ubuntu-22.04-arm, windows-11-arm); cross-compile from x64 fails at
+          # link time. Re-enable when wiring native ARM runners (tracked for v0.9 RC).
+    runs-on: ${{ matrix.runner }}
+    env:
+      CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
+      TG_VERSION: ${{ needs.resolve-version.outputs.tg_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+          dotnet-quality: 'ga'
+
+      - name: Restore
+        run: dotnet restore -p:TerminalGuiVersion=${{ env.TG_VERSION }}
+
+      - name: Build
+        run: dotnet build --no-restore -c Release -p:TerminalGuiVersion=${{ env.TG_VERSION }} -p:Version=${{ env.CLET_VERSION }}
+
+      - name: Unit Tests
+        run: dotnet run --project tests/Clet.UnitTests --no-build -c Release
+
+      - name: Integration Tests
+        run: dotnet run --project tests/Clet.IntegrationTests --no-build -c Release
+
+      - name: Publish AOT
+        run: >
+          dotnet publish src/Clet -c Release
+          -r ${{ matrix.rid }}
+          --self-contained
+          -p:PublishAot=true
+          -p:TerminalGuiVersion=${{ env.TG_VERSION }}
+          -p:Version=${{ env.CLET_VERSION }}
+          -o publish/${{ matrix.rid }}
+
+      - name: Smoke Tests
+        run: dotnet run --project tests/Clet.SmokeTests --no-build -c Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clet-${{ matrix.rid }}
+          path: publish/${{ matrix.rid }}/
+          retention-days: 30
+
+  # Tag the release commit so future patch increments can find the latest.
+  tag:
+    needs: [resolve-version, build]
+    runs-on: ubuntu-latest
+    env:
+      CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create tag
+        run: |
+          git tag "v${CLET_VERSION}" || true
+          git push origin "v${CLET_VERSION}" || true
+
+  # NuGet publish runs on BOTH channels. NuGet's prerelease semantics keep develop
+  # builds off `latest` automatically; consumers opt in via `--prerelease`.
+  publish-nuget:
+    needs: [resolve-version, build]
+    runs-on: ubuntu-latest
+    env:
+      CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
+      TG_VERSION: ${{ needs.resolve-version.outputs.tg_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Pack
+        run: >
+          dotnet pack src/Clet -c Release
+          -p:TerminalGuiVersion=${{ env.TG_VERSION }}
+          -p:Version=${{ env.CLET_VERSION }}
+          -o packages/
+
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push packages/*.nupkg
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+  # Homebrew runs on RELEASE channel only (no '-' in version).
+  # Skipped on develop, and on release if HOMEBREW_TAP_ENABLED isn't set
+  # (the formula step is still a placeholder; D-012).
+  publish-homebrew:
+    needs: [resolve-version, build]
+    runs-on: ubuntu-latest
+    if: ${{ needs.resolve-version.outputs.is_develop == 'false' && vars.HOMEBREW_TAP_ENABLED == 'true' }}
+    env:
+      CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: gui-cs/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: clet-osx-*
+          path: artifacts/
+
+      - name: Generate formula
+        run: |
+          echo "# Homebrew formula generation placeholder"
+          echo "# TODO: Generate clet.rb from template with version=${{ env.CLET_VERSION }}"
+          echo "# and SHA256s from the downloaded artifacts."
+          echo "# For now, Homebrew ships as build-from-source (D-012)."
+
+  # WinGet runs on RELEASE channel only.
+  publish-winget:
+    needs: [resolve-version, build]
+    runs-on: windows-latest
+    if: ${{ needs.resolve-version.outputs.is_develop == 'false' && vars.WINGET_ENABLED == 'true' }}
+    env:
+      CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate manifests (placeholder)
+        run: |
+          Write-Host "# WinGet manifest generation placeholder"
+          Write-Host "# TODO: Generate from templates with version=${{ env.CLET_VERSION }}"
+        shell: pwsh
+
+  notify-failure:
+    needs: [resolve-version, build, publish-nuget, publish-homebrew, publish-winget]
+    if: failure()
+    runs-on: ubuntu-latest
+    env:
+      CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
+      TG_VERSION: ${{ needs.resolve-version.outputs.tg_version }}
+      IS_DEVELOP: ${{ needs.resolve-version.outputs.is_develop }}
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isDevelop = process.env.IS_DEVELOP === 'true';
+            const channel = isDevelop ? 'develop' : 'release';
+            const label = isDevelop ? 'incident:develop' : 'incident:release';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Release clet v${process.env.CLET_VERSION} failed (${channel})`,
+              body: `The ${channel} release workflow for clet \`${process.env.CLET_VERSION}\` (TG \`${process.env.TG_VERSION}\`) failed.\n\nSee [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.\n\nRefer to \`docs/runbooks/release-rollback.md\` for rollback procedures.`,
+              labels: [label]
+            });

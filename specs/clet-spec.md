@@ -611,9 +611,11 @@ If any publish step fails:
 
 ### 5.6 Versioning
 
-clet maintains its own SemVer, independent of Terminal.Gui's version. Major bumps correspond to `schemaVersion` changes (per §4.3.1). Minor bumps cover new clets or significant CLI additions. Patch bumps cover bug fixes. The TG version is surfaced in `--version` output for diagnostics only. See [D-022](decisions.md#d-022).
+clet maintains its own SemVer, independent of Terminal.Gui's version. Major bumps correspond to `schemaVersion` changes (per §4.3.1). Minor bumps cover new clets or significant CLI additions. Patch bumps cover bug fixes, including rebuilds against new TG versions. The TG version is surfaced in `--version` output for diagnostics only. See [D-022](decisions.md#d-022).
 
-The release workflow passes `-p:Version=<clet_version>` to both `dotnet pack` and `dotnet publish`. The csproj declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between the build and what's actually linked. See [D-020](decisions.md#d-020).
+**Auto-increment.** The release workflow (`.github/workflows/release.yml`) auto-increments the patch version on every trigger: (1) TG dispatch (main or develop release), (2) push to clet main that changes `src/` or `tests/`, or (3) manual `workflow_dispatch`. The base version is read from `Clet.csproj <Version>`; the latest `vMAJOR.MINOR.*` git tag determines the next patch. For develop-channel builds, the TG prerelease suffix is appended (e.g. `1.0.1-develop.37`). To force a minor or major bump, push a tag (e.g. `v1.1.0`) to main — the workflow uses that verbatim.
+
+The csproj declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between the build and what's actually linked. See [D-020](decisions.md#d-020).
 
 ## 6. Testing
 
