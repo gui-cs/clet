@@ -44,11 +44,6 @@ internal sealed class CommandLineRoot
 
                 return ExitCodes.Ok;
 
-            case "help":
-                string? helpAlias = args.Length >= 2 ? args [1] : null;
-
-                return await DispatchHelp (helpAlias, cancellationToken, stdout, stderr);
-
             case "list":
                 return WriteList (args, stdout);
         }
@@ -63,6 +58,22 @@ internal sealed class CommandLineRoot
         TextWriter stderr)
     {
         string alias = args [0];
+
+        // Support `clet <alias> help`, `clet <alias> --help`, `clet <alias> -h`
+        // Rewrite as `clet help <alias> [--cat]` and re-dispatch.
+        // Skip when alias is already "help" to avoid infinite recursion.
+        if (alias != "help" && args.Length >= 2 && args [1] is "help" or "--help" or "-h")
+        {
+            List<string> helpArgs = ["help", alias];
+
+            if (Array.Exists (args, a => a == "--cat"))
+            {
+                helpArgs.Add ("--cat");
+            }
+
+            return await DispatchAlias (helpArgs.ToArray (), cancellationToken, stdout, stderr);
+        }
+
         string? initial = null;
         string? title = null;
         string? outputPath = null;
@@ -268,56 +279,6 @@ internal sealed class CommandLineRoot
         }
 
         return await _dispatcher.DispatchAsync (alias, initial, options, cancellationToken, stdout, stderr);
-    }
-
-    private async Task<int> DispatchHelp (
-        string? alias,
-        CancellationToken cancellationToken,
-        TextWriter stdout,
-        TextWriter stderr)
-    {
-        string markdown;
-        string title;
-
-        if (alias is not null)
-        {
-            if (!_registry.TryResolve (alias, out IClet? clet) || clet is null)
-            {
-                stderr.WriteLine ($"error: unknown alias '{alias}'. Try 'clet list' to see available clets.");
-
-                return ExitCodes.UsageError;
-            }
-
-            markdown = MarkdownHelpRenderer.BuildAliasHelpMarkdown (clet);
-            title = $"clet help {clet.PrimaryAlias}";
-        }
-        else
-        {
-            string? rawMarkdown = MarkdownHelpRenderer.ReadEmbeddedHelp ("overview.md");
-
-            if (rawMarkdown is null)
-            {
-                stdout.WriteLine ("clet — typed terminal prompts (and viewers) for shells, scripts, and AI agents");
-                stdout.WriteLine ();
-                stdout.WriteLine ("Usage: clet <alias> [options]");
-                stdout.WriteLine ("       clet list [--json]");
-                stdout.WriteLine ("       clet help <alias>");
-
-                return ExitCodes.Ok;
-            }
-
-            string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
-            markdown = rawMarkdown.Replace ("{{CLET_TABLE}}", cletTable);
-            markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
-            title = "clet";
-        }
-
-        CletRunOptions options = new ()
-        {
-            Title = title,
-        };
-
-        return await _dispatcher.DispatchAsync ("md", markdown, options, cancellationToken, stdout, stderr);
     }
 
     private int WriteList (string[] args, TextWriter stdout)

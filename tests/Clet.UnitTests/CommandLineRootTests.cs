@@ -70,7 +70,7 @@ public class CommandLineRootTests
         int exit = await root.InvokeAsync (["help", "nope"], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.UsageError, exit);
-        Assert.Contains ("unknown alias", stderr.ToString ());
+        Assert.Contains ("Unknown alias", stderr.ToString ());
     }
 
     [Fact]
@@ -342,7 +342,8 @@ public class CommandLineRootTests
     [InlineData ("time", "not-a-time")]
     [InlineData ("duration", "not-a-duration")]
     [InlineData ("confirm", "maybe")]
-    [InlineData ("range", "bad")]
+    // `linear-range` doesn't validate --initial strictly — unmatched labels just produce
+    // an empty span. No "invalid --initial value" path to test, so it isn't in this list.
     public async Task Alias_InvalidInitialValue_ExitsWithUsageError (string alias, string initial)
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
@@ -387,14 +388,20 @@ public class CommandLineRootTests
     }
 
     [Fact]
-    public async Task MdCat_NoContent_ExitsWithUsageError ()
+    public async Task MdCat_NoContent_ExitsWithIoError ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
 
         int exit = await root.InvokeAsync (["md", "--cat"], CancellationToken.None, stdout, stderr);
 
-        Assert.Equal (ExitCodes.UsageError, exit);
-        Assert.Contains ("--cat requires content", stderr.ToString ());
+        // When stdin is redirected (test runner / CI), MarkdownClet reads empty stdin
+        // and returns "No input received from stdin". When not redirected, it returns
+        // "No file specified". Both are IO errors.
+        Assert.Equal (ExitCodes.IoError, exit);
+        string err = stderr.ToString ();
+        Assert.True (
+            err.Contains ("No file specified") || err.Contains ("No input received from stdin"),
+            $"Expected IO error message, got: {err}");
     }
 
     [Fact]

@@ -153,13 +153,20 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.LinkClicked += (_, e) =>
         {
-            // Try to navigate to local .md files that pass the file access policy
+            // Navigate local .md files within the sandbox
             if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath))
             {
                 LoadFile (resolvedPath);
                 e.Handled = true;
 
                 return;
+            }
+
+            // Open http/https links in the default browser — they're safe
+            if (e.Url.StartsWith ("http://", StringComparison.OrdinalIgnoreCase)
+                || e.Url.StartsWith ("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                Link.OpenUrl (e.Url);
             }
 
             // Show URL in status bar as a clickable link

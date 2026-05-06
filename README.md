@@ -21,10 +21,10 @@ Works for humans and AI agents alike.
 | `duration` | Prompts for a duration and returns an ISO-8601 duration string (e.g. PT1H30M). | |
 | `color` | Prompts for a color and returns a hex string (#rrggbb). | |
 | `multi-select` | Presents a list of options with checkboxes and returns the selected texts. | `--options`, `args...` |
-| `attribute-picker` | Prompts for text attributes (foreground, background, style) and returns a JSON object. | |
+| `attribute-picker`, `attribute` | Prompts for text attributes (foreground, background, style) and returns a JSON object. | |
 | `pick-file`, `file` | Opens a file picker dialog and returns the selected file path(s). | `--multi`, `--root`, `--filter` |
 | `pick-directory`, `dir` | Opens a directory picker dialog and returns the selected directory path. | `--root` |
-| `range` | Prompts for a numeric range (low..high) and returns a JSON object. | `--step` |
+| `linear-range`, `range` | Presents a linear range selector (single, multi, or bounded range) over labelled options. | `--mode`, `--options`, `--range-kind`, `args...` |
 | `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. | `--theme`, `--cat`, `args...` |
 
 ## Install
@@ -158,7 +158,7 @@ Esc and Ctrl-C cancel input clets; `q`, Esc, and Ctrl-C dismiss viewer clets. `-
 
 ### Q: Which clets ship in v1.0?
 
-**Input (14):** `text`, `int`, `decimal`, `select`, `multi-select`, `confirm`, `pick-file`, `pick-directory`, `date`, `time`, `duration`, `color`, `attribute-picker`, `range`
+**Input (14):** `text`, `int`, `decimal`, `select`, `multi-select`, `confirm`, `pick-file`, `pick-directory`, `date`, `time`, `duration`, `color`, `attribute-picker`, `linear-range`
 
 **Viewer (1):** `md` (Markdown via Terminal.Gui's built-in `Markdown` View)
 

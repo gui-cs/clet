@@ -50,4 +50,6 @@ clet --help
 clet --version
 ```
 
+[Help on help](clet:help:help)
+
 {{VERSION}} - [clet on GitHub](https://github.com/gui-cs/clet) - By [@tig](https://github.com/tig)

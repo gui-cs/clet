@@ -189,6 +189,15 @@ internal static class MarkdownHelpRenderer
             }
         }
 
+        // Append embedded help content (examples, notes) if available
+        string? extra = ReadEmbeddedHelp ($"{clet.PrimaryAlias}.md");
+
+        if (extra is not null)
+        {
+            sb.AppendLine ();
+            sb.Append (extra);
+        }
+
         return sb.ToString ();
     }
 
@@ -213,6 +222,12 @@ internal static class MarkdownHelpRenderer
 
             sb.AppendLine ($"| {aliases} | {clet.Description} | {options} |");
         }
+
+        // Links don't work inside table cells (gui-cs/Terminal.Gui#5227), so add a
+        // clickable list after the table for help navigation.
+        sb.AppendLine ();
+        sb.Append ("Click for details: ");
+        sb.AppendLine (string.Join (", ", registry.All.Select (c => $"[{c.PrimaryAlias}](clet:help:{c.PrimaryAlias})")));
 
         return sb.ToString ();
     }

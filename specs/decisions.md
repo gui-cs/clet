@@ -128,15 +128,15 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
-## D-011: `range` is integer-only at v0.3 (Active)
+## D-011: `range` is integer-only at v0.3 (Superseded by D-032)
 
 **Context.** Spec §4.3.2 defines the `range` value shape as `{"low": <T>, "high": <T>}` where `<T>` is the scalar of the underlying numeric/date/time type.
 
 **Decision.** At v0.3, `T = int` only. The `RangeClet` uses two `NumericUpDown<int>` controls. Decimal range and date/time range are deferred until demand exists — adding them later is a new clet alias or a generic type parameter, not a breaking change to the existing wire format.
 
-**Status.** Active. Revisit if users request decimal or date ranges before v0.5 schema-lock.
+**Status.** Superseded by D-032. The `range` clet itself is gone; `linear-range` replaces it with an option-label string type, so the integer-only constraint no longer applies.
 
-**Pointers.** `src/Clet/Clets/Input/RangeClet.cs`, `src/Clet/Clets/Input/RangeView.cs`.
+**Pointers.** *(Files referenced here have been removed; see D-029.)*
 
 ---
 
@@ -353,8 +353,6 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 
 ---
 
----
-
 ## D-025: Clets declare `AcceptsPositionalArgs`; non-positional clets reject them early (Active)
 
 **Context.** The CLI parser in `CommandLineRoot.DispatchAlias` collected all non-flag tokens into `CletRunOptions.Arguments` and forwarded them unconditionally. Clets that don't consume positional args (everything except `select`, `multi-select`, and `md`) silently ignored them, giving the user no feedback. `clet color - blue` would open the color picker as if the args weren't there. A bare `-` (common stdin convention) also fell through to positional args rather than being flagged.
@@ -456,7 +454,25 @@ This is clet's own defense. TG's cell model is treated as defense-in-depth, not 
 
 ---
 
-## D-032: `clet md` file-access confinement policy (Active)
+## D-032: Replace `range` clet with `linear-range` backed by Terminal.Gui's `LinearRange<T>` (Active, supersedes D-011)
+
+**Context.** The original `range` clet wrapped a hand-rolled `RangeView` (`NumericUpDown<int>` × 2 + a `..` label) and emitted `{"low": <int>, "high": <int>}` per spec §4.3.2. It worked, but the UX was poor — two independent spinners with no visual sense of the range relationship — and it duplicated functionality TG shipped via [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204) (the `LinearRange<T>` `IValue` refactor).
+
+**Decision.** Delete `RangeClet`, `RangeView`, and their tests. Add `LinearRangeClet` (alias `linear-range`) backed by the `LinearRange<T>` view family, with three modes controlled by `--mode single|multi|range` (default `single`). Wire format changes from `{low, high}` to a mode-dependent JSON object:
+
+- `--mode single` → `{"mode":"single", "value":"<label>", "index":<N>}`
+- `--mode multi` → `{"mode":"multi", "values":[...], "indices":[...]}`
+- `--mode range` → `{"mode":"range", "kind":"closed|left|right|none", "start":"<label>", "end":"<label>", "startIndex":<N>, "endIndex":<M>}` (fields conditional on kind)
+
+Additional options: `--orientation horizontal|vertical`, `--range-kind closed|left|right` (default `closed`, only for `--mode range`), `--allow-empty`, `--hide-legends`.
+
+**Status.** Active. Supersedes [D-011](#d-011-range-is-integer-only-at-v03-active).
+
+**Pointers.** `src/Clet/Clets/Input/LinearRangeClet.cs`, spec §4.3.2, README, [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204).
+
+---
+
+## D-033: `clet md` file-access confinement policy (Active)
 
 **Context.** `clet md FILE` is an arbitrary file-read primitive. In agent contexts, positional arguments may be attacker-influenced via indirect prompt injection. An attacker could instruct an agent to run `clet md /home/$USER/.aws/credentials`, exfiltrating file content through the rendered ANSI output or `--cat` stdout. Glob patterns (`clet md '/etc/*.conf'`) amplify this to directory enumeration. Issue #38 documents the full threat surface.
 
@@ -467,7 +483,7 @@ This is clet's own defense. TG's cell model is treated as defense-in-depth, not 
 4. **Aggregate size cap:** 32 MiB across all glob matches.
 5. **Glob count cap:** 128 files maximum.
 6. **Binary rejection:** NUL byte in first 8 KiB refuses the file.
-7. **`--allow-file <path>`** (repeatable): Bypasses extension + cwd checks for the named path. Size and binary checks still apply.
+7. **`--allow-file <path>`** (repeatable): Bypasses extension + cwd checks for the named path or directory. Size and binary checks still apply.
 8. **`--allow-binary`:** Disables NUL-byte detection.
 
 For `pick-file`/`pick-directory`, `--root` remains a starting directory, not a sandbox. The interactive file picker is user-driven and OS-permission-gated; confinement is the OS sandbox's responsibility, not clet's. Help text updated to make this explicit.
