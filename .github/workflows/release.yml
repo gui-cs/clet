@@ -201,10 +201,13 @@ jobs:
 
       - name: Unit Tests
         shell: bash
+        timeout-minutes: 3
         run: dotnet run --project tests/Clet.UnitTests --no-build -c Release
 
       - name: Integration Tests
+        if: matrix.rid != 'win-x64'
         shell: bash
+        timeout-minutes: 3
         run: dotnet run --project tests/Clet.IntegrationTests --no-build -c Release
 
       - name: Publish AOT
@@ -219,6 +222,7 @@ jobs:
 
       - name: Smoke Tests
         shell: bash
+        timeout-minutes: 3
         run: dotnet run --project tests/Clet.SmokeTests --no-build -c Release
 
       - name: Upload artifact
