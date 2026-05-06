@@ -80,10 +80,12 @@ internal sealed class CommandLineRoot
         bool jsonOutput = false;
         bool fullscreen = false;
         bool cat = false;
+        bool allowBinary = false;
         TimeSpan? timeout = null;
         int? rows = null;
         Dictionary<string, string> cletOptions = new (StringComparer.OrdinalIgnoreCase);
         List<string> positionalArgs = [];
+        List<string> allowedFiles = [];
 
         for (int i = 1; i < args.Length; i++)
         {
@@ -106,6 +108,27 @@ internal sealed class CommandLineRoot
             if (arg == "--cat")
             {
                 cat = true;
+
+                continue;
+            }
+
+            if (arg == "--allow-binary")
+            {
+                allowBinary = true;
+
+                continue;
+            }
+
+            if (arg == "--allow-file")
+            {
+                if (i + 1 >= args.Length)
+                {
+                    stderr.WriteLine ("error: --allow-file requires a file path.");
+
+                    return ExitCodes.UsageError;
+                }
+
+                allowedFiles.Add (args [++i]);
 
                 continue;
             }
@@ -233,6 +256,8 @@ internal sealed class CommandLineRoot
             Rows = rows,
             CletOptions = cletOptions,
             Arguments = positionalArgs.Count > 0 ? positionalArgs : null,
+            AllowedFiles = allowedFiles.Count > 0 ? allowedFiles : null,
+            AllowBinary = allowBinary,
         };
 
         // Validate positional args before dispatching.

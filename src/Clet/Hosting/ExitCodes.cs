@@ -20,6 +20,7 @@ internal static class ExitCodes
             {
                 "validation" => ValidationError,
                 "input-too-large" => ValidationError,
+                "file-access-denied" => UsageError,
                 "io" => IoError,
                 _ => UsageError,
             },
