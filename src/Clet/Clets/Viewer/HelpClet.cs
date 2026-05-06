@@ -94,6 +94,8 @@ internal sealed class HelpClet : IViewerClet
                 return;
             }
 
+            // Help content is authored by us — links are safe to open.
+            Link.OpenUrl (e.Url);
             statusShortcut.Title = e.Url;
             e.Handled = true;
         };
