@@ -6,6 +6,30 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-026: `--rows` / `-r` is a built-in CLI flag, not a per-clet option (Active)
+
+**Context.** The `multiline-text` clet issue (#48) proposed `--rows` as a clet-specific option (in the `Options` list) to control the visible row height of the `TextView`. During implementation review, the requirement was broadened: `--rows` should work for any clet, not just `multiline-text`. The same "number of visible rows" concept is meaningful for other clets (e.g., `select`, `multi-select`).
+
+**Decision.** Add `--rows` / `-r` as a built-in global flag parsed by `CommandLineRoot.DispatchAlias`, alongside `--title`, `--initial`, `--json`, `--fullscreen`, and `--timeout`. Store the value in `CletRunOptions.Rows` (type `int?`). Each clet reads `options.Rows` and falls back to its own default. `MultilineTextClet` defaults to 5 rows. Other clets may adopt `options.Rows` in future PRs as needed.
+
+**Why:** Keeping `--rows` global is consistent with how `--title` was handled (D-014 — title is also conceptually per-clet but elevated to a universal flag because it applies uniformly). It avoids each clet that wants row control having to redeclare a `rows` option descriptor. It keeps the CLI surface predictable: any clet that renders a scrollable or variable-height view honours the same flag.
+
+**How to apply:** `CletRunOptions.Rows` added. `CommandLineRoot` now parses `--rows <n>` (n must be a positive integer) and `-r <n>`. Error message on missing or non-positive value. `MultilineTextClet` uses `options.Rows ?? 5`. Spec §4.7 updated to include `--rows <n>` in the CLI surface line.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Abstractions/CletRunOptions.cs`, `src/Clet/Hosting/CommandLineRoot.cs`, `src/Clet/Clets/Input/MultilineTextClet.cs`. Compare D-014 (`--title` as built-in flag).
+
+## D-025: Input-size caps to prevent OOM from untrusted input (Active)
+
+**Context.** Appendix A of the spec names `--initial`, env vars, and stdin as untrusted inputs but specified no length caps. An agent piping a 4 GB log into `clet md -` would OOM the binary with no error message or exit code — just a dead process. Issue #38.
+
+**Decision.** Cap `--initial` at 64 K characters (enforced in `CommandLineRoot` argument parsing). Cap `clet md` stdin at 8 M characters (enforced in `MarkdownClet`'s content resolver). On exceed: exit 65 (validation), error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Both caps are documented in spec §4.7 and Appendix A. Caps are measured in .NET `char` count (UTF-16 code units), not bytes — this is faster and provides a solid OOM-protection bound even though the actual byte footprint varies with encoding. Per-clet options (`cletOptions` values) are not yet capped; tracked as a follow-up.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (MaxInitialChars constant + guard), `src/Clet/Clets/Viewer/MarkdownClet.cs` (MaxStdinChars + length-limited read), `specs/clet-spec.md` §4.7 + Appendix A.
+
 ## D-024: Package id is bare `clet` (Active)
 
 **Context.** [D-019](#d-019-distribute-clet-as-a-single-project-dotnet-tool-mdv-pattern-active) chose `PackageId=Terminal.Gui.clet` to mirror the [`gui-cs/mdv`](https://github.com/gui-cs/mdv) `Terminal.Gui.mdv` precedent and to keep the gui-cs origin obvious in NuGet search. We've since confirmed the bare `clet` id is unclaimed on nuget.org (verified via the flat-container API and the search index, both empty as of 2026-05-06), and the maintainer has scoped a NuGet API key to a single package id (`clet`) for tighter blast radius. The shorter id matches the tool command name (`dotnet tool install -g clet` is already what users type — and now what they search for too).
@@ -42,22 +66,6 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 **Status.** Active. Supersedes D-022.
 
 **Pointers.** `.github/workflows/release.yml`, `.github/workflows/ci.yml` (PR targets both branches), `src/Clet/Clet.csproj` (`<Version>1.0.0-alpha</Version>`).
-
----
-
-## D-026: `--rows` / `-r` is a built-in CLI flag, not a per-clet option (Active)
-
-**Context.** The `multiline-text` clet issue (#48) proposed `--rows` as a clet-specific option (in the `Options` list) to control the visible row height of the `TextView`. During implementation review, the requirement was broadened: `--rows` should work for any clet, not just `multiline-text`. The same "number of visible rows" concept is meaningful for other clets (e.g., `select`, `multi-select`).
-
-**Decision.** Add `--rows` / `-r` as a built-in global flag parsed by `CommandLineRoot.DispatchAlias`, alongside `--title`, `--initial`, `--json`, `--fullscreen`, and `--timeout`. Store the value in `CletRunOptions.Rows` (type `int?`). Each clet reads `options.Rows` and falls back to its own default. `MultilineTextClet` defaults to 5 rows. Other clets may adopt `options.Rows` in future PRs as needed.
-
-**Why:** Keeping `--rows` global is consistent with how `--title` was handled (D-014 — title is also conceptually per-clet but elevated to a universal flag because it applies uniformly). It avoids each clet that wants row control having to redeclare a `rows` option descriptor. It keeps the CLI surface predictable: any clet that renders a scrollable or variable-height view honours the same flag.
-
-**How to apply:** `CletRunOptions.Rows` added. `CommandLineRoot` now parses `--rows <n>` (n must be a positive integer) and `-r <n>`. Error message on missing or non-positive value. `MultilineTextClet` uses `options.Rows ?? 5`. Spec §4.7 updated to include `--rows <n>` in the CLI surface line.
-
-**Status.** Active.
-
-**Pointers.** `src/Clet/Abstractions/CletRunOptions.cs`, `src/Clet/Hosting/CommandLineRoot.cs`, `src/Clet/Clets/Input/MultilineTextClet.cs`. Compare D-014 (`--title` as built-in flag).
 
 ## D-022: clet versions independently of Terminal.Gui (Superseded by D-023)
 

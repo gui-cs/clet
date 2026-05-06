@@ -19,6 +19,7 @@ internal static class ExitCodes
             CletRunStatus.Error => result.ErrorCode switch
             {
                 "validation" => ValidationError,
+                "input-too-large" => ValidationError,
                 "io" => IoError,
                 _ => UsageError,
             },

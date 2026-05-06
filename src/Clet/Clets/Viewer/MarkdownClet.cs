@@ -11,6 +11,9 @@ namespace Clet;
 
 internal sealed class MarkdownClet : IViewerClet
 {
+    /// <summary>8 M character cap on stdin content to prevent OOM from untrusted piped input.</summary>
+    internal const int MaxStdinChars = 8 * 1024 * 1024;
+
     public string PrimaryAlias => "md";
     public IReadOnlyList<string> Aliases => ["md", "markdown"];
     public string Description => "Renders Markdown files in a themed, scrollable viewer.";
@@ -53,7 +56,28 @@ internal sealed class MarkdownClet : IViewerClet
         }
         else if (Console.IsInputRedirected)
         {
-            content = Console.In.ReadToEnd ();
+            // Read stdin with an 8 M character cap to prevent OOM
+            char[] buffer = new char[MaxStdinChars + 1];
+            int totalRead = 0;
+            int charsRead;
+
+            while (totalRead <= MaxStdinChars
+                   && (charsRead = Console.In.Read (buffer, totalRead, buffer.Length - totalRead)) > 0)
+            {
+                totalRead += charsRead;
+            }
+
+            if (totalRead > MaxStdinChars)
+            {
+                return new ()
+                {
+                    Status = CletRunStatus.Error,
+                    ErrorCode = "input-too-large",
+                    ErrorMessage = $"stdin exceeds the 8 M character limit.",
+                };
+            }
+
+            content = new string (buffer, 0, totalRead);
 
             if (string.IsNullOrEmpty (content))
             {
