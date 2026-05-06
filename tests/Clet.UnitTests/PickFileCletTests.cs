@@ -55,4 +55,12 @@ public class PickFileCletTests
         Assert.Equal ("filter", clet.Options [2].Name);
         Assert.False (clet.Options [0].Required);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new PickFileClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }

@@ -61,4 +61,12 @@ public class DecimalCletTests
 
         Assert.Equal ("0.1", clet.Options [0].DefaultValue);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new DecimalClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }
