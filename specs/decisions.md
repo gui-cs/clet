@@ -410,3 +410,17 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 **Status.** Active.
 
 **Pointers.** `src/Clet/Abstractions/CletRunOptions.cs` (`OutputPath` property), `src/Clet/Hosting/CommandLineRoot.cs` (parsing), `src/Clet/Hosting/OutputFormatter.cs` (file write logic), `src/Clet/Hosting/AliasDispatcher.cs` (error handling), spec §4.7.
+
+---
+
+## D-029: Release workflow uses `env:`-bound variables + allowlist validation for user-supplied inputs (Active)
+
+**Context.** `.github/workflows/release.yml` originally interpolated `${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}` and `${{ github.event.inputs.version_override }}` directly into a `run: bash` script. GitHub Actions evaluates `${{ }}` expressions before the shell parses the script, so shell quoting in YAML does not help — this is the canonical `actions/script-injection` CodeQL pattern. The job runs with `contents: write` + `issues: write` and the downstream `publish-nuget` job consumes `secrets.NUGET_API_KEY`.
+
+**Decision.** All user-controlled expressions in the `Compute version` step are bound to step-level `env:` variables (`TG_VERSION_INPUT`, `VERSION_OVERRIDE`, `EVENT_NAME`) and only referenced as `$VAR` in the `run:` script. Additionally, `TG_VERSION_INPUT` and `VERSION_OVERRIDE` are validated against an allowlist regex (`^[0-9A-Za-z._+*-]+$`) before use; the step exits 2 immediately if validation fails. `github.event_name` (runner-set, not attacker-controllable) is also moved to `env:` for defense-in-depth.
+
+**Why not a third-party action?** The logic is simple bash; adding a new action dependency for this pattern would be a larger attack surface than the single-step env binding. The regex covers every version string shape in use: SemVer (`1.2.3`), prerelease (`1.2.3-alpha.1`, `2.0.2-develop.37`), floating wildcard (`2.0.2-develop.*`), and the `+` build-metadata suffix.
+
+**Status.** Active.
+
+**Pointers.** `.github/workflows/release.yml` (`Compute version` step), `docs/threat-model.md` ("Release pipeline" section), issue #37.
