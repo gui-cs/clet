@@ -137,11 +137,73 @@ internal static class TerminalEscapeSanitizer
                                 i++;
                             }
                         }
+                        else if (next == ']')
+                        {
+                            // OSC sequence (ESC ]). Preserve OSC 8 (hyperlinks) — they're
+                            // legitimate renderer output for terminals that support them.
+                            // Strip all other OSC sequences.
+                            if (i + 2 < renderedAnsi.Length && renderedAnsi [i + 2] == '8')
+                            {
+                                // OSC 8 hyperlink — pass through until ST (ESC \ or BEL)
+                                sb.Append ('\x1b');
+                                sb.Append (']');
+                                i += 2;
+
+                                while (i < renderedAnsi.Length)
+                                {
+                                    char osc = renderedAnsi [i];
+
+                                    if (osc == '\x07')
+                                    {
+                                        // BEL terminates OSC
+                                        sb.Append (osc);
+
+                                        break;
+                                    }
+
+                                    if (osc == '\x1b' && i + 1 < renderedAnsi.Length && renderedAnsi [i + 1] == '\\')
+                                    {
+                                        // ST (ESC \) terminates OSC
+                                        sb.Append ('\x1b');
+                                        sb.Append ('\\');
+                                        i++;
+
+                                        break;
+                                    }
+
+                                    sb.Append (osc);
+                                    i++;
+                                }
+                            }
+                            else
+                            {
+                                // Non-hyperlink OSC — strip until ST or BEL
+                                i += 2;
+
+                                while (i < renderedAnsi.Length)
+                                {
+                                    char osc = renderedAnsi [i];
+
+                                    if (osc == '\x07')
+                                    {
+                                        break;
+                                    }
+
+                                    if (osc == '\x1b' && i + 1 < renderedAnsi.Length && renderedAnsi [i + 1] == '\\')
+                                    {
+                                        i++;
+
+                                        break;
+                                    }
+
+                                    i++;
+                                }
+                            }
+                        }
                         else if (next >= '@' && next <= '_')
                         {
-                            // C1 7-bit pair (ESC @ through ESC _, excluding ESC [ which was handled above).
-                            // Includes dangerous sequences like OSC (ESC ]), DCS (ESC P), etc.
-                            // Strip the pair.
+                            // Other C1 7-bit pair (ESC @ through ESC _, excluding ESC [ and ESC ]).
+                            // Includes DCS (ESC P), etc. Strip the pair.
                             i++;
                         }
                         else

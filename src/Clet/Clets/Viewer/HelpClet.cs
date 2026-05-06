@@ -52,12 +52,7 @@ internal sealed class HelpClet : IViewerClet
         // --cat mode: render to stdout and exit
         if (options.Cat)
         {
-            // Strip clet:help links — they only work in the TUI viewer.
-            // Convert [text](clet:help:x) → text
-            string catMarkdown = System.Text.RegularExpressions.Regex.Replace (
-                markdown, @"\[([^\]]+)\]\(clet:help[^)]*\)", "$1");
-
-            MarkdownHelpRenderer.RenderToAnsi (catMarkdown, Console.Out);
+            MarkdownHelpRenderer.RenderToAnsi (markdown, Console.Out);
 
             return new () { Status = CletRunStatus.Ok };
         }
