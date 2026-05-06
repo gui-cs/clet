@@ -31,11 +31,13 @@ public class BuiltInCletsTests
     [InlineData ("color")]
     [InlineData ("multi-select")]
     [InlineData ("attribute-picker")]
+    [InlineData ("attribute")]
     [InlineData ("pick-file")]
     [InlineData ("file")]
     [InlineData ("pick-directory")]
     [InlineData ("dir")]
     [InlineData ("linear-range")]
+    [InlineData ("range")]
     public void RegisterAll_RegistersInputClet (string alias)
     {
         ICletRegistry registry = new CletRegistry ();

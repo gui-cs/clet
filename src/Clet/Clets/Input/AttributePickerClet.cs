@@ -10,7 +10,7 @@ namespace Clet;
 internal sealed class AttributePickerClet : IClet<JsonObject?>
 {
     public string PrimaryAlias => "attribute-picker";
-    public IReadOnlyList<string> Aliases => ["attribute-picker"];
+    public IReadOnlyList<string> Aliases => ["attribute-picker", "attribute"];
     public string Description => "Prompts for text attributes (foreground, background, style) and returns a JSON object.";
     public CletKind Kind => CletKind.Input;
     public Type ResultType => typeof (JsonObject);

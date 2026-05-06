@@ -28,7 +28,7 @@ namespace Clet;
 internal sealed class LinearRangeClet : IClet<JsonObject?>
 {
     public string PrimaryAlias => "linear-range";
-    public IReadOnlyList<string> Aliases => ["linear-range"];
+    public IReadOnlyList<string> Aliases => ["linear-range", "range"];
 
     public string Description =>
         "Presents a LinearRange (single, multi, or bounded range) over a list of labelled options "
