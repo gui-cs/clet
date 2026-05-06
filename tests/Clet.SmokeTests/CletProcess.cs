@@ -9,13 +9,15 @@ internal static class CletProcess
 
     public static async Task<(int exitCode, string stdout, string stderr)> RunAsync (
         IEnumerable<string> args,
-        TimeSpan? processTimeout = null)
+        TimeSpan? processTimeout = null,
+        string? stdin = null)
     {
         ProcessStartInfo psi = new ()
         {
             FileName = "dotnet",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = stdin is not null,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
@@ -30,6 +32,12 @@ internal static class CletProcess
 
         using Process process = new () { StartInfo = psi };
         process.Start ();
+
+        if (stdin is not null)
+        {
+            await process.StandardInput.WriteAsync (stdin);
+            process.StandardInput.Close ();
+        }
 
         Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync ();
         Task<string> stderrTask = process.StandardError.ReadToEndAsync ();

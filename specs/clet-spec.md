@@ -452,6 +452,8 @@ Plain-text help renders at v0.11. Markdown-rendered help (Terminal.Gui `Markdown
 
 **Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`); other clets ignore them. See decisions log D-014 for why `--title` is a host flag rather than a per-clet option.
 
+**Input-size caps.** `--initial` is capped at 64 KiB. `clet md` stdin is capped at 8 MiB. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. These caps prevent OOM from untrusted piped input (see Appendix A).
+
 **Defaults.** Input clets render inline. Viewer clets (`md`) render fullscreen. `--fullscreen` forces fullscreen for input clets; it's a no-op for viewers.
 
 **Theming.** No `--theme` flag. Theme selection goes through `ConfigurationManager`'s existing mechanisms (config files, env var, system theme); `clet` honors whatever it resolves.
@@ -778,6 +780,7 @@ These pay down the boilerplate without locking us into a TG-side metadata commit
 (Full document published with v0.5; sketch only here.)
 
 - **Untrusted inputs:** `--initial`, env vars, stdin content, fixture file paths, `--title`, clet-specific options.
+- **Input-size caps:** `--initial` is capped at 64 KiB; `clet md` stdin is capped at 8 MiB. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`.
 - **Sanitization:** All output to stdout/stderr passes through a terminal-escape filter (strip C0/C1 control sequences except those we generate). User-controlled display strings (`--title`, prompt labels) sanitized at the View boundary.
 - **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` flag for the user to opt in; off by default for AI agent use.
 - **File access:** `pick-file` and `pick-directory` honor the OS sandbox/permission model; no privilege escalation.

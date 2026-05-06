@@ -6,6 +6,9 @@ namespace Clet;
 
 internal sealed class CommandLineRoot
 {
+    /// <summary>64 KiB cap on --initial to prevent OOM from untrusted input.</summary>
+    internal const int MaxInitialBytes = 64 * 1024;
+
     private readonly ICletRegistry _registry;
     private readonly AliasDispatcher _dispatcher;
 
@@ -116,6 +119,17 @@ internal sealed class CommandLineRoot
                 }
 
                 initial = args [++i];
+
+                // Cap --initial at 64 KiB to prevent OOM from untrusted input
+                if (initial.Length > MaxInitialBytes)
+                {
+                    BoxedCletResult tooLarge = new (
+                        CletRunStatus.Error, null, "input-too-large",
+                        $"--initial value exceeds the 64 KiB limit ({initial.Length} bytes).");
+                    OutputFormatter.Write (tooLarge, jsonOutput, stdout, stderr);
+
+                    return ExitCodes.FromResult (tooLarge);
+                }
 
                 continue;
             }

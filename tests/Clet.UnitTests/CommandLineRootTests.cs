@@ -204,4 +204,47 @@ public class CommandLineRootTests
         Assert.Equal (ExitCodes.UsageError, exit);
         Assert.Contains ("--initial", stderr.ToString ());
     }
+
+    [Fact]
+    public async Task Alias_InitialExceeds64KiB_ExitsWithValidationError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string oversized = new ('x', CommandLineRoot.MaxInitialBytes + 1);
+
+        int exit = await root.InvokeAsync (["select", "--initial", oversized], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.ValidationError, exit);
+        Assert.Contains ("input-too-large", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_InitialExceeds64KiB_Json_EmitsErrorEnvelope ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string oversized = new ('x', CommandLineRoot.MaxInitialBytes + 1);
+
+        int exit = await root.InvokeAsync (["select", "--json", "--initial", oversized], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.ValidationError, exit);
+        string json = stdout.ToString ().TrimEnd ();
+        Assert.Contains ("\"status\":\"error\"", json);
+        Assert.Contains ("\"code\":\"input-too-large\"", json);
+    }
+
+    [Fact]
+    public async Task Alias_InitialAtExactLimit_DoesNotReject ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        string atLimit = new ('x', CommandLineRoot.MaxInitialBytes);
+
+        // Use a pre-cancelled token so dispatch exits immediately without starting TUI
+        using CancellationTokenSource cts = new ();
+        cts.Cancel ();
+
+        int exit = await root.InvokeAsync (["select", "--initial", atLimit], cts.Token, stdout, stderr);
+
+        // Should NOT exit with validation error - dispatch proceeds (and cancels)
+        Assert.NotEqual (ExitCodes.ValidationError, exit);
+        Assert.DoesNotContain ("input-too-large", stderr.ToString ());
+    }
 }

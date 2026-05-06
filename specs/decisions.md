@@ -6,6 +6,16 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-022: Input-size caps to prevent OOM from untrusted input (Active)
+
+**Context.** Appendix A of the spec names `--initial`, env vars, and stdin as untrusted inputs but specified no length caps. An agent piping a 4 GB log into `clet md -` would OOM the binary with no error message or exit code — just a dead process. Issue #38.
+
+**Decision.** Cap `--initial` at 64 KiB (enforced in `CommandLineRoot` argument parsing). Cap `clet md` stdin at 8 MiB (enforced in `MarkdownClet`'s content resolver). On exceed: exit 65 (validation), error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Both caps are documented in spec §4.7 and Appendix A.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs` (MaxInitialBytes constant + guard), `src/Clet/Clets/Viewer/MarkdownClet.cs` (MaxStdinBytes + length-limited read), `specs/clet-spec.md` §4.7 + Appendix A.
+
 ## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
 
 **Context.** The original PR/FAQ pitched clet as a way to expose any Terminal.Gui View with `IValue<T>` to the shell automatically. v1.0 ships 15 hand-written clets instead. Spec §11 lays out what we learned, what full auto-discovery would require on both the TG side (a `[Shellable]` attribute or marker, wire-format declaration, initial-value parser, per-View option surface) and the clet side (a real source generator), and the cross-cutting cost (TG core would need to host clet-shaped opinions, schema-lock would couple to TG's `[Shellable]` surface).

@@ -99,4 +99,17 @@ public class CletSmokeTests
         // the TUIcast harness from v0.3 to drive the binary in a controlled environment.
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task OversizedInitial_ExitsWithValidationError ()
+    {
+        string oversized = new ('x', 64 * 1024 + 1);
+
+        (int exit, string stdout, string stderr) = await CletProcess.RunAsync (
+            ["select", "--json", "--initial", oversized]);
+
+        Assert.Equal (65, exit);
+        Assert.Contains ("input-too-large", stdout);
+        Assert.Contains ("\"status\":\"error\"", stdout);
+    }
 }
