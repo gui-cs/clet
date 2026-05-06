@@ -24,6 +24,13 @@ internal sealed class AliasDispatcher
             return ExitCodes.UsageError;
         }
 
+        if (initial is not null && !clet.TryValidateInitial (initial, options))
+        {
+            stderr.WriteLine ($"error: invalid --initial value '{initial}' for '{alias}'.");
+
+            return ExitCodes.UsageError;
+        }
+
         using CancellationTokenSource? timeoutSource = options.Timeout is { } timeout
             ? new (timeout)
             : null;

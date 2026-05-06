@@ -15,6 +15,9 @@ internal sealed class ColorClet : IClet<string?>
 
     public IReadOnlyList<CletOptionDescriptor> Options => [];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+        => Color.TryParse (initial, null, out _);
+
     public async Task<CletRunResult<string?>> RunAsync (
         IApplication app,
         string? initial,

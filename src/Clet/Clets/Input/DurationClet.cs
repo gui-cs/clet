@@ -18,6 +18,20 @@ internal sealed class DurationClet : IClet<string?>
 
     public IReadOnlyList<CletOptionDescriptor> Options => [];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+    {
+        try
+        {
+            XmlConvert.ToTimeSpan (initial);
+
+            return true;
+        }
+        catch (FormatException)
+        {
+            return TimeSpan.TryParse (initial, CultureInfo.InvariantCulture, out _);
+        }
+    }
+
     public async Task<CletRunResult<string?>> RunAsync (
         IApplication app,
         string? initial,

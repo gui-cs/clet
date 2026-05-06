@@ -20,6 +20,9 @@ internal sealed class IntClet : IClet<int?>
         new ("step", null, typeof (int), "Step increment.", false, "1"),
     ];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+        => int.TryParse (initial, CultureInfo.InvariantCulture, out _);
+
     public async Task<CletRunResult<int?>> RunAsync (
         IApplication app,
         string? initial,

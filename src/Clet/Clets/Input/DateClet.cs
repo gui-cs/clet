@@ -17,6 +17,9 @@ internal sealed class DateClet : IClet<string?>
 
     public IReadOnlyList<CletOptionDescriptor> Options => [];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+        => DateTime.TryParse (initial, CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
+
     public async Task<CletRunResult<string?>> RunAsync (
         IApplication app,
         string? initial,

@@ -53,4 +53,12 @@ public class RangeCletTests
         Assert.Equal ("step", clet.Options [0].Name);
         Assert.False (clet.Options [0].Required);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new RangeClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }

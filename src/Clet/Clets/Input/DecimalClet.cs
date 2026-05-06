@@ -20,6 +20,9 @@ internal sealed class DecimalClet : IClet<decimal?>
         new ("step", null, typeof (decimal), "Step increment.", false, "0.1"),
     ];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+        => decimal.TryParse (initial, CultureInfo.InvariantCulture, out _);
+
     public async Task<CletRunResult<decimal?>> RunAsync (
         IApplication app,
         string? initial,
