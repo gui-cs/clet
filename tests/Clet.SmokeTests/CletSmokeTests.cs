@@ -62,7 +62,7 @@ public class CletSmokeTests
         (int exit, string stdout, string stderr) = await CletProcess.RunAsync (["help", "nope"]);
 
         Assert.Equal (2, exit);
-        Assert.Contains ("unknown alias", stderr);
+        Assert.Contains ("Unknown alias", stderr);
     }
 
     [Fact]
