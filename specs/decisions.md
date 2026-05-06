@@ -202,7 +202,7 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Decision.** Land five of the six smoke cases at v0.11 using `Process.Start` (no PTY: `--version`, `--help`, `list --json`, `help select`, `help <unknown>`). Defer the keystroke-driven cases (happy-path Enter, `--timeout 100ms` cancel envelope) to v0.3, where 13 more clets land at the same time and TUIcast pays for its dependency cost. The cancel/timeout *behavior* is unit-tested at v0.11 (`OutputFormatterTests`, `CommandLineRootTests`, `ExitCodesTests`); only the process-level wiring is deferred.
 
-**Status.** Active. `tests/Clet.SmokeTests/scripts/select.txt` placeholder is in place so the v0.3 wire-up is a content edit, not a layout change. Spec §5.3 / §6.3 still describe the full TUIcast harness — that's the v0.3 target, not v0.11 reality.
+**Status.** Active. TUIcast is not yet wired; the `[Fact(Skip=...)]` test and `tests/Clet.SmokeTests/scripts/select.txt` placeholder are in place. All 14 input clets have landed but the keystroke-driven smoke cases still await TUIcast integration.
 
 **Pointers.** [Issue #9](https://github.com/gui-cs/clet/issues/9), `tests/Clet.SmokeTests/CletSmokeTests.cs` (the deliberately `[Fact(Skip=...)]` test).
 
@@ -212,9 +212,9 @@ Revisit when download numbers show users hitting Gatekeeper/SmartScreen friction
 
 **Decision.** Hand-roll a ~300-line parser at v0.11 (`src/Clet/Hosting/CommandLineRoot.cs`). The v0.11 surface is small: `--help`, `--version`, `help <alias>`, `list [--json]`, `<alias> [initial] [--json] [--timeout] [--<opt> <value>]`. The dependency churn isn't worth it for this surface size.
 
-**Status.** Active for v0.11. Revisit at **v0.3** if AOT polish needs SCL's reflection-free parsing or if the surface grows enough (more clets, more global flags) that hand-rolled stops being clean. If we swap, the call site is one constructor in `Program.Main`.
+**Status.** Active. The hand-rolled parser has handled all 15 clets plus global flags cleanly; no plan to revisit. If the surface ever grows enough to justify a library, the call site is one constructor in `Program.Main`.
 
-**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs`. Spec §4.6 still names SCL — that's intent, not current code.
+**Pointers.** `src/Clet/Hosting/CommandLineRoot.cs`.
 
 ## D-005: Non-generic `IClet.RunBoxedAsync` via default interface methods (Active)
 
