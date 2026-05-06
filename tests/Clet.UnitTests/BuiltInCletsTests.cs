@@ -35,7 +35,7 @@ public class BuiltInCletsTests
     [InlineData ("file")]
     [InlineData ("pick-directory")]
     [InlineData ("dir")]
-    [InlineData ("range")]
+    [InlineData ("linear-range")]
     public void RegisterAll_RegistersInputClet (string alias)
     {
         ICletRegistry registry = new CletRegistry ();

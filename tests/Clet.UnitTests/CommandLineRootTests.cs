@@ -342,7 +342,8 @@ public class CommandLineRootTests
     [InlineData ("time", "not-a-time")]
     [InlineData ("duration", "not-a-duration")]
     [InlineData ("confirm", "maybe")]
-    [InlineData ("range", "bad")]
+    // `linear-range` doesn't validate --initial strictly — unmatched labels just produce
+    // an empty span. No "invalid --initial value" path to test, so it isn't in this list.
     public async Task Alias_InvalidInitialValue_ExitsWithUsageError (string alias, string initial)
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();

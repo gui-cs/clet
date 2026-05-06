@@ -128,15 +128,15 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 ---
 
-## D-011: `range` is integer-only at v0.3 (Active)
+## D-011: `range` is integer-only at v0.3 (Superseded by D-029)
 
 **Context.** Spec §4.3.2 defines the `range` value shape as `{"low": <T>, "high": <T>}` where `<T>` is the scalar of the underlying numeric/date/time type.
 
 **Decision.** At v0.3, `T = int` only. The `RangeClet` uses two `NumericUpDown<int>` controls. Decimal range and date/time range are deferred until demand exists — adding them later is a new clet alias or a generic type parameter, not a breaking change to the existing wire format.
 
-**Status.** Active. Revisit if users request decimal or date ranges before v0.5 schema-lock.
+**Status.** Superseded by [D-029](#d-029-replace-range-clet-with-linear-range-backed-by-terminalguis-linearranget-active-supersedes-d-011). The `range` clet itself is gone; `linear-range` replaces it with an option-label string type, so the integer-only constraint no longer applies.
 
-**Pointers.** `src/Clet/Clets/Input/RangeClet.cs`, `src/Clet/Clets/Input/RangeView.cs`.
+**Pointers.** *(Files referenced here have been removed; see D-029.)*
 
 ---
 
@@ -353,8 +353,6 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 
 ---
 
----
-
 ## D-025: Clets declare `AcceptsPositionalArgs`; non-positional clets reject them early (Active)
 
 **Context.** The CLI parser in `CommandLineRoot.DispatchAlias` collected all non-flag tokens into `CletRunOptions.Arguments` and forwarded them unconditionally. Clets that don't consume positional args (everything except `select`, `multi-select`, and `md`) silently ignored them, giving the user no feedback. `clet color - blue` would open the color picker as if the args weren't there. A bare `-` (common stdin convention) also fell through to positional args rather than being flagged.
@@ -410,3 +408,36 @@ Both channels tag every build (needed for auto-increment). Both publish to NuGet
 **Status.** Active.
 
 **Pointers.** `src/Clet/Abstractions/CletRunOptions.cs` (`OutputPath` property), `src/Clet/Hosting/CommandLineRoot.cs` (parsing), `src/Clet/Hosting/OutputFormatter.cs` (file write logic), `src/Clet/Hosting/AliasDispatcher.cs` (error handling), spec §4.7.
+
+---
+
+## D-029: Replace `range` clet with `linear-range` backed by Terminal.Gui's `LinearRange<T>` (Active, supersedes D-011)
+
+**Context.** The original `range` clet wrapped a hand-rolled `RangeView` (`NumericUpDown<int>` × 2 + a `..` label) and emitted `{"low": <int>, "high": <int>}` per spec §4.3.2. It worked, but the UX was poor — two independent spinners with no visual sense of the range relationship — and it duplicated functionality TG was about to ship in a more honest shape via [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204) (the `LinearRange<T>` `IValue` refactor).
+
+**Decision.** Delete `RangeClet`, `RangeView`, and their tests. Add `LinearRangeClet` (alias `linear-range`) backed by `Terminal.Gui.Views.LinearRange<string>`, taking a comma-separated option list and an optional `--kind closed|left-bounded|right-bounded` (default `closed`). Wire format changes from `{low, high}` to `{kind, start, end}` (with `start`/`end` conditionally present per kind). [D-011](#d-011-range-is-integer-only-at-v03-active) (the "int only at v0.3" deferral for `range`) is **superseded** — `linear-range` is option-label string-typed, so the integer-only constraint no longer applies.
+
+**Why:**
+
+1. **Better UX.** `LinearRange<T>` renders as a single horizontal/vertical track with discrete option stops; the user moves endpoints along it. This is the visual the `range` concept always wanted.
+2. **Honest type model.** `LinearRange<T>` exposes `IValue<LinearRangeSpan<T>>` where `LinearRangeSpan` already carries `Kind` (`None | LeftBounded | RightBounded | Closed`) plus `Start`/`End`. Mapping that to the wire format is a direct projection — no `ResultExtractor` lambda, no synthetic tuple.
+3. **Doesn't duplicate TG.** The hand-rolled `RangeView` was 47 lines of custom layout that TG now ships properly. Carrying our own version forward was tech debt.
+4. **Wire-format change is honest.** The old `{low, high}` shape had no way to express `LeftBounded` or `RightBounded` — clipping to `Closed` only was a lossy hedge. The new `{kind, start, end}` shape is the natural encoding of `LinearRangeSpan<T>`.
+
+**How to apply:**
+
+- `src/Clet/Clets/Input/LinearRangeClet.cs` — new clet.
+- `src/Clet/Clets/Input/RangeClet.cs`, `src/Clet/Clets/Input/RangeView.cs` — deleted.
+- `src/Clet/Registry/BuiltInClets.cs` — `RangeClet` registration replaced with `LinearRangeClet`.
+- `tests/Clet.UnitTests/{RangeCletTests,RangeViewTests}.cs` — deleted; replaced by `LinearRangeCletTests.cs`.
+- `tests/Clet.IntegrationTests/RangeCletIntegrationTests.cs` — deleted; replaced by `LinearRangeCletIntegrationTests.cs`.
+- `tests/Clet.UnitTests/BuiltInCletsTests.cs` — `[InlineData("range")]` → `[InlineData("linear-range")]`.
+- Spec §4.3.2 — `range` row replaced with `linear-range` row carrying the new wire shape.
+- README — `range` removed from the v1.0 Input list; `linear-range` added.
+- D-011 status updated to "Superseded by D-029."
+
+**Status.** Active. Supersedes [D-011](#d-011-range-is-integer-only-at-v03-active). **Depends on Terminal.Gui PR #5204 merging.** Until that PR lands and a TG develop NuGet ships with `LinearRange<T> : IValue<LinearRangeSpan<T>>`, this clet builds against a local TG worktree (csproj `<ProjectReference>` instead of `<PackageReference>`) — same TEMP pattern used for PR #5153. The clet PR is held in draft until the TG dependency lands.
+
+**Pointers.** `src/Clet/Clets/Input/LinearRangeClet.cs`, spec §4.3.2, README v1.0 input list, [Terminal.Gui PR #5204](https://github.com/gui-cs/Terminal.Gui/pull/5204), TG `Terminal.Gui/Views/LinearRange/LinearRangeT.cs` and `LinearRangeSpan.cs`.
+
+---

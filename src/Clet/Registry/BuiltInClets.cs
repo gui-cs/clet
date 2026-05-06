@@ -18,7 +18,7 @@ internal static class BuiltInClets
         registry.Register (new AttributePickerClet ());
         registry.Register (new PickFileClet ());
         registry.Register (new PickDirectoryClet ());
-        registry.Register (new RangeClet ());
+        registry.Register (new LinearRangeClet ());
         registry.Register (new MarkdownClet ());
     }
 }

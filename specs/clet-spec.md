@@ -235,7 +235,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias.
 | `duration`                    | string, ISO-8601 duration (`PT1H30M`)                        |
 | `color`                       | string, `#RRGGBB` (lowercase hex)                            |
 | `attribute-picker`            | object, `{"fg": "#RRGGBB", "bg": "#RRGGBB", "style": "..."}` |
-| `range`                       | object, `{"low": <T>, "high": <T>}` (`int` only at v0.3 — see [D-011](decisions.md)) |
+| `linear-range`                | object, `{"kind": "closed", "start": <T>, "end": <T>}` for closed; `{"kind": "left-bounded", "end": <T>}` and `{"kind": "right-bounded", "start": <T>}` for the bounded forms. `<T>` is the option-label string. See [D-029](decisions.md). |
 
 ### 4.4 Registration
 
