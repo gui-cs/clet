@@ -34,11 +34,12 @@ internal sealed class MultilineTextClet : IClet<string?>
             Text = initial ?? string.Empty,
             Width = Dim.Fill (),
             Height = rows,
+            TabKeyAddsTab = false,
         };
 
         Button okButton = new ()
         {
-            Text = "OK",
+            Text = "_OK",
             Y = Pos.Bottom (textView),
         };
 
