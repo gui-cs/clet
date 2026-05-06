@@ -95,24 +95,86 @@ internal sealed class AliasDispatcher
     {
         if (options.Arguments is { Count: > 0 } args)
         {
+            FileAccessPolicy policy = new (
+                Directory.GetCurrentDirectory (),
+                options.AllowedFiles,
+                options.AllowBinary);
+
             List<string> contents = [];
+            long aggregateSize = 0;
 
             foreach (string arg in args)
             {
-                if (File.Exists (arg))
+                // Expand globs
+                List<string> files;
+
+                if (arg.Contains ('*') || arg.Contains ('?'))
                 {
-                    try
+                    string directory = Path.GetDirectoryName (arg) is { Length: > 0 } dir ? dir : ".";
+                    string filePattern = Path.GetFileName (arg);
+
+                    if (!Directory.Exists (directory))
                     {
-                        contents.Add (File.ReadAllText (arg));
+                        stderr.WriteLine ($"Warning: Directory not found: {directory}");
+
+                        continue;
                     }
-                    catch (Exception ex)
+
+                    files = [.. Directory.GetFiles (directory, filePattern)];
+                    string? globError = policy.CheckGlobAggregate (files);
+
+                    if (globError is not null)
                     {
-                        stderr.WriteLine ($"Warning: Could not read file '{arg}': {ex.Message}");
+                        stderr.WriteLine ($"error: {globError}");
+
+                        return null;
                     }
                 }
                 else
                 {
-                    stderr.WriteLine ($"Warning: File not found: {arg}");
+                    files = [arg];
+                }
+
+                foreach (string file in files)
+                {
+                    string? violation = policy.CheckFile (file);
+
+                    if (violation is not null)
+                    {
+                        stderr.WriteLine ($"error: {violation}");
+
+                        return null;
+                    }
+
+                    if (!File.Exists (file))
+                    {
+                        stderr.WriteLine ($"Warning: File not found: {file}");
+
+                        continue;
+                    }
+
+                    FileInfo fi = new (file);
+                    aggregateSize += fi.Length;
+
+                    if (aggregateSize > FileAccessPolicy.MaxAggregateSizeBytes)
+                    {
+                        stderr.WriteLine ($"error: Refused: aggregate file size exceeds {FileAccessPolicy.MaxAggregateSizeBytes / (1024 * 1024)} MiB limit.");
+
+                        return null;
+                    }
+
+                    try
+                    {
+                        contents.Add (File.ReadAllText (file));
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        stderr.WriteLine ($"Warning: Could not read file '{file}': {ex.Message}");
+                    }
+                    catch (IOException ex)
+                    {
+                        stderr.WriteLine ($"Warning: Could not read file '{file}': {ex.Message}");
+                    }
                 }
             }
 

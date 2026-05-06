@@ -453,3 +453,27 @@ This is clet's own defense. TG's cell model is treated as defense-in-depth, not 
 **Status.** Active.
 
 **Pointers.** D-017, `src/Clet/Clets/Viewer/MarkdownClet.cs` (LinkClicked handler), `docs/threat-model.md` (Markdown link policy section), `specs/clet-spec.md` (Appendix A), `tests/Clet.IntegrationTests/MarkdownCletIntegrationTests.cs` (link safety tests).
+
+---
+
+## D-032: `clet md` file-access confinement policy (Active)
+
+**Context.** `clet md FILE` is an arbitrary file-read primitive. In agent contexts, positional arguments may be attacker-influenced via indirect prompt injection. An attacker could instruct an agent to run `clet md /home/$USER/.aws/credentials`, exfiltrating file content through the rendered ANSI output or `--cat` stdout. Glob patterns (`clet md '/etc/*.conf'`) amplify this to directory enumeration. Issue #38 documents the full threat surface.
+
+**Decision.** Default-deny file access policy with explicit opt-in escape hatches:
+1. **Extension allowlist:** `.md`, `.markdown`, `.txt` only.
+2. **Working directory confinement:** Files must be under the process cwd.
+3. **Per-file size cap:** 16 MiB.
+4. **Aggregate size cap:** 32 MiB across all glob matches.
+5. **Glob count cap:** 128 files maximum.
+6. **Binary rejection:** NUL byte in first 8 KiB refuses the file.
+7. **`--allow-file <path>`** (repeatable): Bypasses extension + cwd checks for the named path. Size and binary checks still apply.
+8. **`--allow-binary`:** Disables NUL-byte detection.
+
+For `pick-file`/`pick-directory`, `--root` remains a starting directory, not a sandbox. The interactive file picker is user-driven and OS-permission-gated; confinement is the OS sandbox's responsibility, not clet's. Help text updated to make this explicit.
+
+**Why not confine `pick-*`?** The user is interactively choosing files. Constraining navigation would break legitimate workflows and provide false security (the user can always run `ls` separately). The agent-context risk is in *non-interactive* file reads (`clet md`), not interactive dialogs.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Hosting/FileAccessPolicy.cs`, `src/Clet/Hosting/AliasDispatcher.cs` (`ResolveViewerContent`), `src/Clet/Clets/Viewer/MarkdownClet.cs` (`ExpandFiles`), `src/Clet/Hosting/CommandLineRoot.cs` (`--allow-file`, `--allow-binary` parsing), `docs/threat-model.md` ("File access scope" section), issue #38.

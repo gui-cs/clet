@@ -17,7 +17,7 @@ internal sealed class PickFileClet : IClet<JsonNode?>
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
         new ("multi", "m", typeof (bool), "Allow selecting multiple files.", false, "false"),
-        new ("root", "r", typeof (string), "Starting directory.", false, null),
+        new ("root", "r", typeof (string), "Starting directory (not a sandbox — user can navigate freely).", false, null),
         new ("filter", "f", typeof (string), "File type filter (e.g. \"*.cs\").", false, null),
     ];
 

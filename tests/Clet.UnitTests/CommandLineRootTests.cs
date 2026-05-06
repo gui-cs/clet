@@ -369,13 +369,13 @@ public class CommandLineRootTests
     public async Task MdCat_WithFile_RendersFileToStdout ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
-        string tempFile = Path.GetTempFileName ();
+        string tempFile = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ()}.md");
 
         try
         {
             File.WriteAllText (tempFile, "# Test File\n\nSome content.");
 
-            int exit = await root.InvokeAsync (["md", "--cat", tempFile], CancellationToken.None, stdout, stderr);
+            int exit = await root.InvokeAsync (["md", "--cat", "--allow-file", tempFile, tempFile], CancellationToken.None, stdout, stderr);
 
             Assert.Equal (ExitCodes.Ok, exit);
             Assert.NotEmpty (stdout.ToString ());

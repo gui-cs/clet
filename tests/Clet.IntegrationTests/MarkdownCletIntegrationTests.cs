@@ -82,8 +82,8 @@ public class MarkdownCletIntegrationTests
     [Fact]
     public async Task RunAsync_WithFileArgument_ReturnsOk ()
     {
-        // Create a temporary markdown file for this test
-        string tempFile = Path.GetTempFileName ();
+        // Create a temporary .md file in the current directory (satisfies FileAccessPolicy)
+        string tempFile = Path.Combine (Directory.GetCurrentDirectory (), $"test-{Guid.NewGuid ()}.md");
 
         try
         {
