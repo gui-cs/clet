@@ -37,7 +37,8 @@ internal sealed class CommandLineRoot
                 return ExitCodes.Ok;
 
             case "--version":
-                stdout.WriteLine (GetVersion ());
+                stdout.WriteLine ($"clet {GetVersion ()}");
+                stdout.WriteLine ($"Terminal.Gui {GetTerminalGuiVersion ()}");
 
                 return ExitCodes.Ok;
 
@@ -70,14 +71,14 @@ internal sealed class CommandLineRoot
         {
             string arg = args [i];
 
-            if (arg == "--json")
+            if (arg is "--json" or "-j")
             {
                 jsonOutput = true;
 
                 continue;
             }
 
-            if (arg == "--fullscreen")
+            if (arg is "--fullscreen" or "-f")
             {
                 fullscreen = true;
 
@@ -105,7 +106,7 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
-            if (arg == "--initial")
+            if (arg is "--initial" or "-i")
             {
                 if (i + 1 >= args.Length)
                 {
@@ -119,7 +120,7 @@ internal sealed class CommandLineRoot
                 continue;
             }
 
-            if (arg == "--title")
+            if (arg is "--title" or "-t")
             {
                 if (i + 1 >= args.Length)
                 {
@@ -189,7 +190,7 @@ internal sealed class CommandLineRoot
 
     private int WriteList (string[] args, TextWriter stdout)
     {
-        bool json = args.Length > 1 && args [1] == "--json";
+        bool json = args.Length > 1 && args [1] is "--json" or "-j";
 
         if (json)
         {
@@ -340,7 +341,7 @@ internal sealed class CommandLineRoot
         // Inject dynamic content into the template
         string cletTable = MarkdownHelpRenderer.BuildCletTableMarkdown (_registry).TrimEnd ();
         markdown = markdown.Replace ("{{CLET_TABLE}}", cletTable);
-        markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()}");
+        markdown = markdown.Replace ("{{VERSION}}", $"v{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
 
         MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
     }
@@ -350,6 +351,25 @@ internal sealed class CommandLineRoot
         Version? version = typeof (Program).Assembly.GetName ().Version;
 
         return version?.ToString (3) ?? "0.0.0";
+    }
+
+    private static string GetTerminalGuiVersion ()
+    {
+        System.Reflection.Assembly tg = typeof (Terminal.Gui.App.Application).Assembly;
+        string? informational = tg
+            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
+            .FirstOrDefault ()
+            ?.InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace (informational))
+        {
+            int plus = informational.IndexOf ('+');
+
+            return plus >= 0 ? informational [..plus] : informational;
+        }
+
+        return tg.GetName ().Version?.ToString (3) ?? "unknown";
     }
 
     private static string ResultTypeName (Type type)

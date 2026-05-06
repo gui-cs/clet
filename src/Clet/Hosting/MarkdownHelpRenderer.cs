@@ -20,6 +20,28 @@ internal static class MarkdownHelpRenderer
     /// </summary>
     public static void RenderToAnsi (string markdown, TextWriter output)
     {
+        // The ANSI driver emits Unicode box-drawing glyphs (U+2500 range) plus the
+        // ASCII-art logo. On Windows, Console.OutputEncoding defaults to the OEM code
+        // page; Windows Terminal then interprets those bytes as broken UTF-8 and
+        // substitutes the replacement glyph. Force UTF-8 for the duration of this
+        // render and restore the prior encoding on exit. Only mutate the console
+        // when output was originally Console.Out and stdout isn't redirected —
+        // captured TextWriters (tests) and piped output go through their own encoders.
+        //
+        // Note: assigning to Console.OutputEncoding REPLACES Console.Out with a fresh
+        // StreamWriter under the new encoding. The `output` parameter still points at
+        // the *old* writer (captured in Program.Main before this method ran), so we
+        // re-fetch Console.Out after the swap and write through that.
+        Encoding? previousEncoding = null;
+        TextWriter target = output;
+
+        if (ReferenceEquals (output, Console.Out) && !Console.IsOutputRedirected)
+        {
+            previousEncoding = Console.OutputEncoding;
+            Console.OutputEncoding = Encoding.UTF8;
+            target = Console.Out;
+        }
+
         int width;
 
         try
@@ -86,11 +108,16 @@ internal static class MarkdownHelpRenderer
 
             app.Driver?.ClearContents ();
             markdownView.Draw ();
-            output.WriteLine (app.Driver?.ToAnsi ());
+            target.WriteLine (app.Driver?.ToAnsi ());
         }
         finally
         {
             app.Dispose ();
+
+            if (previousEncoding is not null)
+            {
+                Console.OutputEncoding = previousEncoding;
+            }
         }
     }
 
