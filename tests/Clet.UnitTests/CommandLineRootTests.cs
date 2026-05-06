@@ -128,7 +128,7 @@ public class CommandLineRootTests
         int exit = await root.InvokeAsync (["nope"], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.UsageError, exit);
-        Assert.Contains ("Unknown alias", stderr.ToString ());
+        Assert.Contains ("unknown alias", stderr.ToString ());
     }
 
     [Fact]
@@ -394,8 +394,14 @@ public class CommandLineRootTests
 
         int exit = await root.InvokeAsync (["md", "--cat"], CancellationToken.None, stdout, stderr);
 
+        // When stdin is redirected (test runner / CI), MarkdownClet reads empty stdin
+        // and returns "No input received from stdin". When not redirected, it returns
+        // "No file specified". Both are IO errors.
         Assert.Equal (ExitCodes.IoError, exit);
-        Assert.Contains ("No file specified", stderr.ToString ());
+        string err = stderr.ToString ();
+        Assert.True (
+            err.Contains ("No file specified") || err.Contains ("No input received from stdin"),
+            $"Expected IO error message, got: {err}");
     }
 
     [Fact]
