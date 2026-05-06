@@ -80,7 +80,10 @@ internal sealed class AliasDispatcher
             }
         }
 
-        OutputFormatter.Write (result, options.JsonOutput, stdout, stderr);
+        if (!OutputFormatter.Write (result, options.JsonOutput, stdout, stderr, options.OutputPath))
+        {
+            return ExitCodes.UsageError;
+        }
 
         return ExitCodes.FromResult (result);
     }

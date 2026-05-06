@@ -4,11 +4,48 @@ namespace Clet;
 
 internal static class OutputFormatter
 {
-    public static void Write (BoxedCletResult result, bool jsonOutput, TextWriter stdout, TextWriter stderr)
+    public static bool Write (BoxedCletResult result, bool jsonOutput, TextWriter stdout, TextWriter stderr, string? outputPath = null)
+    {
+        TextWriter target;
+
+        if (outputPath is not null)
+        {
+            try
+            {
+                target = new StreamWriter (outputPath, append: false, encoding: System.Text.Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                stderr.WriteLine ($"error: cannot write to '{outputPath}': {ex.Message}");
+
+                return false;
+            }
+        }
+        else
+        {
+            target = stdout;
+        }
+
+        try
+        {
+            WriteCore (result, jsonOutput, target, stderr);
+        }
+        finally
+        {
+            if (outputPath is not null)
+            {
+                target.Dispose ();
+            }
+        }
+
+        return true;
+    }
+
+    private static void WriteCore (BoxedCletResult result, bool jsonOutput, TextWriter target, TextWriter stderr)
     {
         if (jsonOutput)
         {
-            stdout.WriteLine (ToSchemaV1 (result).ToJson ());
+            target.WriteLine (ToSchemaV1 (result).ToJson ());
 
             return;
         }
@@ -23,16 +60,16 @@ internal static class OutputFormatter
                         case JsonArray arr:
                             foreach (JsonNode? item in arr)
                             {
-                                stdout.WriteLine (item?.ToString ());
+                                target.WriteLine (item?.ToString ());
                             }
 
                             break;
                         case JsonNode node:
-                            stdout.WriteLine (node.ToJsonString ());
+                            target.WriteLine (node.ToJsonString ());
 
                             break;
                         default:
-                            stdout.WriteLine (result.Value);
+                            target.WriteLine (result.Value);
 
                             break;
                     }
