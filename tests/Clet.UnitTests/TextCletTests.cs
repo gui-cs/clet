@@ -51,4 +51,12 @@ public class TextCletTests
 
         Assert.Empty (clet.Options);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new TextClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }

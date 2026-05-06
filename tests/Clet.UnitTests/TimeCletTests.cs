@@ -51,4 +51,12 @@ public class TimeCletTests
 
         Assert.Empty (clet.Options);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new TimeClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }

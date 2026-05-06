@@ -59,4 +59,12 @@ public class MultilineTextCletTests
 
         Assert.Empty (clet.Options);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new MultilineTextClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }

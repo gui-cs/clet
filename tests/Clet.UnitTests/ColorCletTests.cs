@@ -51,4 +51,12 @@ public class ColorCletTests
 
         Assert.Empty (clet.Options);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new ColorClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }

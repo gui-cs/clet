@@ -53,4 +53,12 @@ public class ConfirmCletTests
         Assert.Equal ("prompt", clet.Options [0].Name);
         Assert.False (clet.Options [0].Required);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new ConfirmClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }
