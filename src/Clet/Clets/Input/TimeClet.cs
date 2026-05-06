@@ -17,6 +17,9 @@ internal sealed class TimeClet : IClet<string?>
 
     public IReadOnlyList<CletOptionDescriptor> Options => [];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+        => TimeSpan.TryParse (initial, CultureInfo.InvariantCulture, out _);
+
     public async Task<CletRunResult<string?>> RunAsync (
         IApplication app,
         string? initial,

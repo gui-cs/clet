@@ -330,4 +330,23 @@ public class CommandLineRootTests
         Assert.NotEqual (ExitCodes.ValidationError, exit);
         Assert.DoesNotContain ("input-too-large", stderr.ToString ());
     }
+
+    [Theory]
+    [InlineData ("color", "not-a-color")]
+    [InlineData ("int", "abc")]
+    [InlineData ("decimal", "xyz")]
+    [InlineData ("date", "not-a-date")]
+    [InlineData ("time", "not-a-time")]
+    [InlineData ("duration", "not-a-duration")]
+    [InlineData ("confirm", "maybe")]
+    [InlineData ("range", "bad")]
+    public async Task Alias_InvalidInitialValue_ExitsWithUsageError (string alias, string initial)
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync ([alias, "--initial", initial], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("invalid --initial value", stderr.ToString ());
+    }
 }

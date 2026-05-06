@@ -61,4 +61,17 @@ public class IntCletTests
 
         Assert.False (clet.AcceptsPositionalArgs);
     }
+
+    [Theory]
+    [InlineData ("42", true)]
+    [InlineData ("-7", true)]
+    [InlineData ("abc", false)]
+    [InlineData ("3.14", false)]
+    public void TryValidateInitial_ValidatesIntString (string initial, bool expected)
+    {
+        IntClet clet = new ();
+        CletRunOptions options = new ();
+
+        Assert.Equal (expected, clet.TryValidateInitial (initial, options));
+    }
 }

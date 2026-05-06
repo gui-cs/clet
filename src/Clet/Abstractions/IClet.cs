@@ -18,6 +18,13 @@ internal interface IClet
     /// </summary>
     bool AcceptsPositionalArgs => false;
 
+    /// <summary>
+    /// Validates that the <paramref name="initial"/> string can be parsed by this clet.
+    /// Returns <see langword="true"/> if valid (or if the clet accepts any string).
+    /// Clets with typed parsing (int, date, color, etc.) should override to reject unparseable values.
+    /// </summary>
+    bool TryValidateInitial (string initial, CletRunOptions options) => true;
+
     Task<BoxedCletResult> RunBoxedAsync (
         IApplication app,
         string? input,

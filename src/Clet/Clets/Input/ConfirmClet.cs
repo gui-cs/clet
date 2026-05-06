@@ -18,6 +18,12 @@ internal sealed class ConfirmClet : IClet<bool?>
         new ("prompt", "p", typeof (string), "Custom prompt text displayed as the title.", false, null),
     ];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+        => string.Equals (initial, "true", StringComparison.OrdinalIgnoreCase)
+           || string.Equals (initial, "yes", StringComparison.OrdinalIgnoreCase)
+           || string.Equals (initial, "false", StringComparison.OrdinalIgnoreCase)
+           || string.Equals (initial, "no", StringComparison.OrdinalIgnoreCase);
+
     public async Task<CletRunResult<bool?>> RunAsync (
         IApplication app,
         string? initial,
