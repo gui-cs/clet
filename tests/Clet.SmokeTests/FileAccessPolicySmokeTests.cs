@@ -99,7 +99,7 @@ public class FileAccessPolicySmokeTests
 
         try
         {
-            (int exit, string stdout, string stderr) = await CletProcess.RunAsync (
+            (int exit, _, string stderr) = await CletProcess.RunAsync (
                 ["md", "--cat", "--allow-file", tmpFile, tmpFile]);
 
             Assert.NotEqual (0, exit);
