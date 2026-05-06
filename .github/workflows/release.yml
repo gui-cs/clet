@@ -54,7 +54,7 @@ jobs:
           # Determine TG version: dispatch payload > workflow input > csproj default
           TG_VERSION="${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}"
           if [ -z "$TG_VERSION" ]; then
-            TG_VERSION=$(grep -oP '(?<=<TerminalGuiVersion.*>)[^<]+' src/Clet/Clet.csproj | head -1)
+            TG_VERSION=$(sed -n 's/.*<TerminalGuiVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
           fi
           echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
 
@@ -73,7 +73,7 @@ jobs:
             CLET_VERSION=$(git describe --tags --exact-match HEAD | sed 's/^v//')
           else
             # Read base version from csproj (strip any prerelease suffix for patch math)
-            BASE_VERSION=$(grep -oP '(?<=<Version>)[^<]+' src/Clet/Clet.csproj | head -1)
+            BASE_VERSION=$(sed -n 's/.*<Version>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
             BASE_VERSION=${BASE_VERSION%%-*}  # strip prerelease suffix if any
             MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
             MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
