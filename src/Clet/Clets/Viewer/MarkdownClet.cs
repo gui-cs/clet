@@ -48,7 +48,17 @@ internal sealed class MarkdownClet : IViewerClet
 
         if (options.Arguments is { Count: > 0 })
         {
-            files = ExpandFiles (options.Arguments);
+            FileAccessPolicy policy = new (
+                Directory.GetCurrentDirectory (),
+                options.AllowedFiles,
+                options.AllowBinary);
+
+            files = ExpandFiles (options.Arguments, policy, out string? policyError);
+
+            if (policyError is not null)
+            {
+                return new () { Status = CletRunStatus.Error, ErrorCode = "file-access-denied", ErrorMessage = policyError };
+            }
 
             if (files.Count == 0)
             {
@@ -266,9 +276,10 @@ internal sealed class MarkdownClet : IViewerClet
         }
     }
 
-    private static List<string> ExpandFiles (IReadOnlyList<string> patterns)
+    private static List<string> ExpandFiles (IReadOnlyList<string> patterns, FileAccessPolicy policy, out string? error)
     {
         List<string> result = [];
+        error = null;
 
         foreach (string pattern in patterns)
         {
@@ -279,17 +290,58 @@ internal sealed class MarkdownClet : IViewerClet
 
                 if (Directory.Exists (directory))
                 {
-                    result.AddRange (Directory.GetFiles (directory, filePattern));
+                    string[] matched = Directory.GetFiles (directory, filePattern);
+                    string? globError = policy.CheckGlobAggregate (matched);
+
+                    if (globError is not null)
+                    {
+                        error = globError;
+
+                        return [];
+                    }
+
+                    foreach (string file in matched)
+                    {
+                        string? violation = policy.CheckFile (file);
+
+                        if (violation is not null)
+                        {
+                            error = violation;
+
+                            return [];
+                        }
+
+                        result.Add (Path.GetFullPath (file));
+                    }
                 }
             }
             else if (File.Exists (pattern))
             {
+                string? violation = policy.CheckFile (pattern);
+
+                if (violation is not null)
+                {
+                    error = violation;
+
+                    return [];
+                }
+
                 result.Add (Path.GetFullPath (pattern));
             }
             else
             {
                 Console.Error.WriteLine ($"Warning: File not found: {pattern}");
             }
+        }
+
+        // Final aggregate size check
+        string? aggregateError = policy.CheckGlobAggregate (result);
+
+        if (aggregateError is not null)
+        {
+            error = aggregateError;
+
+            return [];
         }
 
         return result;

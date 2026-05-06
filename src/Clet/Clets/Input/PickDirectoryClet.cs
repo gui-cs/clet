@@ -15,7 +15,7 @@ internal sealed class PickDirectoryClet : IClet<string?>
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
-        new ("root", "r", typeof (string), "Starting directory.", false, null),
+        new ("root", "r", typeof (string), "Starting directory (not a sandbox — user can navigate freely).", false, null),
     ];
 
     public async Task<CletRunResult<string?>> RunAsync (
