@@ -70,7 +70,7 @@ public class CommandLineRootTests
         int exit = await root.InvokeAsync (["help", "nope"], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.UsageError, exit);
-        Assert.Contains ("unknown alias", stderr.ToString ());
+        Assert.Contains ("Unknown alias", stderr.ToString ());
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class CommandLineRootTests
         int exit = await root.InvokeAsync (["nope"], CancellationToken.None, stdout, stderr);
 
         Assert.Equal (ExitCodes.UsageError, exit);
-        Assert.Contains ("unknown alias", stderr.ToString ());
+        Assert.Contains ("Unknown alias", stderr.ToString ());
     }
 
     [Fact]
@@ -388,14 +388,14 @@ public class CommandLineRootTests
     }
 
     [Fact]
-    public async Task MdCat_NoContent_ExitsWithUsageError ()
+    public async Task MdCat_NoContent_ExitsWithIoError ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
 
         int exit = await root.InvokeAsync (["md", "--cat"], CancellationToken.None, stdout, stderr);
 
-        Assert.Equal (ExitCodes.UsageError, exit);
-        Assert.Contains ("--cat requires content", stderr.ToString ());
+        Assert.Equal (ExitCodes.IoError, exit);
+        Assert.Contains ("No file specified", stderr.ToString ());
     }
 
     [Fact]
