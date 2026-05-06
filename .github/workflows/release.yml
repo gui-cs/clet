@@ -169,8 +169,12 @@ jobs:
 
       - name: Create tag
         run: |
-          git tag "v${CLET_VERSION}" || true
-          git push origin "v${CLET_VERSION}" || true
+          if git rev-parse "v${CLET_VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${CLET_VERSION} already exists, skipping."
+          else
+            git tag "v${CLET_VERSION}"
+            git push origin "v${CLET_VERSION}"
+          fi
 
   # NuGet publish runs on BOTH channels. NuGet's prerelease semantics keep develop
   # builds off `latest` automatically; consumers opt in via `--prerelease`.
@@ -186,8 +190,8 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
-          dotnet-quality: 'preview'
+          dotnet-version: '10.x'
+          dotnet-quality: 'ga'
 
       - name: Pack
         run: >
