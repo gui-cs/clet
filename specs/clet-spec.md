@@ -467,7 +467,7 @@ Full document published at `docs/threat-model.md`.
 
 - **Untrusted inputs:** `--initial`, env vars, stdin content, fixture file paths, `--title`, clet-specific options.
 - **Input-size caps:** `--initial` is capped at 64 K characters; `clet md` stdin is capped at 8 M characters. On exceed: exit 65, error code `input-too-large`, JSON envelope `{"schemaVersion":1,"status":"error","code":"input-too-large","message":"..."}`. Per-clet options are not yet capped; tracked as a follow-up.
-- **Sanitization:** All output to stdout/stderr passes through a terminal-escape filter (strip C0/C1 control sequences except those we generate). User-controlled display strings (`--title`, prompt labels) sanitized at the View boundary.
+- **Sanitization:** A `TerminalEscapeSanitizer` strips ESC, BEL, 8-bit CSI/OSC, and C1 7-bit pairs from all user-supplied content before it reaches the terminal driver or Terminal.Gui views. Applied at `MarkdownClet` (inline + file content) and `MarkdownHelpRenderer.RenderToAnsi` (input + rendered output). clet does not rely on TG to filter terminal escapes (D-030).
 - **Markdown link policy:** Default `SurfaceOnly` (links shown, never auto-opened). `--allow-link-open` flag for the user to opt in; off by default for AI agent use.
 - **File access:** `pick-file` and `pick-directory` honor the OS sandbox/permission model; no privilege escalation.
 - **Plugin loading:** None in v1.0. (Closes the entire LoadFrom-based attack surface.)
