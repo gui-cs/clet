@@ -63,8 +63,10 @@ The trust boundary is between the shell/agent layer and the clet CLI host. Every
 **Mitigation:** Default link policy is `SurfaceOnly` (D-017):
 - `LinkClicked` event handler shows the URL in the status bar and sets `e.Handled = true`.
 - No link is ever opened automatically.
-- A future `--allow-link-open` option can opt in to opening links; it is off by default.
+- No `Process.Start` or `ShellExecute` call exists anywhere in `src/`.
 - AI agents running `clet md` on untrusted content are safe by default.
+
+**`--allow-link-open` status:** v1.0 ships with the closed-by-default policy only. No `--allow-link-open` opt-in flag is wired up. The flag is reserved for a future release (v1.x or later) and will require explicit user acceptance of the documented risks (arbitrary URL scheme handling, potential data exfiltration via URL parameters). Until that flag ships, there is no code path that can open a link from rendered Markdown.
 
 ### File access scope
 
