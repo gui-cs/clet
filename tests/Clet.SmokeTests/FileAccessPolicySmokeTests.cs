@@ -32,8 +32,10 @@ public class FileAccessPolicySmokeTests
     [Fact]
     public async Task MdSystemFile_AllowedWithAllowFile ()
     {
-        // Create a .conf file in /tmp to test --allow-file bypass
-        string tmpFile = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ()}.conf");
+        // Create a .conf file in temp directory to test --allow-file bypass
+        string baseTempFile = Path.GetTempFileName ();
+        string tmpFile = Path.ChangeExtension (baseTempFile, ".conf");
+        File.Move (baseTempFile, tmpFile);
         File.WriteAllText (tmpFile, "# test config content");
 
         try
