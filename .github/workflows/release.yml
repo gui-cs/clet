@@ -31,6 +31,10 @@ permissions:
   contents: write
   issues: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   resolve-version:
     runs-on: ubuntu-latest
@@ -85,8 +89,8 @@ jobs:
             CLET_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           fi
 
-          # For develop channel, append prerelease suffix
-          if [[ "$TG_VERSION" == *-* ]]; then
+          # For develop channel, append prerelease suffix (skip if version already has one)
+          if [[ "$TG_VERSION" == *-* && "$CLET_VERSION" != *-* ]]; then
             # Extract the develop build number from TG version (e.g. "37" from "2.0.2-develop.37")
             DEV_SUFFIX=$(echo "$TG_VERSION" | sed 's/[^-]*-//')
             CLET_VERSION="${CLET_VERSION}-${DEV_SUFFIX}"
@@ -159,8 +163,10 @@ jobs:
           retention-days: 30
 
   # Tag the release commit so future patch increments can find the latest.
+  # Only tag stable releases — develop versions are tracked on NuGet, not git tags.
   tag:
     needs: [resolve-version, build]
+    if: ${{ needs.resolve-version.outputs.is_develop == 'false' }}
     runs-on: ubuntu-latest
     env:
       CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
@@ -252,7 +258,7 @@ jobs:
         shell: pwsh
 
   notify-failure:
-    needs: [resolve-version, build, publish-nuget, publish-homebrew, publish-winget]
+    needs: [resolve-version, build, tag, publish-nuget, publish-homebrew, publish-winget]
     if: failure()
     runs-on: ubuntu-latest
     env:
