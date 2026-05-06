@@ -189,6 +189,15 @@ internal static class MarkdownHelpRenderer
             }
         }
 
+        // Append embedded help content (examples, notes) if available
+        string? extra = ReadEmbeddedHelp ($"{clet.PrimaryAlias}.md");
+
+        if (extra is not null)
+        {
+            sb.AppendLine ();
+            sb.Append (extra);
+        }
+
         return sb.ToString ();
     }
 
