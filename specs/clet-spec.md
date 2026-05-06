@@ -487,7 +487,7 @@ In `Clet.csproj`:
 <UseSystemResourceKeys>true</UseSystemResourceKeys>
 ```
 
-Target binary size: ~8MB. Cold-start budget: <100ms on Apple Silicon, <150ms on Windows x64.
+Target binary size: ~8MB. Cold-start budget: <100ms on Apple Silicon, <100ms on Linux x64, <150ms on Windows x64.
 
 ## 5. Release and Update Pipeline
 
