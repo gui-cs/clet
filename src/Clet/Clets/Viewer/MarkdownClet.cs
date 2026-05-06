@@ -334,16 +334,6 @@ internal sealed class MarkdownClet : IViewerClet
             }
         }
 
-        // Final aggregate size check
-        string? aggregateError = policy.CheckGlobAggregate (result);
-
-        if (aggregateError is not null)
-        {
-            error = aggregateError;
-
-            return [];
-        }
-
         return result;
     }
 

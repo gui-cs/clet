@@ -149,11 +149,18 @@ internal sealed class FileAccessPolicy
 
     private static bool IsUnderDirectory (string filePath, string directory)
     {
-        // Normalize: ensure directory ends with separator
-        string normalizedDir = directory.EndsWith (Path.DirectorySeparatorChar)
-            ? directory
-            : directory + Path.DirectorySeparatorChar;
+        // Normalize both paths fully before comparison
+        string normalizedFile = Path.GetFullPath (filePath);
+        string normalizedDir = Path.GetFullPath (directory);
 
-        return filePath.StartsWith (normalizedDir, StringComparison.OrdinalIgnoreCase);
+        // Ensure directory ends with separator to prevent prefix matching attacks
+        // (e.g. "/safe" matching "/safe-other-dir/file.txt")
+        if (!normalizedDir.EndsWith (Path.DirectorySeparatorChar))
+        {
+            normalizedDir += Path.DirectorySeparatorChar;
+        }
+
+        return normalizedFile.StartsWith (normalizedDir, StringComparison.OrdinalIgnoreCase)
+               || normalizedFile.Equals (normalizedDir.TrimEnd (Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
     }
 }
