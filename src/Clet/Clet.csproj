@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Clet</RootNamespace>
     <AssemblyName>clet</AssemblyName>
+    <RollForward>LatestMajor</RollForward>
 
     <!-- NativeAOT publish settings (apply only to `dotnet publish`, not `dotnet pack`/`dotnet build`). -->
     <PublishAot>true</PublishAot>
