@@ -93,20 +93,20 @@ clet is in **friends-and-family alpha** ([milestone tracker](https://github.com/
 
 ## FAQ
 
-**Q: Why not just use `gum` (or `glow`, or `bat`, or `dialog`)?**
+### Q: Why not just use `gum` (or `glow`, or `bat`, or `dialog`)?
 
 Each of those is good at one thing. `clet` is the unification, with a real UI toolkit underneath. Every clet has full mouse support, configurable keybindings, themed colors, and one consistent navigation model. `clet pick-file` is Terminal.Gui's `FileDialog` — a real tree with sortable columns, extension filters, and breadcrumbs, not a fuzzy-filter over `find` output. And because inputs and viewers live in one tool, you get the same keys and colors whether you're picking a file or reading a Markdown document.
 
 For a shell user who only needs `read`-with-validation, `gum` is fine. We are not competing for that user.
 
-**Q: What's the difference between an input clet and a viewer clet?**
+### Q: What's the difference between an input clet and a viewer clet?
 
 - **Input clets** (`select`, `text`, `pick-file`, …) prompt for a value and return a typed result: exit 0, `{"schemaVersion":1,"status":"ok","value":…}`.
 - **Viewer clets** (`md`) render content for the user to read and return on dismiss: exit 0, `{"schemaVersion":1,"status":"ok"}`.
 
 Both share theming, keybindings, mouse support, and the JSON envelope.
 
-**Q: What does the JSON output look like?**
+### Q: What does the JSON output look like?
 
 ```json
 { "schemaVersion": 1, "status": "ok",      "value": "prod" }   // input selected
@@ -115,25 +115,18 @@ Both share theming, keybindings, mouse support, and the JSON envelope.
 { "schemaVersion": 1, "status": "error", "code": "validation", "message": "…" }
 ```
 
-**Q: Exit codes?**
+### Q: Exit codes?
 
 - `0` success
 - `1` no-result
 - `2` usage error
 - `130` cancelled (SIGINT convention).
 
-**Q: Cancellation and timeouts?**
+### Q: Cancellation and timeouts?
 
 Esc and Ctrl-C cancel input clets; `q`, Esc, and Ctrl-C dismiss viewer clets. `--timeout <duration>` (e.g. `--timeout 30s`) cancels automatically — useful for AI agent scripts.
 
-**Q: What if I don't like what keys do what?
-
-See [Terminal.Gui Configuration Manager](https://gui-cs.github.io/Terminal.Gui/docs/config.html). All key bindings are completely configurable. E.g. you'll create a `~/.tui/clet.config.json` like this:
-
-```json
-```
-
-**Q: Which clets ship in v1.0?**
+### Q: Which clets ship in v1.0?
 
 **Input (14):** `text`, `int`, `decimal`, `select`, `multi-select`, `confirm`, `pick-file`, `pick-directory`, `date`, `time`, `duration`, `color`, `attribute-picker`, `range`
 
@@ -141,7 +134,7 @@ See [Terminal.Gui Configuration Manager](https://gui-cs.github.io/Terminal.Gui/d
 
 Run `clet list` to see what's available in your installed version.
 
-**Q: Theming?**
+### Q: Theming?
 
 Every clet inherits the active Terminal.Gui theme automatically. To customize, create `~/.tui/clet.config.json`:
 
@@ -163,9 +156,17 @@ Every clet inherits the active Terminal.Gui theme automatically. To customize, c
 }
 ```
 
+Or, you can pick from a built-in Terminal.Gui Theme. This example picks the `Anders` theme, a nod to [Anders Heilsberg](https://www.microsoft.com/en-us/behind-the-tech/anders-hejlsberg-a-craftsman-of-computer-language) who created TurboPascal. 
+
+```json
+{
+  "Theme": "Anders"
+}
+```
+
 All clets render with the `Base` color scheme, so customizing `Base` controls every clet's appearance. See the [Terminal.Gui Configuration docs](https://gui-cs.github.io/Terminal.Gui/docs/configuration.html) for the full schema.
 
-**Q: Key bindings?**
+### Q: Key bindings?
 
 Key bindings are also configured via `~/.tui/clet.config.json`:
 
@@ -179,17 +180,17 @@ Key bindings are also configured via `~/.tui/clet.config.json`:
 
 This changes the quit/dismiss key for all clets. `clet md` shows the active quit key in the status bar automatically.
 
-**Q: Do I need .NET installed?**
+### Q: Do I need .NET installed?
 
 **No** - for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
 
 **Yes** - for `dotnet tool install -g clet`.
 
-**Q: What's the `--prerelease` channel?**
+### Q: What's the `--prerelease` channel?
 
 Every push to `develop` triggers a matching `clet` prerelease push to NuGet (versioned `1.x.y-develop.NN`). Stable users see no churn — `dotnet tool install -g clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship stable main releases. If you want the bleeding edge, pass `--prerelease`. 
 
-**Q: How do I report a bug or give feedback during alpha?**
+### Q: How do I report a bug or give feedback during alpha?
 
 [File an issue](https://github.com/gui-cs/clet/issues/new). That's the only feedback channel — no Discussions, no forum. See the [Alpha feedback](#alpha-feedback) section above for what to include.
 
