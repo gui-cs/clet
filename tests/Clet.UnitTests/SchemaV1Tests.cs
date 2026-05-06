@@ -91,4 +91,28 @@ public class SchemaV1Tests
 
         Assert.Equal ("hello", root.GetProperty ("value").GetString ());
     }
+
+    [Fact]
+    public void Ok_WithDecimalValue_ProducesCorrectJson ()
+    {
+        SchemaV1 envelope = SchemaV1.Ok (3.14m);
+        string json = envelope.ToJson ();
+
+        using JsonDocument doc = JsonDocument.Parse (json);
+        JsonElement root = doc.RootElement;
+
+        Assert.Equal (3.14m, root.GetProperty ("value").GetDecimal ());
+    }
+
+    [Fact]
+    public void Ok_WithBoolValue_ProducesCorrectJson ()
+    {
+        SchemaV1 envelope = SchemaV1.Ok (true);
+        string json = envelope.ToJson ();
+
+        using JsonDocument doc = JsonDocument.Parse (json);
+        JsonElement root = doc.RootElement;
+
+        Assert.True (root.GetProperty ("value").GetBoolean ());
+    }
 }
