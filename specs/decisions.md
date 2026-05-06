@@ -6,7 +6,21 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
-## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
+## D-022: Clets declare `AcceptsPositionalArgs`; non-positional clets reject them early (Active)
+
+**Context.** The CLI parser in `CommandLineRoot.DispatchAlias` collected all non-flag tokens into `CletRunOptions.Arguments` and forwarded them unconditionally. Clets that don't consume positional args (everything except `select`, `multi-select`, and `md`) silently ignored them, giving the user no feedback. `clet color - blue` would open the color picker as if the args weren't there. A bare `-` (common stdin convention) also fell through to positional args rather than being flagged.
+
+**Decision.** Add `bool AcceptsPositionalArgs { get; }` to the `IClet` interface with a default implementation of `false`. `SelectClet`, `MultiSelectClet`, and `MarkdownClet` override it to `true`. In `CommandLineRoot.DispatchAlias`, after parsing all args and before dispatching, the clet is resolved from the registry and checked: if `!clet.AcceptsPositionalArgs && positionalArgs.Count > 0`, emit an error to stderr (exit 2) without starting Terminal.Gui. When exactly one positional arg is present, a `hint:` line suggests the likely intended flag (`--initial`).
+
+**Why:** Early rejection in the CLI layer (before TUI init) keeps the feedback fast and the error message useful. The property approach is the simplest declaration that doesn't require clets to report "consumed" state after run. The three positional-consuming clets are known and stable; the default of `false` means new clets are safe by default.
+
+**How to apply.** `src/Clet/Abstractions/IClet.cs` — new default property. `src/Clet/Hosting/CommandLineRoot.cs` — early validation block. `SelectClet`, `MultiSelectClet`, `MarkdownClet` — explicit override. Spec §4.7 updated to describe the rejection. New unit tests in `CommandLineRootTests`, `SelectCletTests`, `MultiSelectCletTests`, `MarkdownCletTests`, `IntCletTests`.
+
+**Status.** Active.
+
+**Pointers.** `src/Clet/Abstractions/IClet.cs`, `src/Clet/Hosting/CommandLineRoot.cs`, spec §4.7.
+
+
 
 **Context.** The original PR/FAQ pitched clet as a way to expose any Terminal.Gui View with `IValue<T>` to the shell automatically. v1.0 ships 15 hand-written clets instead. Spec §11 lays out what we learned, what full auto-discovery would require on both the TG side (a `[Shellable]` attribute or marker, wire-format declaration, initial-value parser, per-View option surface) and the clet side (a real source generator), and the cross-cutting cost (TG core would need to host clet-shaped opinions, schema-lock would couple to TG's `[Shellable]` surface).
 

@@ -450,7 +450,7 @@ clet --version
 
 Plain-text help renders at v0.11. Markdown-rendered help (Terminal.Gui `Markdown` View) defers to v0.5.
 
-**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`); other clets ignore them. See decisions log D-014 for why `--title` is a host flag rather than a per-clet option.
+**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, and `--fullscreen` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`, `md`); clets that do not consume positional args reject them with a usage error (exit 2) before the clet runs. See D-022 for the `AcceptsPositionalArgs` design.
 
 **Defaults.** Input clets render inline. Viewer clets (`md`) render fullscreen. `--fullscreen` forces fullscreen for input clets; it's a no-op for viewers.
 

@@ -204,4 +204,55 @@ public class CommandLineRootTests
         Assert.Equal (ExitCodes.UsageError, exit);
         Assert.Contains ("--initial", stderr.ToString ());
     }
+
+    [Fact]
+    public async Task Alias_PositionalArgs_NonPositionalClet_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["int", "42"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("does not accept positional arguments", stderr.ToString ());
+        Assert.Contains ("42", stderr.ToString ());
+    }
+
+    [Fact]
+    public async Task Alias_PositionalArgs_NonPositionalClet_SingleArg_ShowsInitialHint ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["int", "42"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        string stderrStr = stderr.ToString ();
+        Assert.Contains ("hint:", stderrStr);
+        Assert.Contains ("--initial", stderrStr);
+        Assert.Contains ("42", stderrStr);
+    }
+
+    [Fact]
+    public async Task Alias_PositionalArgs_NonPositionalClet_MultipleArgs_NoHint ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        int exit = await root.InvokeAsync (["int", "foo", "bar"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        string stderrStr = stderr.ToString ();
+        Assert.Contains ("does not accept positional arguments", stderrStr);
+        Assert.DoesNotContain ("hint:", stderrStr);
+    }
+
+    [Fact]
+    public async Task Alias_PositionalArgs_NonPositionalClet_SingleDash_ExitsWithUsageError ()
+    {
+        (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+
+        // bare "-" is treated as a positional arg (not a flag), and should be rejected
+        int exit = await root.InvokeAsync (["int", "-"], CancellationToken.None, stdout, stderr);
+
+        Assert.Equal (ExitCodes.UsageError, exit);
+        Assert.Contains ("does not accept positional arguments", stderr.ToString ());
+    }
 }
