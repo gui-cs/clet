@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using System.Linq;
 
@@ -175,12 +176,9 @@ internal static class TerminalEscapeSanitizer
 
     private static bool ContainsDangerousOutputBytes (string s)
     {
-        foreach (char c in s)
+        if (s.Any (c => c is '\x07' or '\x9b' or '\x9d'))
         {
-            if (c is '\x07' or '\x9b' or '\x9d')
-            {
-                return true;
-            }
+            return true;
         }
 
         // Also check for dangerous ESC sequences (not just ESC[)
