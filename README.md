@@ -81,11 +81,7 @@ Exit codes:
 
 ### Demo
 
-> 🎬 *Recording coming soon.*
-
-Here's `clet file`
-
-<img width="709" height="395" alt="image" src="https://github.com/user-attachments/assets/9ed8a6e4-2d00-4636-92b4-f07d20e1b250" />
+![date](./docs/images/date.gif)
 
 ## Alpha feedback
 
