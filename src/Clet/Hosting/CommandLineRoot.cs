@@ -37,8 +37,7 @@ internal sealed class CommandLineRoot
                 return ExitCodes.Ok;
 
             case "--version":
-                stdout.WriteLine ($"clet {GetVersion ()}");
-                stdout.WriteLine ($"Terminal.Gui {GetTerminalGuiVersion ()}");
+                stdout.WriteLine ($"{GetVersion ()} (Terminal.Gui {GetTerminalGuiVersion ()})");
 
                 return ExitCodes.Ok;
 

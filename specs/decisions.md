@@ -6,6 +6,18 @@ When a decision changes, **don't edit the entry** — add a new one above it tha
 
 Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Superseded by D-NNN`, `Reversed`, or `Pending`.
 
+## D-022: clet versions independently of Terminal.Gui (Active)
+
+**Context.** The original spec (§1, §5.6, §7) tied clet's version 1:1 to Terminal.Gui's. D-020 point 4 made this explicit: "clet version = TG version verbatim." That made sense when clet was conceived as a TG satellite moving in lockstep. It's now clear this was a bad idea: clet has its own wire contract (`schemaVersion: 1`) that versioning should reflect; TG releases on its own cadence; and the develop NuGet builds (`2.0.0-develop.X`) polluted the package history with TG's version numbers.
+
+**Decision.** clet maintains its own SemVer starting at `1.0.0`. Major bumps = schema version bumps (per §4.3.1). Minor bumps = new clets or significant CLI additions. Patch = bug fixes. TG version is surfaced in `--version` output (`X.Y.Z (Terminal.Gui A.B.C)`) for diagnostics but does not drive clet's version number. D-020 point 4 ("clet version = TG version verbatim") is superseded by this entry; the rest of D-020 (two dispatch types, channel from suffix, per-channel publishing, MSBuild variable for TG version) remains active.
+
+**Why:** With `schemaVersion: 1` as the public API surface, clet's major version should reflect schema stability, not TG's release cadence. Starting at `1.0.0` aligns with the JSON contract already locked. The develop-build NuGet pollution made the cost concrete. The pre-release `2.0.0-develop.X` builds will be unlisted on nuget.org.
+
+**Status.** Active. Supersedes D-020 point 4.
+
+**Pointers.** Spec §1, §4.7 (`--version` format), §5.6 (versioning), §4.3.1 (schema versioning policy). `src/Clet/Clet.csproj` (`<Version>`). `src/Clet/Hosting/CommandLineRoot.cs` (GetVersion + GetTerminalGuiVersion combined output).
+
 ## D-021: Auto-discovered clets ("any IValue<T> View just works") deferred to v2 (Active)
 
 **Context.** The original PR/FAQ pitched clet as a way to expose any Terminal.Gui View with `IValue<T>` to the shell automatically. v1.0 ships 15 hand-written clets instead. Spec §11 lays out what we learned, what full auto-discovery would require on both the TG side (a `[Shellable]` attribute or marker, wire-format declaration, initial-value parser, per-View option surface) and the clet side (a real source generator), and the cross-cutting cost (TG core would need to host clet-shaped opinions, schema-lock would couple to TG's `[Shellable]` surface).
@@ -20,7 +32,7 @@ Format: `## D-NNN: <short title> (status)`. Status is one of `Active`, `Supersed
 
 **Pointers.** Spec §11 (full exploration), §11.5 (recommendation + v1.x refinements), §11.6 (open questions for v2). `src/Clet.SourceGen/` retained as placeholder. `src/Clet/Registry/BuiltInClets.cs` continues as hand-written. Bar-raise issue [#11](https://github.com/gui-cs/clet/issues/11) #BR-11.
 
-## D-020: Continuous-release loop on TG develop + release; channel from version suffix (Active)
+## D-020: Continuous-release loop on TG develop + release; channel from version suffix (Active — point 4 superseded by D-022)
 
 **Context.** Spec §5.1 originally fired clet's release workflow on a single trigger: `repository_dispatch type=tg-released` from a TG release tag. That left the §8 develop-pin risk wide open — clet had to hand-pin `Terminal.Gui Version="2.0.2-develop.NN"` and bump manually whenever TG develop changed. It also left clet silent during the long stretches between TG releases, even when develop carries shippable improvements. We want clet to track TG continuously (every develop NuGet publish drives a clet prerelease) **and** still produce stable artifacts on TG release tags (Homebrew, WinGet, NuGet "latest"). See [issue #30](https://github.com/gui-cs/clet/issues/30) for the kicked-off plan.
 

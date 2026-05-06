@@ -12,7 +12,7 @@ This is the implementation spec. It assumes the PR/FAQ is broadly accepted and c
 - Targeted changes to `gui-cs/Terminal.Gui` core (§3) that benefit TG generally and unblock clet specifically.
 - Fourteen input clets and one viewer clet (`md`) statically registered in v1.0.
 - Native installer channels: Homebrew (gui-cs tap), WinGet, .NET tool. NativeAOT for native channels.
-- Auto-release workflow tied to TG releases. Version 1:1 with TG.
+- Auto-release workflow tied to TG releases. clet versions independently; major version tied to `schemaVersion` changes per §4.3.1.
 - JSON output contract (schemaVersion 1).
 - Inline input rendering; alt-screen viewer rendering.
 - Theming via TG's `ConfigurationManager`.
@@ -440,6 +440,8 @@ clet --help
 clet --version
 ```
 
+**`--version` output.** `clet --version` prints a single line in the format `X.Y.Z (Terminal.Gui A.B.C)` where `X.Y.Z` is clet's own SemVer and `A.B.C` is the Terminal.Gui version the binary was built against. The TG version is informational — it helps users file bugs and lets agents know what TG features are available. See D-022.
+
 **`--help` banner.** `clet --help` (and `clet` with no arguments) prints the ASCII logo followed by a plain-text usage summary. The logo is the approved three-line box-drawing art:
 
 ```
@@ -561,7 +563,7 @@ Before any publish step, every built binary runs a smoke matrix. The gate is pro
 
 **Cases:**
 
-1. `clet --version` returns the clet version and the Terminal.Gui version (one per line: `clet <ver>` then `Terminal.Gui <ver>`). The TG version line is the smoke gate's authoritative source for which TG build the binary was linked against.
+1. `clet --version` returns the clet version and the Terminal.Gui version in a single line: `X.Y.Z (Terminal.Gui A.B.C)`. The TG version portion is the smoke gate's authoritative source for which TG build the binary was linked against.
 2. `clet list --json` validates against the schema.
 3. For each input clet: TUIcast spawns with `--initial <stub> --json --timeout 1s` and a per-clet keystroke script that drives it to accept; verify exit 0 and JSON envelope.
 4. For `md`: TUIcast spawns against a fixture markdown file with `"wait:500,q"`; verify exit 0 and `{"schemaVersion":1,"status":"ok"}`.
@@ -607,11 +609,11 @@ If any publish step fails:
 - Already-published channels are noted; rollback is manual (we don't auto-revert).
 - The smoke-test step ensures broken binaries never hit a channel; failures here are most often manifest/signing problems, not runtime regressions.
 
-### 5.6 Version 1:1 with TG
+### 5.6 Versioning
 
-clet's published version is the dispatch payload's `tg_version`, **verbatim including any prerelease suffix** (e.g. `2.0.2-develop.36` ⇒ clet `2.0.2-develop.36`; `2.1.0` ⇒ clet `2.1.0`). The workflow passes `-p:Version=${{ env.TG_VERSION }}` to both `dotnet pack` and `dotnet publish`. There is no version negotiation, no compatibility matrix, no "clet 1.5 supports TG 2.3+." The pair is locked.
+clet maintains its own SemVer, independent of Terminal.Gui's version. Major bumps correspond to `schemaVersion` changes (per §4.3.1). Minor bumps cover new clets or significant CLI additions. Patch bumps cover bug fixes. The TG version is surfaced in `--version` output for diagnostics only. See [D-022](decisions.md#d-022).
 
-The csproj also declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between `tg_version` in the package label and what's actually linked. See [D-020](decisions.md#d-020).
+The release workflow passes `-p:Version=<clet_version>` to both `dotnet pack` and `dotnet publish`. The csproj declares `<TerminalGuiVersion>` (defaulted to a known-good develop build for local development) and references TG via `<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />`. The release workflow passes `-p:TerminalGuiVersion=${{ env.TG_VERSION }}` so the build pulls the exact TG version named by the dispatch — no floating range, no version drift between the build and what's actually linked. See [D-020](decisions.md#d-020).
 
 ## 6. Testing
 

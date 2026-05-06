@@ -20,7 +20,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>clet</ToolCommandName>
     <PackageId>Terminal.Gui.clet</PackageId>
-    <Version>0.5.0-alpha</Version>
+    <Version>1.0.0-alpha</Version>
     <Authors>gui-cs</Authors>
     <Description>Turns every Terminal.Gui View into a CLI command — typed inputs, a real file picker, a Markdown viewer — with consistent JSON output, predictable exit codes, and full keyboard/mouse support.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
