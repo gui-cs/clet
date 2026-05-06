@@ -51,4 +51,12 @@ public class DurationCletTests
 
         Assert.Empty (clet.Options);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new DurationClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }

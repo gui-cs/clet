@@ -51,4 +51,12 @@ public class DateCletTests
 
         Assert.Empty (clet.Options);
     }
+
+    [Fact]
+    public void AcceptsPositionalArgs_IsFalse ()
+    {
+        IClet clet = new DateClet ();
+
+        Assert.False (clet.AcceptsPositionalArgs);
+    }
 }
