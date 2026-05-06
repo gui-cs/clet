@@ -9,9 +9,9 @@ Turns every [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) View into a C
 ### Release
 
 ```sh
-brew install gui-cs/tap/clet              # macOS / Linux
-winget install gui-cs.clet                # Windows 10/11
-dotnet tool install -g Terminal.Gui.clet  # any platform with .NET SDK
+brew install gui-cs/tap/clet  # macOS / Linux
+winget install gui-cs.clet    # Windows 10/11
+dotnet tool install -g clet   # any platform with .NET SDK
 ```
 
 ### Pre-Release
@@ -19,7 +19,7 @@ dotnet tool install -g Terminal.Gui.clet  # any platform with .NET SDK
 Tracks Terminal.Gui's `develop` channel — a new clet prerelease lands on NuGet for every TG develop publish. See [D-020](specs/decisions.md#d-020).
 
 ```sh
-dotnet tool install -g Terminal.Gui.clet --prerelease
+dotnet tool install -g clet --prerelease
 ```
 
 ## What it replaces
@@ -137,11 +137,11 @@ Whatever theme is set in your TG `ConfigurationManager` applies to every clet au
 
 **No** for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
 
-**Yes** for `dotnet tool install -g Terminal.Gui.clet`.
+**Yes** for `dotnet tool install -g clet`.
 
 **Q: What's the `--prerelease` channel?**
 
-Every Terminal.Gui develop NuGet publish triggers a matching `clet` prerelease push (versioned `2.x.y-develop.NN` to mirror TG's own develop versioning). Stable users see no churn — `dotnet tool install -g Terminal.Gui.clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship release builds. If you want the bleeding edge, pass `--prerelease`. See [D-020](specs/decisions.md#d-020) for the rationale.
+Every push to `develop` triggers a matching `clet` prerelease push to NuGet (versioned `1.x.y-develop.NN` per D-023). Stable users see no churn — `dotnet tool install -g clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship stable main releases. If you want the bleeding edge, pass `--prerelease`. See [D-020](specs/decisions.md), [D-023](specs/decisions.md), and [D-024](specs/decisions.md) for the rationale.
 
 **Q: How do I report a bug or give feedback during alpha?**
 
