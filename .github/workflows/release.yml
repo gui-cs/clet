@@ -201,11 +201,11 @@ jobs:
 
       - name: Unit Tests
         shell: bash
-        run: dotnet exec tests/Clet.UnitTests/bin/Release/net10.0/Clet.UnitTests.dll
+        run: dotnet run --project tests/Clet.UnitTests --no-build -c Release
 
       - name: Integration Tests
         shell: bash
-        run: dotnet exec tests/Clet.IntegrationTests/bin/Release/net10.0/Clet.IntegrationTests.dll
+        run: dotnet run --project tests/Clet.IntegrationTests --no-build -c Release
 
       - name: Publish AOT
         run: >
@@ -218,7 +218,8 @@ jobs:
           -o publish/${{ matrix.rid }}
 
       - name: Smoke Tests
-        run: dotnet exec tests/Clet.SmokeTests/bin/Release/net10.0/Clet.SmokeTests.dll
+        shell: bash
+        run: dotnet run --project tests/Clet.SmokeTests --no-build -c Release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
