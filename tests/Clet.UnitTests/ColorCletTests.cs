@@ -59,4 +59,18 @@ public class ColorCletTests
 
         Assert.False (clet.AcceptsPositionalArgs);
     }
+
+    [Theory]
+    [InlineData ("#ff0000", true)]
+    [InlineData ("#FFFFFF", true)]
+    [InlineData ("Red", true)]
+    [InlineData ("42", false)]
+    [InlineData ("not-a-color", false)]
+    public void TryValidateInitial_ValidatesColorString (string initial, bool expected)
+    {
+        ColorClet clet = new ();
+        CletRunOptions options = new ();
+
+        Assert.Equal (expected, clet.TryValidateInitial (initial, options));
+    }
 }

@@ -20,6 +20,9 @@ internal sealed class RangeClet : IClet<JsonObject?>
         new ("step", null, typeof (int), "Step increment.", false, "1"),
     ];
 
+    public bool TryValidateInitial (string initial, CletRunOptions options)
+        => TryParseRange (initial, out _, out _);
+
     public async Task<CletRunResult<JsonObject?>> RunAsync (
         IApplication app,
         string? initial,
