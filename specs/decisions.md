@@ -441,3 +441,15 @@ This is clet's own defense. TG's cell model is treated as defense-in-depth, not 
 **Status.** Active.
 
 **Pointers.** `src/Clet/Hosting/TerminalEscapeSanitizer.cs`, `src/Clet/Clets/Viewer/MarkdownClet.cs`, `src/Clet/Hosting/MarkdownHelpRenderer.cs`, `docs/threat-model.md` ("Terminal escape sanitization" section), `specs/clet-spec.md` Appendix A, issue #38.
+
+---
+
+## D-031: SurfaceOnly link policy locked at v0.5; `--allow-link-open` deferred (Active)
+
+**Context.** D-017 established the SurfaceOnly default for `clet md` links. At v0.5 we lock this behavior: the `LinkClicked` handler sets `e.Handled = true` and shows the URL in the status bar; no `Process.Start` or `ShellExecute` exists in `src/`. Spec Appendix A previously mentioned `--allow-link-open` as if it were available — it is not wired up.
+
+**Decision.** The closed-by-default SurfaceOnly policy is locked for v1.0. No `--allow-link-open` flag ships. The flag name is reserved for a future v1.x release that will require explicit user acceptance of documented risks (arbitrary URL scheme handling, potential data exfiltration). Spec Appendix A updated to state "deferred — not wired in v1.0." Integration tests verify the invariant.
+
+**Status.** Active.
+
+**Pointers.** D-017, `src/Clet/Clets/Viewer/MarkdownClet.cs` (LinkClicked handler), `docs/threat-model.md` (Markdown link policy section), `specs/clet-spec.md` (Appendix A), `tests/Clet.IntegrationTests/MarkdownCletIntegrationTests.cs` (link safety tests).
