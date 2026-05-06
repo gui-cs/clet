@@ -78,7 +78,7 @@ public class FileAccessPolicySmokeTests
 
         try
         {
-            (int exit, string stdout, string stderr) = await CletProcess.RunAsync (
+            (int exit, _, string stderr) = await CletProcess.RunAsync (
                 ["md", "--cat", mdFile, "--allow-file", mdFile]);
 
             // With --allow-file, should succeed even though it may be outside the process cwd
