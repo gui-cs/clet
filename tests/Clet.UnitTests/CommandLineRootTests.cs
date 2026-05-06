@@ -48,15 +48,18 @@ public class CommandLineRootTests
     }
 
     [Fact]
-    public async Task HelpAlias_KnownAlias_PrintsAliasHelp ()
+    public async Task HelpAlias_KnownAlias_DispatchesHelpViewer ()
     {
         (CommandLineRoot root, StringWriter stdout, StringWriter stderr) = Build ();
+        using CancellationTokenSource cts = new ();
+        cts.Cancel ();
 
-        int exit = await root.InvokeAsync (["help", "select"], CancellationToken.None, stdout, stderr);
+        int exit = await root.InvokeAsync (["help", "select"], cts.Token, stdout, stderr);
 
-        Assert.Equal (ExitCodes.Ok, exit);
-        Assert.Contains ("select", stdout.ToString ());
-        Assert.Contains ("--options", stdout.ToString ());
+        // Pre-cancelled token causes the md viewer to return Cancelled immediately,
+        // proving that help <alias> dispatches through the interactive help viewer.
+        Assert.Equal (ExitCodes.Cancelled, exit);
+        Assert.Empty (stderr.ToString ());
     }
 
     [Fact]
