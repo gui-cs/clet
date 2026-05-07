@@ -38,11 +38,6 @@ internal sealed class DurationClet : IClet<string?>
         CletRunOptions options,
         CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
-
         TimeEditor editor = new ();
 
         if (initial is not null)
@@ -63,32 +58,18 @@ internal sealed class DurationClet : IClet<string?>
 
         RunnableWrapper<TimeEditor, TimeSpan?> wrapper = new (editor)
         {
-            Title = options.Title ?? "Enter a duration (Enter to accept, Esc to cancel)",
-            Width = Dim.Fill (),
-            BorderStyle = LineStyle.Rounded,
             ResultExtractor = e => ((IValue<TimeSpan>)e).Value,
-            SchemeName = CletStyling.BaseSchemeName,
         };
-        wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
-        wrapper.KeyBindings.Add (Key.Enter, Command.Accept);
 
-        try
-        {
-            await app.RunAsync (wrapper, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
+        return await InputCletRunner.RunAsync<TimeEditor, TimeSpan?, string?> (
+            app, wrapper, options,
+            "Enter a duration (Enter to accept, Esc to cancel)",
+            cancellationToken,
+            result =>
+            {
+                string? formatted = result is { } ts ? XmlConvert.ToString (ts) : null;
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
-
-        TimeSpan? result = wrapper.Result;
-        string? formatted = result is { } ts ? XmlConvert.ToString (ts) : null;
-
-        return new () { Status = CletRunStatus.Ok, Value = formatted };
+                return new () { Status = CletRunStatus.Ok, Value = formatted };
+            });
     }
 }
