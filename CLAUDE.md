@@ -62,7 +62,7 @@ The repo intentionally splits "design intent" from "current code" from "queued c
 
 - **`specs/clet-spec.md`** — authoritative design document. Planned clets, exit code semantics, JSON schema (§4.3 + §4.3.1 versioning + §4.3.2 per-clet shapes), milestone roadmap (§7), risks (§8), open questions (§9), auto-discovery exploration (§11). Where the spec and current code diverge, the decisions log says why. **§6 (Testing) is a thin pointer** to `tests/SPEC.md`.
 - **`tests/SPEC.md`** — authoritative testing strategy. Nine test layers, tier matrix (which layers run when), per-layer cases, harness shapes, golden-file conventions. Lives next to the test projects so it stays in sync. The main spec defers to it for everything in `tests/`.
-- **`specs/decisions.md`** — append-only log of cross-cutting decisions that don't fit cleanly into one spec section. *Why* the parser is hand-rolled (D-006), *why* TUIcast is deferred to v0.3 (D-007), *why* the JSON envelope dropped its `type` field (D-001), etc. **Read this before "fixing" something to match the spec** — the deviation may be deliberate. New decisions append; supersede, don't edit.
+- **`specs/decisions.md`** — historical log of cross-cutting decisions. **Read-only reference** — do not append new entries. New design rationale goes in the PR description instead. Existing entries are still useful context for understanding *why* something was built a certain way (e.g. D-006 for the hand-rolled parser, D-007 for deferred TUIcast).
 - **[Bar-raise backlog issue #11](https://github.com/gui-cs/clet/issues/11)** (label `bar-raise`) — critique that's been raised, considered, and *not yet* acted on. Before claiming a section is "done," check the backlog for queued items in that area. New design pushback goes there, not into a side conversation.
 - **`docs/runbooks/release-rollback.md`** — operational runbook for withdrawing a bad release across Homebrew/WinGet/NuGet. Draft until exercised at v0.9.
 
@@ -70,17 +70,16 @@ The repo intentionally splits "design intent" from "current code" from "queued c
 
 Before a PR can be merged, the docs above must reflect what the PR changes. This isn't a stylistic preference — it's how the three-document split (intent / decisions / backlog) stays trustworthy. **A PR that ships behavior without updating the right doc is incomplete, even if all tests pass.**
 
-Use this checklist on every PR. **The spec and the decisions log must agree on every claim** — if you touch one, audit the other in the same PR.
+Use this checklist on every PR:
 
-- **Did the PR change CLI surface, exit codes, JSON envelope, or any user-visible behavior the spec describes?** → Update `specs/clet-spec.md` in the same PR. If the change *contradicts* something in the spec (rather than refining it), also add a decisions-log entry explaining why.
-- **Did the PR change a test project's layout, harness shape, or layer scope?** → Update `tests/SPEC.md` in the same PR. The main spec's §6 is a pointer; the substance lives in `tests/SPEC.md`.
-- **Did the PR add or update a `D-NNN` entry in `specs/decisions.md`?** → **Audit the spec and the README for anything that now disagrees with the new entry, and update them in the same PR**, pointing the affected section at the `D-NNN` entry. The decisions log captures *why* a deviation exists; the spec/README must still describe *what currently ships*. A `D-NNN` that says "we return text not indices" while §4.3.2 still says "integer (zero-based index)" is a worse failure than no decision entry at all — it makes the spec actively misleading. Concrete trigger list: any new/updated entry whose Context or Decision section quotes the spec, references a press-release claim, or names a section like "§4.3", "§4.7", "§5.4", "Appendix A".
-- **Did the PR make a non-obvious choice a future reader might want to "fix"?** (workarounds against upstream bugs, deliberate divergence from the spec, hand-rolled where a library exists, deferred mechanism, load-bearing handler that looks redundant) → Append a new entry to `specs/decisions.md` with `## D-NNN: <title> (Active)`. Append, don't edit; supersede with a new entry if a prior decision is reversed. Then re-run the bullet above — adding a `D-NNN` is itself a trigger for the spec/README audit.
+- **Did the PR change CLI surface, exit codes, JSON envelope, or any user-visible behavior the spec describes?** → Update `specs/clet-spec.md` in the same PR.
+- **Did the PR change a test project's layout, harness shape, or layer scope?** → Update `tests/SPEC.md` in the same PR.
+- **Did the PR make a non-obvious design choice?** → Document the rationale in the PR description.
 - **Did the PR resolve or invalidate an item on bar-raise issue #11?** → Tick the checkbox or add a follow-up note on the issue.
 - **Did the PR complete a checkbox on a milestone tracking issue (#2/#9/#3/#4/#5/#6)?** → Tick the box on the issue itself, not just locally.
 - **Did the PR change release/operational steps?** → Update `docs/runbooks/release-rollback.md` (or add a new runbook under `docs/runbooks/`).
 
-If none of the above apply, say so explicitly in the PR description ("no spec/decisions/runbook impact") rather than leaving it implicit. Reviewers should reject PRs that ship surface-level changes without the corresponding doc update — and reject PRs that add a `D-NNN` entry without the matching spec/README sync, since that strands the spec in a misleading state.
+If none of the above apply, say so explicitly in the PR description ("no spec/runbook impact").
 
 ### Milestones
 

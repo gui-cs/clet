@@ -28,6 +28,9 @@ internal sealed class MarkdownClet : IViewerClet
         new ("cat", null, typeof (bool),
             "Render markdown to stdout without launching the TUI viewer.",
             false, "false"),
+        new ("no-browse", null, typeof (bool),
+            "Disable browser mode (back/forward navigation, top bar).",
+            false, "false"),
     ];
 
     public bool AcceptsPositionalArgs => true;
@@ -113,6 +116,12 @@ internal sealed class MarkdownClet : IViewerClet
             options.AllowedFiles,
             options.AllowBinary);
 
+        // Browser mode: back/forward navigation with history stacks
+        bool browseMode = !options.NoBrowse;
+        Stack<string> backStack = new ();
+        Stack<string> forwardStack = new ();
+        string? currentFile = files.Count > 0 ? Path.GetFullPath (files [0]) : null;
+
         // Parse --theme option
         ThemeName syntaxTheme = ThemeName.DarkPlus;
 
@@ -124,7 +133,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         Runnable window = new ()
         {
-            Title = options.Title ?? "Markdown Viewer",
+            Title = options.Title ?? (browseMode ? "Markdown Browser" : "Markdown Viewer"),
             Width = Dim.Fill (),
             Height = Dim.Fill (),
         };
@@ -138,7 +147,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.ViewportSettings |= ViewportSettingsFlags.HasHorizontalScrollBar;
 
-        // --- StatusBar items ---
+        // --- StatusBar items (declared early so local functions can capture them) ---
 
         Shortcut lineCountShortcut = new () { Title = "0 lines", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut fileSizeShortcut = new () { Title = "0 B", MouseHighlightStates = MouseState.None, Enabled = false };
@@ -149,17 +158,64 @@ internal sealed class MarkdownClet : IViewerClet
         Link statusLink = new () { Text = "Ready", CanFocus = false };
         Shortcut statusShortcut = new () { CommandView = statusLink, MouseHighlightStates = MouseState.None };
 
+        // --- Top bar (browser mode) ---
+        Shortcut? backShortcut = null;
+        Shortcut? forwardShortcut = null;
+        Shortcut? locationShortcut = null;
+
+        if (browseMode)
+        {
+            backShortcut = new Shortcut
+            {
+                Title = "\u2190",
+                Key = Key.CursorLeft.WithCtrl,
+                Enabled = false,
+            };
+            backShortcut.Accepting += (_, _) => NavigateBack ();
+
+            forwardShortcut = new Shortcut
+            {
+                Title = "\u2192",
+                Key = Key.CursorRight.WithCtrl,
+                Enabled = false,
+            };
+            forwardShortcut.Accepting += (_, _) => NavigateForward ();
+
+            locationShortcut = new Shortcut
+            {
+                Title = currentFile is not null ? GetRelativeBreadcrumb (currentFile) : "(inline)",
+                MouseHighlightStates = MouseState.None,
+                Enabled = false,
+            };
+
+            Bar topBar = new ([backShortcut, forwardShortcut, locationShortcut])
+            {
+                Y = 0,
+                Width = Dim.Fill (),
+                Height = 1,
+                CanFocus = false,
+                TabStop = TabBehavior.NoStop,
+            };
+
+            markdownView.Y = 1;
+
+            window.Add (topBar);
+        }
+
         // --- MarkdownView event wiring ---
 
         markdownView.LinkClicked += (_, e) =>
         {
-            // Navigate local .md files within the sandbox
-            if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath))
+            if (browseMode)
             {
-                LoadFile (resolvedPath);
-                e.Handled = true;
+                // Navigate local .md files within the sandbox
+                if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath, out string? fragment))
+                {
+                    LoadFile (resolvedPath, fragment);
+                    e.Handled = true;
 
-                return;
+                    return;
+                }
             }
 
             // Open http/https links in the default browser — they're safe
@@ -266,12 +322,31 @@ internal sealed class MarkdownClet : IViewerClet
 
         window.Add (markdownView, statusBar);
 
+        // Register Ctrl+Left/Right key bindings on the window for back/forward navigation
+        if (browseMode)
+        {
+            window.KeyDown += (_, e) =>
+            {
+                if (e == Key.CursorLeft.WithCtrl)
+                {
+                    NavigateBack ();
+                    e.Handled = true;
+                }
+                else if (e == Key.CursorRight.WithCtrl)
+                {
+                    NavigateForward ();
+                    e.Handled = true;
+                }
+            };
+        }
+
         // Load content after initial layout
         window.Initialized += (_, _) =>
         {
             if (files.Count > 0)
             {
-                LoadFile (files [0]);
+                // Initial load — skip history push
+                LoadFile (files [0], isHistoryNavigation: true);
             }
             else if (!string.IsNullOrEmpty (content))
             {
@@ -282,7 +357,6 @@ internal sealed class MarkdownClet : IViewerClet
                 statusLink.Url = string.Empty;
                 statusShortcut.MouseHighlightStates = MouseState.None;
             }
-
         };
 
         try
@@ -301,18 +375,91 @@ internal sealed class MarkdownClet : IViewerClet
 
         return new () { Status = CletRunStatus.Ok };
 
-        void LoadFile (string filePath)
+        void LoadFile (string filePath, string? fragment = null, bool isHistoryNavigation = false)
         {
             string fullPath = Path.GetFullPath (filePath);
+
+            // Push current file onto the back stack for non-history navigations
+            if (!isHistoryNavigation && currentFile is not null)
+            {
+                backStack.Push (currentFile);
+                forwardStack.Clear ();
+            }
+
             string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (fullPath))!;
             markdownView.Text = fileContent;
 
+            currentFile = fullPath;
             currentFileDir = Path.GetDirectoryName (fullPath);
 
             FileInfo fileInfo = new (fullPath);
             fileSizeShortcut.Title = FormatFileSize (fileInfo.Length);
             statusLink.Text = Path.GetFileName (fullPath);
             statusLink.Url = string.Empty;
+
+            // Update browser UI
+            if (browseMode && locationShortcut is not null)
+            {
+                locationShortcut.Title = GetRelativeBreadcrumb (fullPath);
+            }
+
+            UpdateNavigationButtons ();
+
+            // Scroll to fragment anchor if specified
+            if (!string.IsNullOrEmpty (fragment))
+            {
+                markdownView.ScrollToAnchor (fragment);
+            }
+        }
+
+        void NavigateBack ()
+        {
+            if (backStack.Count == 0)
+            {
+                return;
+            }
+
+            if (currentFile is not null)
+            {
+                forwardStack.Push (currentFile);
+            }
+
+            string prev = backStack.Pop ();
+            LoadFile (prev, isHistoryNavigation: true);
+        }
+
+        void NavigateForward ()
+        {
+            if (forwardStack.Count == 0)
+            {
+                return;
+            }
+
+            if (currentFile is not null)
+            {
+                backStack.Push (currentFile);
+            }
+
+            string next = forwardStack.Pop ();
+            LoadFile (next, isHistoryNavigation: true);
+        }
+
+        void UpdateNavigationButtons ()
+        {
+            if (!browseMode)
+            {
+                return;
+            }
+
+            backShortcut!.Enabled = backStack.Count > 0;
+            forwardShortcut!.Enabled = forwardStack.Count > 0;
+        }
+
+        string GetRelativeBreadcrumb (string fullPath)
+        {
+            string cwd = Directory.GetCurrentDirectory ();
+
+            return Path.GetRelativePath (cwd, fullPath);
         }
     }
 
@@ -323,13 +470,20 @@ internal sealed class MarkdownClet : IViewerClet
         string url,
         string currentDir,
         FileAccessPolicy policy,
-        out string? resolvedPath)
+        out string? resolvedPath,
+        out string? fragment)
     {
         resolvedPath = null;
+        fragment = null;
 
-        // Strip fragment (e.g. #section)
+        // Extract fragment (e.g. #section) before resolving the path
         int fragmentIndex = url.IndexOf ('#');
         string pathPart = fragmentIndex >= 0 ? url [..fragmentIndex] : url;
+
+        if (fragmentIndex >= 0)
+        {
+            fragment = url [(fragmentIndex + 1)..];
+        }
 
         if (string.IsNullOrWhiteSpace (pathPart))
         {

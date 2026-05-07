@@ -17,4 +17,7 @@ internal sealed record CletRunOptions
 
     /// <summary>When true, binary file content (NUL bytes) is permitted.</summary>
     public bool AllowBinary { get; init; }
+
+    /// <summary>When true, disables browser-mode navigation (back/forward, top bar) for viewer clets.</summary>
+    public bool NoBrowse { get; init; }
 }
