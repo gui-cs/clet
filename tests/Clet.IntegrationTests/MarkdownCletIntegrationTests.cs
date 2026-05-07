@@ -218,6 +218,54 @@ public class MarkdownCletIntegrationTests
         Assert.Equal ("file:///etc/passwd", capturedUrl);
     }
 
+    [Fact]
+    public async Task RunAsync_NoBrowse_WithInlineContent_ReturnsOk ()
+    {
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+        app.StopAfterFirstIteration = true;
+
+        MarkdownClet clet = new ();
+        CletRunOptions options = new () { NoBrowse = true };
+
+        using CancellationTokenSource cts = new ();
+
+        CletRunResult result = await clet.RunAsync (app, "# Hello\n\nThis is **Markdown**.", options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Ok, result.Status);
+    }
+
+    [Fact]
+    public async Task RunAsync_BrowseMode_WithFileArgument_ReturnsOk ()
+    {
+        string tempFile = Path.Combine (Directory.GetCurrentDirectory (), $"test-browse-{Guid.NewGuid ()}.md");
+
+        try
+        {
+            File.WriteAllText (tempFile, "# Browse Test\n\nSome content with a [link](other.md).");
+
+            using IApplication app = Application.Create ();
+            app.Init ("ansi");
+            app.StopAfterFirstIteration = true;
+
+            MarkdownClet clet = new ();
+            CletRunOptions options = new ()
+            {
+                Arguments = [tempFile],
+            };
+
+            using CancellationTokenSource cts = new ();
+
+            CletRunResult result = await clet.RunAsync (app, null, options, cts.Token);
+
+            Assert.Equal (CletRunStatus.Ok, result.Status);
+        }
+        finally
+        {
+            File.Delete (tempFile);
+        }
+    }
+
     private static void RaiseLinkClicked (Markdown markdownView, string url)
     {
         // RaiseLinkClicked(string) is non-public; use reflection to invoke it for testing

@@ -12,11 +12,11 @@ namespace Clet;
 internal sealed class MarkdownClet : IViewerClet
 {
     /// <summary>8 M character cap on stdin content to prevent OOM from untrusted piped input.</summary>
-    internal const int MaxStdinChars = 8 * 1024 * 1024;
+    internal const int MaxStdinChars = MarkdownContentResolver.MaxStdinChars;
 
     public string PrimaryAlias => "md";
     public IReadOnlyList<string> Aliases => ["md", "markdown"];
-    public string Description => "Renders Markdown files in a themed, scrollable viewer.";
+    public string Description => "Browse and render Markdown files with link navigation and syntax highlighting.";
     public CletKind Kind => CletKind.Viewer;
     public Type ResultType => typeof (void);
 
@@ -27,6 +27,9 @@ internal sealed class MarkdownClet : IViewerClet
             false, nameof (ThemeName.DarkPlus)),
         new ("cat", null, typeof (bool),
             "Render markdown to stdout without launching the TUI viewer.",
+            false, "false"),
+        new ("no-browse", null, typeof (bool),
+            "Disable browser mode (back/forward navigation, top bar).",
             false, "false"),
     ];
 
@@ -44,64 +47,19 @@ internal sealed class MarkdownClet : IViewerClet
         }
 
         // Resolve content: file args → inline content → stdin → error
-        List<string> files = [];
+        TextReader? stdinReader = Console.IsInputRedirected ? Console.In : null;
+        var resolved = MarkdownContentResolver.Resolve (content, options, stdinReader);
 
-        if (options.Arguments is { Count: > 0 })
+        if (!resolved.IsSuccess)
         {
-            FileAccessPolicy policy = new (
-                Directory.GetCurrentDirectory (),
-                options.AllowedFiles,
-                options.AllowBinary);
-
-            files = ExpandFiles (options.Arguments, policy, out string? policyError);
-
-            if (policyError is not null)
-            {
-                return new () { Status = CletRunStatus.Error, ErrorCode = "file-access-denied", ErrorMessage = policyError };
-            }
-
-            if (files.Count == 0)
-            {
-                return new () { Status = CletRunStatus.Error, ErrorCode = "io", ErrorMessage = "No matching files found." };
-            }
+            return new () { Status = CletRunStatus.Error, ErrorCode = resolved.ErrorCode, ErrorMessage = resolved.ErrorMessage };
         }
-        else if (!string.IsNullOrEmpty (content))
+
+        List<string> files = resolved.Files;
+
+        if (resolved.Content is not null)
         {
-            // Inline content via --initial; render directly
-        }
-        else if (Console.IsInputRedirected)
-        {
-            // Read stdin with an 8 M character cap to prevent OOM
-            char[] buffer = new char[MaxStdinChars + 1];
-            int totalRead = 0;
-            int charsRead;
-
-            while (totalRead <= MaxStdinChars
-                   && (charsRead = Console.In.Read (buffer, totalRead, buffer.Length - totalRead)) > 0)
-            {
-                totalRead += charsRead;
-            }
-
-            if (totalRead > MaxStdinChars)
-            {
-                return new ()
-                {
-                    Status = CletRunStatus.Error,
-                    ErrorCode = "input-too-large",
-                    ErrorMessage = $"stdin exceeds the 8 M character limit.",
-                };
-            }
-
-            content = new string (buffer, 0, totalRead);
-
-            if (string.IsNullOrEmpty (content))
-            {
-                return new () { Status = CletRunStatus.Error, ErrorCode = "io", ErrorMessage = "No input received from stdin." };
-            }
-        }
-        else
-        {
-            return new () { Status = CletRunStatus.Error, ErrorCode = "io", ErrorMessage = "No file specified. Usage: clet md <file.md>" };
+            content = resolved.Content;
         }
 
         // Track current file directory for resolving relative links
@@ -112,6 +70,11 @@ internal sealed class MarkdownClet : IViewerClet
             Directory.GetCurrentDirectory (),
             options.AllowedFiles,
             options.AllowBinary);
+
+        // Browser mode
+        bool browseMode = !options.NoBrowse;
+        string? currentFile = files.Count > 0 ? Path.GetFullPath (files [0]) : null;
+        BrowseBar? browseBar = null;
 
         // Parse --theme option
         ThemeName syntaxTheme = ThemeName.DarkPlus;
@@ -124,7 +87,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         Runnable window = new ()
         {
-            Title = options.Title ?? "Markdown Viewer",
+            Title = options.Title ?? "Markdown Browser",
             Width = Dim.Fill (),
             Height = Dim.Fill (),
         };
@@ -138,7 +101,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.ViewportSettings |= ViewportSettingsFlags.HasHorizontalScrollBar;
 
-        // --- StatusBar items ---
+        // --- StatusBar items (declared early so local functions can capture them) ---
 
         Shortcut lineCountShortcut = new () { Title = "0 lines", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut fileSizeShortcut = new () { Title = "0 B", MouseHighlightStates = MouseState.None, Enabled = false };
@@ -149,31 +112,44 @@ internal sealed class MarkdownClet : IViewerClet
         Link statusLink = new () { Text = "Ready", CanFocus = false };
         Shortcut statusShortcut = new () { CommandView = statusLink, MouseHighlightStates = MouseState.None };
 
+        // Browser mode: back/forward shortcuts for bottom StatusBar
+        if (browseMode)
+        {
+            browseBar = new BrowseBar (currentFile);
+            browseBar.OnNavigate = path => LoadFile (path);
+        }
+
         // --- MarkdownView event wiring ---
 
         markdownView.LinkClicked += (_, e) =>
         {
-            // Navigate local .md files within the sandbox
-            if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath))
-            {
-                LoadFile (resolvedPath);
-                e.Handled = true;
+            LinkNavigationHelper.HandleLinkClicked (
+                e,
+                customSchemeHandler: url =>
+                {
+                    if (!browseMode)
+                    {
+                        return false;
+                    }
 
-                return;
-            }
+                    // Navigate local .md files within the sandbox
+                    if (currentFileDir is not null && TryResolveLocalMarkdownLink (url, currentFileDir, linkPolicy, out string? resolvedPath, out string? fragment))
+                    {
+                        browseBar!.Push (resolvedPath);
+                        LoadFile (resolvedPath, fragment);
 
-            // Open http/https links in the default browser — they're safe
-            if (e.Url.StartsWith ("http://", StringComparison.OrdinalIgnoreCase)
-                || e.Url.StartsWith ("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                Link.OpenUrl (e.Url);
-            }
+                        return true;
+                    }
 
-            // Show URL in status bar as a clickable link
-            statusLink.Text = e.Url;
-            statusLink.Url = e.Url;
-            statusShortcut.MouseHighlightStates = MouseState.In;
-            e.Handled = true;
+                    return false;
+                },
+                openHttpLinks: true,
+                statusUpdater: url =>
+                {
+                    statusLink.Text = url;
+                    statusLink.Url = url;
+                    statusShortcut.MouseHighlightStates = MouseState.In;
+                });
         };
 
         markdownView.SubViewsLaidOut += (_, _) =>
@@ -187,6 +163,12 @@ internal sealed class MarkdownClet : IViewerClet
         [
             new (Application.GetDefaultKey (Command.Quit), "Quit", window.RequestStop),
         ];
+
+        if (browseBar is not null)
+        {
+            statusItems.Insert (0, browseBar.Forward);
+            statusItems.Insert (0, browseBar.Back);
+        }
 
         // Theme selector
         DropDownList<ThemeName> themeDropDown = new () { Value = syntaxTheme, CanFocus = false };
@@ -255,6 +237,7 @@ internal sealed class MarkdownClet : IViewerClet
                     return;
                 }
 
+                browseBar?.Push (files [index]);
                 LoadFile (files [index]);
             };
 
@@ -263,6 +246,7 @@ internal sealed class MarkdownClet : IViewerClet
         }
 
         StatusBar statusBar = new (statusItems) { AlignmentModes = AlignmentModes.IgnoreFirstOrLast };
+        browseBar?.ApplyStyle ();
 
         window.Add (markdownView, statusBar);
 
@@ -282,7 +266,6 @@ internal sealed class MarkdownClet : IViewerClet
                 statusLink.Url = string.Empty;
                 statusShortcut.MouseHighlightStates = MouseState.None;
             }
-
         };
 
         try
@@ -301,19 +284,27 @@ internal sealed class MarkdownClet : IViewerClet
 
         return new () { Status = CletRunStatus.Ok };
 
-        void LoadFile (string filePath)
+        void LoadFile (string filePath, string? fragment = null)
         {
             string fullPath = Path.GetFullPath (filePath);
+
             string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (fullPath))!;
             markdownView.Text = fileContent;
 
+            currentFile = fullPath;
             currentFileDir = Path.GetDirectoryName (fullPath);
 
             FileInfo fileInfo = new (fullPath);
             fileSizeShortcut.Title = FormatFileSize (fileInfo.Length);
             statusLink.Text = Path.GetFileName (fullPath);
             statusLink.Url = string.Empty;
+
+            if (!string.IsNullOrEmpty (fragment))
+            {
+                markdownView.ScrollToAnchor (fragment);
+            }
         }
+
     }
 
     /// <summary>
@@ -323,13 +314,20 @@ internal sealed class MarkdownClet : IViewerClet
         string url,
         string currentDir,
         FileAccessPolicy policy,
-        out string? resolvedPath)
+        out string? resolvedPath,
+        out string? fragment)
     {
         resolvedPath = null;
+        fragment = null;
 
-        // Strip fragment (e.g. #section)
+        // Extract fragment (e.g. #section) before resolving the path
         int fragmentIndex = url.IndexOf ('#');
         string pathPart = fragmentIndex >= 0 ? url [..fragmentIndex] : url;
+
+        if (fragmentIndex >= 0)
+        {
+            fragment = url [(fragmentIndex + 1)..];
+        }
 
         if (string.IsNullOrWhiteSpace (pathPart))
         {
@@ -379,67 +377,6 @@ internal sealed class MarkdownClet : IViewerClet
         resolvedPath = fullPath;
 
         return true;
-    }
-
-    private static List<string> ExpandFiles (IReadOnlyList<string> patterns, FileAccessPolicy policy, out string? error)
-    {
-        List<string> result = [];
-        error = null;
-
-        foreach (string pattern in patterns)
-        {
-            if (pattern.Contains ('*') || pattern.Contains ('?'))
-            {
-                string directory = Path.GetDirectoryName (pattern) is { Length: > 0 } dir ? dir : ".";
-                string filePattern = Path.GetFileName (pattern);
-
-                if (Directory.Exists (directory))
-                {
-                    string[] matched = Directory.GetFiles (directory, filePattern);
-                    string? globError = policy.CheckGlobAggregate (matched);
-
-                    if (globError is not null)
-                    {
-                        error = globError;
-
-                        return [];
-                    }
-
-                    foreach (string file in matched)
-                    {
-                        string? violation = policy.CheckFile (file);
-
-                        if (violation is not null)
-                        {
-                            error = violation;
-
-                            return [];
-                        }
-
-                        result.Add (Path.GetFullPath (file));
-                    }
-                }
-            }
-            else if (File.Exists (pattern))
-            {
-                string? violation = policy.CheckFile (pattern);
-
-                if (violation is not null)
-                {
-                    error = violation;
-
-                    return [];
-                }
-
-                result.Add (Path.GetFullPath (pattern));
-            }
-            else
-            {
-                Console.Error.WriteLine ($"Warning: File not found: {pattern}");
-            }
-        }
-
-        return result;
     }
 
     private static string FormatFileSize (long bytes)

@@ -38,9 +38,14 @@ internal sealed class AliasDispatcher
             ? CancellationTokenSource.CreateLinkedTokenSource (cancellationToken)
             : CancellationTokenSource.CreateLinkedTokenSource (cancellationToken, timeoutSource.Token);
 
-        // --cat mode: render viewer content directly to stdout without TUI
+        // --cat mode: render viewer content directly to stdout without TUI.
         if (options.Cat && clet is IViewerClet)
         {
+            if (clet is HelpClet helpClet)
+            {
+                return helpClet.RenderCat (options, stdout, stderr);
+            }
+
             string? markdown = ResolveViewerContent (initial, options, stderr);
 
             if (markdown is not null)
@@ -49,9 +54,6 @@ internal sealed class AliasDispatcher
 
                 return ExitCodes.Ok;
             }
-
-            // No static content resolved — fall through to RunAsync.
-            // The clet may handle --cat internally (e.g. HelpClet builds content dynamically).
         }
 
         BoxedCletResult result;
@@ -92,125 +94,16 @@ internal sealed class AliasDispatcher
     /// </summary>
     private static string? ResolveViewerContent (string? initial, CletRunOptions options, TextWriter stderr)
     {
-        if (options.Arguments is { Count: > 0 } args)
+        TextReader? stdinReader = Console.IsInputRedirected ? Console.In : null;
+        var result = MarkdownContentResolver.Resolve (initial, options, stdinReader);
+
+        if (!result.IsSuccess)
         {
-            FileAccessPolicy policy = new (
-                Directory.GetCurrentDirectory (),
-                options.AllowedFiles,
-                options.AllowBinary);
+            stderr.WriteLine ($"error: {result.ErrorMessage}");
 
-            List<string> contents = [];
-            long aggregateSize = 0;
-
-            foreach (string arg in args)
-            {
-                // Expand globs
-                List<string> files;
-
-                if (arg.Contains ('*') || arg.Contains ('?'))
-                {
-                    string directory = Path.GetDirectoryName (arg) is { Length: > 0 } dir ? dir : ".";
-                    string filePattern = Path.GetFileName (arg);
-
-                    if (!Directory.Exists (directory))
-                    {
-                        stderr.WriteLine ($"Warning: Directory not found: {directory}");
-
-                        continue;
-                    }
-
-                    files = [.. Directory.GetFiles (directory, filePattern)];
-                    string? globError = policy.CheckGlobAggregate (files);
-
-                    if (globError is not null)
-                    {
-                        stderr.WriteLine ($"error: {globError}");
-
-                        return null;
-                    }
-                }
-                else
-                {
-                    files = [arg];
-                }
-
-                foreach (string file in files)
-                {
-                    string? violation = policy.CheckFile (file);
-
-                    if (violation is not null)
-                    {
-                        stderr.WriteLine ($"error: {violation}");
-
-                        return null;
-                    }
-
-                    if (!File.Exists (file))
-                    {
-                        stderr.WriteLine ($"Warning: File not found: {file}");
-
-                        continue;
-                    }
-
-                    FileInfo fi = new (file);
-                    aggregateSize += fi.Length;
-
-                    if (aggregateSize > FileAccessPolicy.MaxAggregateSizeBytes)
-                    {
-                        stderr.WriteLine ($"error: Refused: aggregate file size exceeds {FileAccessPolicy.MaxAggregateSizeBytes / (1024 * 1024)} MiB limit.");
-
-                        return null;
-                    }
-
-                    try
-                    {
-                        contents.Add (File.ReadAllText (file));
-                    }
-                    catch (UnauthorizedAccessException ex)
-                    {
-                        stderr.WriteLine ($"Warning: Could not read file '{file}': {ex.Message}");
-                    }
-                    catch (IOException ex)
-                    {
-                        stderr.WriteLine ($"Warning: Could not read file '{file}': {ex.Message}");
-                    }
-                }
-            }
-
-            return contents.Count > 0 ? string.Join ("\n\n", contents) : null;
+            return null;
         }
 
-        if (!string.IsNullOrEmpty (initial))
-        {
-            return initial;
-        }
-
-        if (Console.IsInputRedirected)
-        {
-            // Enforce the same 8 M character cap as MarkdownClet's stdin path
-            const int maxChars = MarkdownClet.MaxStdinChars;
-            char[] buffer = new char[maxChars + 1];
-            int totalRead = 0;
-            int charsRead;
-
-            while (totalRead <= maxChars
-                   && (charsRead = Console.In.Read (buffer, totalRead, buffer.Length - totalRead)) > 0)
-            {
-                totalRead += charsRead;
-            }
-
-            if (totalRead > maxChars)
-            {
-                stderr.WriteLine ("error: stdin exceeds the 8 M character limit.");
-
-                return null;
-            }
-
-            string stdinContent = new (buffer, 0, totalRead);
-
-            return string.IsNullOrEmpty (stdinContent) ? null : stdinContent;
-        }
-
-        return null;
+        return result.Content;
     }
 }

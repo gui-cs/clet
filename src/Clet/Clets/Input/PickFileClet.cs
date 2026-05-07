@@ -12,16 +12,16 @@ internal sealed class PickFileClet : IClet<JsonNode?>
     public IReadOnlyList<string> Aliases => ["pick-file", "file"];
     public string Description => "Opens a file picker dialog and returns the selected file path(s).";
     public CletKind Kind => CletKind.Input;
-    public Type ResultType => typeof (JsonNode);
+    public Type ResultType => typeof(JsonNode);
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
-        new ("multi", "m", typeof (bool), "Allow selecting multiple files.", false, "false"),
-        new ("root", "r", typeof (string), "Starting directory (not a sandbox — user can navigate freely).", false, null),
-        new ("filter", "f", typeof (string), "File type filter (e.g. \"*.cs\").", false, null),
+        new("multi", "m", typeof(bool), "Allow selecting multiple files.", false, "false"),
+        new("root", "r", typeof(string), "Starting directory (not a sandbox — user can navigate freely).", false, null),
+        new("filter", "f", typeof(string), "File type filter (e.g. \"*.cs\").", false, null),
     ];
 
-    public async Task<CletRunResult<JsonNode?>> RunAsync (
+    public async Task<CletRunResult<JsonNode?>> RunAsync(
         IApplication app,
         string? initial,
         CletRunOptions options,
@@ -29,27 +29,27 @@ internal sealed class PickFileClet : IClet<JsonNode?>
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return new () { Status = CletRunStatus.Cancelled };
+            return new() { Status = CletRunStatus.Cancelled };
         }
 
-        bool multi = options.CletOptions?.TryGetValue ("multi", out string? multiStr) == true
-                     && string.Equals (multiStr, "true", StringComparison.OrdinalIgnoreCase);
+        bool multi = options.CletOptions?.TryGetValue("multi", out string? multiStr) == true
+                     && string.Equals(multiStr, "true", StringComparison.OrdinalIgnoreCase);
 
-        string? root = options.CletOptions?.TryGetValue ("root", out string? rootStr) == true ? rootStr : null;
-        string? filter = options.CletOptions?.TryGetValue ("filter", out string? filterStr) == true ? filterStr : null;
+        string? root = options.CletOptions?.TryGetValue("root", out string? rootStr) == true ? rootStr : null;
+        string? filter = options.CletOptions?.TryGetValue("filter", out string? filterStr) == true ? filterStr : null;
         string? startPath = root ?? initial;
 
-        OpenDialog dialog = new ()
+        OpenDialog dialog = new()
         {
             Title = options.Title ?? "Select a file (Enter to accept, Esc to cancel)",
-            Width = Dim.Fill (),
+            Width = Dim.Fill(),
             Height = 25,
             AllowsMultipleSelection = multi,
             BorderStyle = LineStyle.Rounded,
             ShadowStyle = null,
             SchemeName = CletStyling.BaseSchemeName,
         };
-        dialog.Border.Thickness = new Thickness (0, 1, 0, 0);
+        dialog.Border.Thickness = new Thickness(0, 1, 0, 0);
 
         dialog.IsRunningChanged += (_, _) =>
         {
@@ -64,49 +64,50 @@ internal sealed class PickFileClet : IClet<JsonNode?>
             dialog.Path = startPath;
         }
 
-        string[] extensions = FileFilterParser.ParseExtensions (filter);
+        string[] extensions = FileFilterParser.ParseExtensions(filter);
 
         if (extensions.Length > 0)
         {
-            dialog.AllowedTypes.Add (new AllowedType (filter ?? "Filtered", extensions));
-            dialog.AllowedTypes.Add (new AllowedTypeAny ());
+            dialog.AllowedTypes.Add(new AllowedType(filter ?? "Filtered", extensions));
+            dialog.AllowedTypes.Add(new AllowedTypeAny());
         }
 
         try
         {
-            await app.RunAsync (dialog, cancellationToken);
+            await app.RunAsync(dialog, cancellationToken);
         }
         catch (OperationCanceledException)
         {
-            return new () { Status = CletRunStatus.Cancelled };
+            return new() { Status = CletRunStatus.Cancelled };
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return new () { Status = CletRunStatus.Cancelled };
+            return new CletRunResult<JsonNode?> { Status = CletRunStatus.Cancelled };
         }
 
-        IReadOnlyList<string>? paths = dialog.FilePaths;
+        IReadOnlyList<string> paths = dialog.FilePaths;
 
-        if (paths is null || paths.Count == 0)
+        if (paths.Count == 0)
         {
-            return new () { Status = CletRunStatus.Cancelled };
+            return new CletRunResult<JsonNode?> { Status = CletRunStatus.Cancelled };
         }
 
-        if (multi)
+        if (!multi)
         {
-            List<string> sorted = new (paths);
-            sorted.Sort (StringComparer.Ordinal);
-            JsonArray arr = new ();
-
-            foreach (string p in sorted)
-            {
-                arr.Add (JsonValue.Create (p));
-            }
-
-            return new () { Status = CletRunStatus.Ok, Value = arr };
+            return new CletRunResult<JsonNode?> { Status = CletRunStatus.Ok, Value = JsonValue.Create(paths[0]) };
         }
 
-        return new () { Status = CletRunStatus.Ok, Value = JsonValue.Create (paths [0]) };
+        List<string> sorted = new(paths);
+        sorted.Sort(StringComparer.Ordinal);
+        JsonArray arr = [];
+
+        foreach (string p in sorted)
+        {
+            arr.Add((JsonNode)p);
+        }
+
+        return new() { Status = CletRunStatus.Ok, Value = arr };
+
     }
 }

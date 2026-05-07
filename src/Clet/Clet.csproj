@@ -23,7 +23,7 @@
     <PackageId>clet</PackageId>
     <Version>1.0.0-alpha</Version>
     <Authors>gui-cs</Authors>
-    <Description>Turns every Terminal.Gui View into a CLI command — typed inputs, a real file picker, a Markdown viewer — with consistent JSON output, predictable exit codes, and full keyboard/mouse support.</Description>
+    <Description>Turns every Terminal.Gui View into a CLI command — typed inputs, a real file picker, a Markdown browser — with consistent JSON output, predictable exit codes, and full keyboard/mouse support.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageProjectUrl>https://github.com/gui-cs/clet</PackageProjectUrl>

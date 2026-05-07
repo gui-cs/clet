@@ -23,6 +23,24 @@ internal sealed class HelpClet : IViewerClet
 
     public IReadOnlyList<CletOptionDescriptor> Options => [];
 
+    /// <summary>Handles --cat mode without TUI init. Called by the dispatcher.</summary>
+    public int RenderCat (CletRunOptions options, TextWriter stdout, TextWriter stderr)
+    {
+        string? alias = options.Arguments?.FirstOrDefault ();
+
+        if (alias is not null and not "help" && !_registry.TryResolve (alias, out _))
+        {
+            stderr.WriteLine ($"error: Unknown alias '{alias}'. Try 'clet list' to see available clets.");
+
+            return ExitCodes.UsageError;
+        }
+
+        (string markdown, _) = BuildHelpContent (alias);
+        MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
+
+        return ExitCodes.Ok;
+    }
+
     public async Task<CletRunResult> RunAsync (
         IApplication app,
         string? content,
@@ -59,6 +77,10 @@ internal sealed class HelpClet : IViewerClet
 
         // --- Build TUI ---
 
+        bool browseMode = !options.NoBrowse;
+        string? currentAlias = alias;
+        BrowseBar? browseBar = null;
+
         Runnable window = new ()
         {
             Title = title,
@@ -77,36 +99,56 @@ internal sealed class HelpClet : IViewerClet
 
         Shortcut statusShortcut = new (Key.Empty, title, null) { MouseHighlightStates = MouseState.None };
 
+        if (browseMode)
+        {
+            string key = alias ?? "(overview)";
+            browseBar = new BrowseBar (key);
+            browseBar.OnNavigate = NavigateTo;
+        }
+
         markdownView.LinkClicked += (_, e) =>
         {
-            if (e.Url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
-            {
-                string? linkAlias = e.Url.Length > "clet:help:".Length
-                    ? e.Url ["clet:help:".Length..]
-                    : null;
+            LinkNavigationHelper.HandleLinkClicked (
+                e,
+                customSchemeHandler: url =>
+                {
+                    if (!url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
 
-                (string md, string t) = BuildHelpContent (linkAlias);
-                markdownView.Text = md;
-                window.Title = t;
-                statusShortcut.Title = t;
-                e.Handled = true;
+                    string? linkAlias = url.Length > "clet:help:".Length
+                        ? url ["clet:help:".Length..]
+                        : null;
 
-                return;
-            }
+                    string key = linkAlias ?? "(overview)";
+                    browseBar?.Push (key);
+                    NavigateTo (key);
 
-            // Help content is authored by us — links are safe to open.
-            Link.OpenUrl (e.Url);
-            statusShortcut.Title = e.Url;
-            e.Handled = true;
+                    return true;
+                },
+                openHttpLinks: true,
+                statusUpdater: url => statusShortcut.Title = url);
         };
 
-        StatusBar statusBar = new ([
+        List<Shortcut> statusItems =
+        [
             new (Application.GetDefaultKey (Command.Quit), "Quit", window.RequestStop),
-            statusShortcut,
-        ])
+        ];
+
+        if (browseBar is not null)
+        {
+            statusItems.Insert (0, browseBar.Forward);
+            statusItems.Insert (0, browseBar.Back);
+        }
+
+        statusItems.Add (statusShortcut);
+
+        StatusBar statusBar = new (statusItems)
         {
             AlignmentModes = AlignmentModes.IgnoreFirstOrLast,
         };
+        browseBar?.ApplyStyle ();
 
         window.Add (markdownView, statusBar);
 
@@ -114,6 +156,16 @@ internal sealed class HelpClet : IViewerClet
         {
             markdownView.Text = markdown;
         };
+
+        void NavigateTo (string key)
+        {
+            string? targetAlias = key == "(overview)" ? null : key;
+            currentAlias = targetAlias;
+            (string md, string t) = BuildHelpContent (targetAlias);
+            markdownView.Text = md;
+            window.Title = t;
+            statusShortcut.Title = t;
+        }
 
         try
         {
@@ -176,40 +228,7 @@ internal sealed class HelpClet : IViewerClet
         return (markdown, "clet");
     }
 
-    private static string GetVersion ()
-    {
-        string? informational = typeof (Program).Assembly
-            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
-            .FirstOrDefault ()
-            ?.InformationalVersion;
+    private static string GetVersion () => VersionInfo.GetCletVersion ();
 
-        if (!string.IsNullOrWhiteSpace (informational))
-        {
-            int plus = informational.IndexOf ('+');
-
-            return plus >= 0 ? informational [..plus] : informational;
-        }
-
-        return typeof (Program).Assembly.GetName ().Version?.ToString (3) ?? "0.0.0";
-    }
-
-    private static string GetTerminalGuiVersion ()
-    {
-        System.Reflection.Assembly tg = typeof (Application).Assembly;
-        string? informational = tg
-            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
-            .FirstOrDefault ()
-            ?.InformationalVersion;
-
-        if (!string.IsNullOrWhiteSpace (informational))
-        {
-            int plus = informational.IndexOf ('+');
-
-            return plus >= 0 ? informational [..plus] : informational;
-        }
-
-        return tg.GetName ().Version?.ToString (3) ?? "unknown";
-    }
+    private static string GetTerminalGuiVersion () => VersionInfo.GetTerminalGuiVersion ();
 }

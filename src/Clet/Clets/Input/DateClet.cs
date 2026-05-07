@@ -26,11 +26,6 @@ internal sealed class DateClet : IClet<string?>
         CletRunOptions options,
         CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
-
         DatePicker picker = new ();
 
         if (initial is not null
@@ -41,32 +36,18 @@ internal sealed class DateClet : IClet<string?>
 
         RunnableWrapper<DatePicker, DateTime?> wrapper = new (picker)
         {
-            Title = options.Title ?? "Select a date (Enter to accept, Esc to cancel)",
-            Width = Dim.Fill (),
-            BorderStyle = LineStyle.Rounded,
             ResultExtractor = p => p.Value,
-            SchemeName = CletStyling.BaseSchemeName,
         };
-        wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
-        wrapper.KeyBindings.Add (Key.Enter, Command.Accept);
 
-        try
-        {
-            await app.RunAsync (wrapper, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
+        return await InputCletRunner.RunAsync<DatePicker, DateTime?, string?> (
+            app, wrapper, options,
+            "Select a date (Enter to accept, Esc to cancel)",
+            cancellationToken,
+            result =>
+            {
+                string? formatted = result?.ToString ("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
-
-        DateTime? result = wrapper.Result;
-        string? formatted = result?.ToString ("yyyy-MM-dd", CultureInfo.InvariantCulture);
-
-        return new () { Status = CletRunStatus.Ok, Value = formatted };
+                return new () { Status = CletRunStatus.Ok, Value = formatted };
+            });
     }
 }
