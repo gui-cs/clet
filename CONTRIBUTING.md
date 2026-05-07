@@ -9,10 +9,18 @@ clet builds and tests with just the .NET SDK. **AOT publishing** (`make publish`
 Run this first; it will tell you what (if anything) is missing:
 
 ```sh
-make doctor
+make doctor                          # macOS / Linux / Windows with make installed
 ```
 
-If you don't have `make`, run `bash scripts/doctor.sh` directly.
+No `make`? Run the script directly:
+
+```sh
+bash scripts/doctor.sh               # macOS / Linux / Git Bash / WSL
+pwsh -File scripts/doctor.ps1        # Windows PowerShell
+.\scripts\doctor.ps1                 # Windows PowerShell (shorthand)
+```
+
+The PowerShell and bash versions are kept in sync and check the same things.
 
 | Platform | Required for build/test | Required for `make publish` (AOT) |
 |----------|-------------------------|------------------------------------|
