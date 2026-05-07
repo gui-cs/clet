@@ -2,7 +2,39 @@
 
 Hell yes. We want your help.
 
+## Prerequisites
+
+clet builds and tests with just the .NET SDK. **AOT publishing** (`make publish`) additionally needs a platform-native linker — that's where local setups go wrong.
+
+Run this first; it will tell you what (if anything) is missing:
+
+```sh
+make doctor
+```
+
+If you don't have `make`, run `bash scripts/doctor.sh` directly.
+
+| Platform | Required for build/test | Required for `make publish` (AOT) |
+|----------|-------------------------|------------------------------------|
+| **macOS** | .NET 10 SDK (preview) | Xcode Command Line Tools (`xcode-select --install`) |
+| **Linux** (Debian/Ubuntu) | .NET 10 SDK (preview) | `sudo apt install -y clang zlib1g-dev build-essential` |
+| **Linux** (Fedora/RHEL) | .NET 10 SDK (preview) | `sudo dnf install -y clang zlib-devel` |
+| **Windows** | .NET 10 SDK (preview) | Visual Studio Build Tools 2022 with the **"Desktop development with C++"** workload (provides the MSVC linker, the Windows SDK, and `vswhere.exe`). Either VS 2022 with the C++ workload or the standalone Build Tools installer works. |
+
+.NET 10 SDK (preview): <https://dotnet.microsoft.com/download/dotnet/10.0>.
+Windows Build Tools: <https://aka.ms/vs/17/release/vs_BuildTools.exe>.
+
+If `make publish` fails on Windows with a `vswhere.exe is not recognized` or `MSB3073` error, the C++ workload is the missing piece — `make doctor` will say so.
+
 ## Quick start
+
+```sh
+make doctor      # one-time: verify your toolchain (or run scripts/doctor.sh)
+make build
+make test        # unit + integration + smoke
+```
+
+Or, without `make`:
 
 ```sh
 dotnet restore

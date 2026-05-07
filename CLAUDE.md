@@ -26,6 +26,7 @@ A `Makefile` at the repo root wraps the common loops. CI is the source of truth 
 
 | Target | What it does |
 |--------|-------------|
+| `make doctor` | Check that the local toolchain (`.NET SDK`, native linker for AOT) is set up correctly. Run this first if `make publish` fails. |
 | `make restore` | `dotnet restore` |
 | `make build` | Debug build (depends on restore) |
 | `make build-release` | Release build |
@@ -35,6 +36,8 @@ A `Makefile` at the repo root wraps the common loops. CI is the source of truth 
 | `make clean` | Removes `publish/` and runs `dotnet clean` |
 
 RID is auto-detected from `uname` (Darwin/arm64 → `osx-arm64`, Linux/x86_64 → `linux-x64`, etc.). On Windows, run from a POSIX shell (Git Bash, WSL) or set `RID` explicitly.
+
+**AOT publishing requires a native toolchain** (Xcode CLT on macOS, `clang`+`zlib1g-dev` on Linux, Visual Studio Build Tools 2022 with the *Desktop development with C++* workload on Windows). See `CONTRIBUTING.md` → Prerequisites for the per-platform install commands, or run `make doctor` to check your box.
 
 **Zero warnings policy.** `dotnet build` must produce zero warnings in both Debug and Release configurations. Fix warnings at their source — do not suppress unless the warning is a false positive (document why in the suppression comment). Check with `dotnet build -c Release` before pushing.
 

@@ -31,12 +31,13 @@ RID ?= $(DETECTED_RID)
 PROJECT     := src/Clet
 PUBLISH_DIR := publish
 
-.PHONY: all restore build build-release test publish publish-all clean help
+.PHONY: all restore build build-release test publish publish-all clean help doctor
 
 all: build
 
 help:
 	@echo "Targets:"
+	@echo "  doctor         Check AOT toolchain prerequisites for this platform"
 	@echo "  restore        dotnet restore"
 	@echo "  build          Debug build (default)"
 	@echo "  build-release  Release build"
@@ -46,6 +47,13 @@ help:
 	@echo "  clean          Remove publish/ and run dotnet clean"
 	@echo ""
 	@echo "Override RID: make publish RID=linux-x64"
+	@echo "If 'make publish' fails, run 'make doctor' to diagnose the toolchain."
+
+# Verify the prerequisites needed for `make publish` (AOT) on this platform.
+# AOT compilation invokes the platform-native linker; missing it produces
+# cryptic MSBuild errors. This target checks for the linker up front.
+doctor:
+	@bash scripts/doctor.sh
 
 restore:
 	dotnet restore
