@@ -32,7 +32,7 @@
     <PackageTags>terminal-gui;tui;cli;prompt;json;agent;select;file-picker;markdown</PackageTags>
 
     <!-- TG version for local builds; release workflow overrides via -p:TerminalGuiVersion=<dispatched_tg_version>. See D-020. -->
-    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.0.2-develop.*</TerminalGuiVersion>
+    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.1.0-rc.2</TerminalGuiVersion>
   </PropertyGroup>
 
   <ItemGroup>
