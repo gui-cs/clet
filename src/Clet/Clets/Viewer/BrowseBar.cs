@@ -2,6 +2,7 @@ using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using Command = Terminal.Gui.Input.Command;
 
 namespace Clet;
 
@@ -37,20 +38,22 @@ internal sealed class BrowseBar
 
         Back = new Shortcut
         {
-            AlignmentModes = AlignmentModes.EndToStart,
+            AlignmentModes = AlignmentModes.StartToEnd,
             Title = Glyphs.LeftArrow.ToString (),
             Key = Key.CursorLeft.WithCtrl,
+            Command = Command.Left,
+            Action = NavigateBack,
             Enabled = false,
         };
-        Back.Accepting += (_, _) => NavigateBack ();
 
         Forward = new Shortcut
         {
             Title = Glyphs.RightArrow.ToString (),
             Key = Key.CursorRight.WithCtrl,
+            Command = Command.Right,
+            Action = NavigateForward,
             Enabled = false,
         };
-        Forward.Accepting += (_, _) => NavigateForward ();
 
         Location = new Shortcut
         {
