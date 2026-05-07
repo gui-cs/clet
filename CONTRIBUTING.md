@@ -22,17 +22,31 @@ pwsh -File scripts/doctor.ps1        # Windows PowerShell
 
 The PowerShell and bash versions are kept in sync and check the same things.
 
-| Platform | Required for build/test | Required for `make publish` (AOT) |
-|----------|-------------------------|------------------------------------|
-| **macOS** | .NET 10 SDK (preview) | Xcode Command Line Tools (`xcode-select --install`) |
-| **Linux** (Debian/Ubuntu) | .NET 10 SDK (preview) | `sudo apt install -y clang zlib1g-dev build-essential` |
-| **Linux** (Fedora/RHEL) | .NET 10 SDK (preview) | `sudo dnf install -y clang zlib-devel` |
-| **Windows** | .NET 10 SDK (preview) | Visual Studio Build Tools 2022 with the **"Desktop development with C++"** workload (provides the MSVC linker, the Windows SDK, and `vswhere.exe`). Either VS 2022 with the C++ workload or the standalone Build Tools installer works. |
+| Platform | Required for build/test | Required for AOT publish | `make` |
+|----------|-------------------------|--------------------------|--------|
+| **macOS** | .NET 10 SDK (preview) | Xcode Command Line Tools (`xcode-select --install`) | included with CLT |
+| **Linux** (Debian/Ubuntu) | .NET 10 SDK (preview) | `sudo apt install -y clang zlib1g-dev build-essential` | included with `build-essential` |
+| **Linux** (Fedora/RHEL) | .NET 10 SDK (preview) | `sudo dnf install -y clang zlib-devel` | `sudo dnf install -y make` |
+| **Windows** | .NET 10 SDK (preview) | Visual Studio Build Tools 2022 with the **"Desktop development with C++"** workload (provides the MSVC linker, the Windows SDK, and `vswhere.exe`). Either VS 2022 with the C++ workload or the standalone Build Tools installer works. | **separate install** — see below |
 
 .NET 10 SDK (preview): <https://dotnet.microsoft.com/download/dotnet/10.0>.
 Windows Build Tools: <https://aka.ms/vs/17/release/vs_BuildTools.exe>.
 
-If `make publish` fails on Windows with a `vswhere.exe is not recognized` or `MSB3073` error, the C++ workload is the missing piece — `make doctor` will say so.
+### `make` on Windows
+
+The Visual Studio C++ workload does **not** include GNU `make` (it ships MSBuild and `nmake`, neither of which understands our Makefile). The Makefile is optional — every target maps to a plain `dotnet` command (see "Quick start" below) — but if you want it, install GNU make via one of:
+
+```pwsh
+choco install make            # Chocolatey
+winget install GnuWin32.Make  # winget
+scoop install make            # Scoop
+```
+
+Or use **WSL** / **Git Bash**, both of which can run the Makefile directly.
+
+### Common Windows AOT failure
+
+If `dotnet publish ... -p:PublishAot=true` (or `make publish`) fails with `vswhere.exe is not recognized` or `MSB3073`, the C++ workload is missing — `.\scripts\doctor.ps1` will say so.
 
 ## Quick start
 
