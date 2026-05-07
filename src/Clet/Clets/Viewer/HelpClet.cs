@@ -83,11 +83,9 @@ internal sealed class HelpClet : IViewerClet
 
         if (browseMode)
         {
-            browseBar = new BrowseBar (title);
+            string key = alias ?? "(overview)";
+            browseBar = new BrowseBar (key);
             browseBar.OnNavigate = NavigateTo;
-
-            markdownView.Y = 1;
-            window.Add (browseBar.Bar);
         }
 
         markdownView.LinkClicked += (_, e) =>
@@ -112,10 +110,20 @@ internal sealed class HelpClet : IViewerClet
             e.Handled = true;
         };
 
-        StatusBar statusBar = new ([
+        List<Shortcut> statusItems =
+        [
             new (Application.GetDefaultKey (Command.Quit), "Quit", window.RequestStop),
-            statusShortcut,
-        ])
+        ];
+
+        if (browseBar is not null)
+        {
+            statusItems.Add (browseBar.Back);
+            statusItems.Add (browseBar.Forward);
+        }
+
+        statusItems.Add (statusShortcut);
+
+        StatusBar statusBar = new (statusItems)
         {
             AlignmentModes = AlignmentModes.IgnoreFirstOrLast,
         };
@@ -135,7 +143,6 @@ internal sealed class HelpClet : IViewerClet
             markdownView.Text = md;
             window.Title = t;
             statusShortcut.Title = t;
-            browseBar?.SetLocationTitle (t);
         }
 
         try

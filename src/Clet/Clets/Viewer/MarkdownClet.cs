@@ -157,15 +157,11 @@ internal sealed class MarkdownClet : IViewerClet
         Link statusLink = new () { Text = "Ready", CanFocus = false };
         Shortcut statusShortcut = new () { CommandView = statusLink, MouseHighlightStates = MouseState.None };
 
-        // --- Top bar (browser mode) ---
+        // Browser mode: back/forward shortcuts for bottom StatusBar
         if (browseMode)
         {
-            string initialLocation = currentFile is not null ? GetRelativeBreadcrumb (currentFile) : "(inline)";
-            browseBar = new BrowseBar (initialLocation);
+            browseBar = new BrowseBar (currentFile);
             browseBar.OnNavigate = path => LoadFile (path);
-
-            markdownView.Y = 1;
-            window.Add (browseBar.Bar);
         }
 
         // --- MarkdownView event wiring ---
@@ -210,6 +206,12 @@ internal sealed class MarkdownClet : IViewerClet
         [
             new (Application.GetDefaultKey (Command.Quit), "Quit", window.RequestStop),
         ];
+
+        if (browseBar is not null)
+        {
+            statusItems.Add (browseBar.Back);
+            statusItems.Add (browseBar.Forward);
+        }
 
         // Theme selector
         DropDownList<ThemeName> themeDropDown = new () { Value = syntaxTheme, CanFocus = false };
@@ -339,20 +341,12 @@ internal sealed class MarkdownClet : IViewerClet
             statusLink.Text = Path.GetFileName (fullPath);
             statusLink.Url = string.Empty;
 
-            browseBar?.SetLocationTitle (GetRelativeBreadcrumb (fullPath));
-
             if (!string.IsNullOrEmpty (fragment))
             {
                 markdownView.ScrollToAnchor (fragment);
             }
         }
 
-        string GetRelativeBreadcrumb (string fullPath)
-        {
-            string cwd = Directory.GetCurrentDirectory ();
-
-            return Path.GetRelativePath (cwd, fullPath);
-        }
     }
 
     /// <summary>

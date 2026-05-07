@@ -7,9 +7,9 @@ using Command = Terminal.Gui.Input.Command;
 namespace Clet;
 
 /// <summary>
-/// Top StatusBar with back/forward navigation and a location breadcrumb for viewer clets in browser mode.
-/// Manages a history stack and exposes <see cref="Back"/> and <see cref="Forward"/> shortcuts whose
-/// <c>Enabled</c> state tracks stack depth.
+/// Back/forward navigation history for viewer clets in browser mode.
+/// Exposes <see cref="Back"/> and <see cref="Forward"/> shortcuts (single-glyph wide)
+/// for insertion into an existing StatusBar. Manages the history stacks internally.
 /// </summary>
 internal sealed class BrowseBar
 {
@@ -23,12 +23,6 @@ internal sealed class BrowseBar
     /// <summary>The forward shortcut (Ctrl+Right).</summary>
     public Shortcut Forward { get; }
 
-    /// <summary>The location breadcrumb shortcut (read-only label).</summary>
-    public Shortcut Location { get; }
-
-    /// <summary>The StatusBar positioned at Y=0.</summary>
-    public StatusBar Bar { get; }
-
     /// <summary>Called when back/forward navigation fires. The argument is the target location string.</summary>
     public Action<string>? OnNavigate { get; set; }
 
@@ -38,13 +32,14 @@ internal sealed class BrowseBar
 
         Back = new Shortcut
         {
-            AlignmentModes = AlignmentModes.StartToEnd,
             Title = Glyphs.LeftArrow.ToString (),
             Key = Key.CursorLeft.WithCtrl,
             Command = Command.Left,
             Action = NavigateBack,
             Enabled = false,
         };
+        Back.AlignmentModes = AlignmentModes.StartToEnd;
+        Back.KeyView.Visible = false;
 
         Forward = new Shortcut
         {
@@ -54,19 +49,7 @@ internal sealed class BrowseBar
             Action = NavigateForward,
             Enabled = false,
         };
-
-        Location = new Shortcut
-        {
-            Title = initialLocation ?? "(inline)",
-            MouseHighlightStates = MouseState.None,
-            Enabled = false,
-        };
-
-        Bar = new StatusBar ([Back, Location, Forward])
-        {
-            Y = 0,
-            AlignmentModes = AlignmentModes.StartToEnd,
-        };
+        Forward.KeyView.Visible = false;
     }
 
     /// <summary>
@@ -84,9 +67,6 @@ internal sealed class BrowseBar
         _current = location;
         UpdateButtons ();
     }
-
-    /// <summary>Updates the location breadcrumb text.</summary>
-    public void SetLocationTitle (string title) => Location.Title = title;
 
     private void NavigateBack ()
     {
