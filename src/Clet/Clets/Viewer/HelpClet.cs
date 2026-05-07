@@ -60,9 +60,8 @@ internal sealed class HelpClet : IViewerClet
         // --- Build TUI ---
 
         bool browseMode = !options.NoBrowse;
-        Stack<string?> backStack = new ();
-        Stack<string?> forwardStack = new ();
         string? currentAlias = alias;
+        BrowseBar? browseBar = null;
 
         Runnable window = new ()
         {
@@ -82,44 +81,13 @@ internal sealed class HelpClet : IViewerClet
 
         Shortcut statusShortcut = new (Key.Empty, title, null) { MouseHighlightStates = MouseState.None };
 
-        // --- Top bar (browser mode) ---
-        Shortcut? backShortcut = null;
-        Shortcut? forwardShortcut = null;
-        Shortcut? locationShortcut = null;
-
         if (browseMode)
         {
-            backShortcut = new Shortcut
-            {
-                Title = Glyphs.LeftArrow.ToString (),
-                Key = Key.CursorLeft.WithCtrl,
-                Enabled = false,
-            };
-            backShortcut.Accepting += (_, _) => NavigateBack ();
-
-            forwardShortcut = new Shortcut
-            {
-                Title = Glyphs.RightArrow.ToString (),
-                Key = Key.CursorRight.WithCtrl,
-                Enabled = false,
-            };
-            forwardShortcut.Accepting += (_, _) => NavigateForward ();
-
-            locationShortcut = new Shortcut
-            {
-                Title = title,
-                MouseHighlightStates = MouseState.None,
-                Enabled = false,
-            };
-
-            StatusBar topBar = new ([backShortcut, forwardShortcut, locationShortcut])
-            {
-                Y = 0,
-            };
+            browseBar = new BrowseBar (title);
+            browseBar.OnNavigate = target => NavigateTo (target, isHistoryNavigation: true);
 
             markdownView.Y = 1;
-
-            window.Add (topBar);
+            window.Add (browseBar.Bar);
         }
 
         markdownView.LinkClicked += (_, e) =>
@@ -159,10 +127,15 @@ internal sealed class HelpClet : IViewerClet
 
         void NavigateTo (string? targetAlias, bool isHistoryNavigation = false)
         {
-            if (!isHistoryNavigation)
+            string key = targetAlias ?? "(overview)";
+
+            if (isHistoryNavigation)
             {
-                backStack.Push (currentAlias);
-                forwardStack.Clear ();
+                browseBar?.SetCurrent (key);
+            }
+            else
+            {
+                browseBar?.Push (key);
             }
 
             currentAlias = targetAlias;
@@ -170,46 +143,7 @@ internal sealed class HelpClet : IViewerClet
             markdownView.Text = md;
             window.Title = t;
             statusShortcut.Title = t;
-
-            if (browseMode && locationShortcut is not null)
-            {
-                locationShortcut.Title = t;
-            }
-
-            UpdateNavigationButtons ();
-        }
-
-        void NavigateBack ()
-        {
-            if (backStack.Count == 0)
-            {
-                return;
-            }
-
-            forwardStack.Push (currentAlias);
-            NavigateTo (backStack.Pop (), isHistoryNavigation: true);
-        }
-
-        void NavigateForward ()
-        {
-            if (forwardStack.Count == 0)
-            {
-                return;
-            }
-
-            backStack.Push (currentAlias);
-            NavigateTo (forwardStack.Pop (), isHistoryNavigation: true);
-        }
-
-        void UpdateNavigationButtons ()
-        {
-            if (!browseMode)
-            {
-                return;
-            }
-
-            backShortcut!.Enabled = backStack.Count > 0;
-            forwardShortcut!.Enabled = forwardStack.Count > 0;
+            browseBar?.SetLocationTitle (t);
         }
 
         try

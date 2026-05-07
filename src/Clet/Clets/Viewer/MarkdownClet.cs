@@ -116,11 +116,10 @@ internal sealed class MarkdownClet : IViewerClet
             options.AllowedFiles,
             options.AllowBinary);
 
-        // Browser mode: back/forward navigation with history stacks
+        // Browser mode
         bool browseMode = !options.NoBrowse;
-        Stack<string> backStack = new ();
-        Stack<string> forwardStack = new ();
         string? currentFile = files.Count > 0 ? Path.GetFullPath (files [0]) : null;
+        BrowseBar? browseBar = null;
 
         // Parse --theme option
         ThemeName syntaxTheme = ThemeName.DarkPlus;
@@ -159,43 +158,14 @@ internal sealed class MarkdownClet : IViewerClet
         Shortcut statusShortcut = new () { CommandView = statusLink, MouseHighlightStates = MouseState.None };
 
         // --- Top bar (browser mode) ---
-        Shortcut? backShortcut = null;
-        Shortcut? forwardShortcut = null;
-        Shortcut? locationShortcut = null;
-
         if (browseMode)
         {
-            backShortcut = new Shortcut
-            {
-                Title = Glyphs.LeftArrow.ToString (),
-                Key = Key.CursorLeft.WithCtrl,
-                Enabled = false,
-            };
-            backShortcut.Accepting += (_, _) => NavigateBack ();
-
-            forwardShortcut = new Shortcut
-            {
-                Title = Glyphs.RightArrow.ToString (),
-                Key = Key.CursorRight.WithCtrl,
-                Enabled = false,
-            };
-            forwardShortcut.Accepting += (_, _) => NavigateForward ();
-
-            locationShortcut = new Shortcut
-            {
-                Title = currentFile is not null ? GetRelativeBreadcrumb (currentFile) : "(inline)",
-                MouseHighlightStates = MouseState.None,
-                Enabled = false,
-            };
-
-            StatusBar topBar = new ([backShortcut, forwardShortcut, locationShortcut])
-            {
-                Y = 0,
-            };
+            string initialLocation = currentFile is not null ? GetRelativeBreadcrumb (currentFile) : "(inline)";
+            browseBar = new BrowseBar (initialLocation);
+            browseBar.OnNavigate = path => LoadFile (path, isHistoryNavigation: true);
 
             markdownView.Y = 1;
-
-            window.Add (topBar);
+            window.Add (browseBar.Bar);
         }
 
         // --- MarkdownView event wiring ---
@@ -357,11 +327,18 @@ internal sealed class MarkdownClet : IViewerClet
         {
             string fullPath = Path.GetFullPath (filePath);
 
-            // Push current file onto the back stack for non-history navigations
-            if (!isHistoryNavigation && currentFile is not null)
+            if (browseBar is not null)
             {
-                backStack.Push (currentFile);
-                forwardStack.Clear ();
+                if (isHistoryNavigation)
+                {
+                    browseBar.SetCurrent (fullPath);
+                }
+                else
+                {
+                    browseBar.Push (fullPath);
+                }
+
+                browseBar.SetLocationTitle (GetRelativeBreadcrumb (fullPath));
             }
 
             string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (fullPath))!;
@@ -375,62 +352,11 @@ internal sealed class MarkdownClet : IViewerClet
             statusLink.Text = Path.GetFileName (fullPath);
             statusLink.Url = string.Empty;
 
-            // Update browser UI
-            if (browseMode && locationShortcut is not null)
-            {
-                locationShortcut.Title = GetRelativeBreadcrumb (fullPath);
-            }
-
-            UpdateNavigationButtons ();
-
             // Scroll to fragment anchor if specified
             if (!string.IsNullOrEmpty (fragment))
             {
                 markdownView.ScrollToAnchor (fragment);
             }
-        }
-
-        void NavigateBack ()
-        {
-            if (backStack.Count == 0)
-            {
-                return;
-            }
-
-            if (currentFile is not null)
-            {
-                forwardStack.Push (currentFile);
-            }
-
-            string prev = backStack.Pop ();
-            LoadFile (prev, isHistoryNavigation: true);
-        }
-
-        void NavigateForward ()
-        {
-            if (forwardStack.Count == 0)
-            {
-                return;
-            }
-
-            if (currentFile is not null)
-            {
-                backStack.Push (currentFile);
-            }
-
-            string next = forwardStack.Pop ();
-            LoadFile (next, isHistoryNavigation: true);
-        }
-
-        void UpdateNavigationButtons ()
-        {
-            if (!browseMode)
-            {
-                return;
-            }
-
-            backShortcut!.Enabled = backStack.Count > 0;
-            forwardShortcut!.Enabled = forwardStack.Count > 0;
         }
 
         string GetRelativeBreadcrumb (string fullPath)
