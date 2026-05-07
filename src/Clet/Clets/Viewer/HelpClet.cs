@@ -127,6 +127,7 @@ internal sealed class HelpClet : IViewerClet
         {
             AlignmentModes = AlignmentModes.IgnoreFirstOrLast,
         };
+        browseBar?.ApplyStyle ();
 
         window.Add (markdownView, statusBar);
 

@@ -289,6 +289,7 @@ internal sealed class MarkdownClet : IViewerClet
         }
 
         StatusBar statusBar = new (statusItems) { AlignmentModes = AlignmentModes.IgnoreFirstOrLast };
+        browseBar?.ApplyStyle ();
 
         window.Add (markdownView, statusBar);
 

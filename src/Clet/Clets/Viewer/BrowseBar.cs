@@ -38,8 +38,6 @@ internal sealed class BrowseBar
             Action = NavigateBack,
             Enabled = false,
         };
-        Back.AlignmentModes = AlignmentModes.StartToEnd;
-        Back.KeyView.Visible = false;
 
         Forward = new Shortcut
         {
@@ -49,6 +47,16 @@ internal sealed class BrowseBar
             Action = NavigateForward,
             Enabled = false,
         };
+    }
+
+    /// <summary>
+    /// Applies styling that must be set after the shortcuts are added to a StatusBar.
+    /// Call this after inserting <see cref="Back"/> and <see cref="Forward"/> into the bar.
+    /// </summary>
+    public void ApplyStyle ()
+    {
+        Back.AlignmentModes = AlignmentModes.StartToEnd;
+        Back.KeyView.Visible = false;
         Forward.KeyView.Visible = false;
     }
 
