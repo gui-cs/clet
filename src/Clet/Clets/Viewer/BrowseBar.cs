@@ -85,16 +85,6 @@ internal sealed class BrowseBar
         UpdateButtons ();
     }
 
-    /// <summary>
-    /// Sets the current location without affecting the history stacks.
-    /// Use for the initial load.
-    /// </summary>
-    public void SetCurrent (string location)
-    {
-        _current = location;
-        UpdateButtons ();
-    }
-
     /// <summary>Updates the location breadcrumb text.</summary>
     public void SetLocationTitle (string title) => Location.Title = title;
 

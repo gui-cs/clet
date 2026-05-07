@@ -84,7 +84,7 @@ internal sealed class HelpClet : IViewerClet
         if (browseMode)
         {
             browseBar = new BrowseBar (title);
-            browseBar.OnNavigate = target => NavigateTo (target, isHistoryNavigation: true);
+            browseBar.OnNavigate = NavigateTo;
 
             markdownView.Y = 1;
             window.Add (browseBar.Bar);
@@ -98,7 +98,9 @@ internal sealed class HelpClet : IViewerClet
                     ? e.Url ["clet:help:".Length..]
                     : null;
 
-                NavigateTo (linkAlias);
+                string key = linkAlias ?? "(overview)";
+                browseBar?.Push (key);
+                NavigateTo (key);
                 e.Handled = true;
 
                 return;
@@ -125,19 +127,9 @@ internal sealed class HelpClet : IViewerClet
             markdownView.Text = markdown;
         };
 
-        void NavigateTo (string? targetAlias, bool isHistoryNavigation = false)
+        void NavigateTo (string key)
         {
-            string key = targetAlias ?? "(overview)";
-
-            if (isHistoryNavigation)
-            {
-                browseBar?.SetCurrent (key);
-            }
-            else
-            {
-                browseBar?.Push (key);
-            }
-
+            string? targetAlias = key == "(overview)" ? null : key;
             currentAlias = targetAlias;
             (string md, string t) = BuildHelpContent (targetAlias);
             markdownView.Text = md;

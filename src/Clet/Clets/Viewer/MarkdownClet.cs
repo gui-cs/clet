@@ -162,7 +162,7 @@ internal sealed class MarkdownClet : IViewerClet
         {
             string initialLocation = currentFile is not null ? GetRelativeBreadcrumb (currentFile) : "(inline)";
             browseBar = new BrowseBar (initialLocation);
-            browseBar.OnNavigate = path => LoadFile (path, isHistoryNavigation: true);
+            browseBar.OnNavigate = path => LoadFile (path);
 
             markdownView.Y = 1;
             window.Add (browseBar.Bar);
@@ -177,6 +177,7 @@ internal sealed class MarkdownClet : IViewerClet
                 // Navigate local .md files within the sandbox
                 if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath, out string? fragment))
                 {
+                    browseBar!.Push (resolvedPath);
                     LoadFile (resolvedPath, fragment);
                     e.Handled = true;
 
@@ -277,6 +278,7 @@ internal sealed class MarkdownClet : IViewerClet
                     return;
                 }
 
+                browseBar?.Push (files [index]);
                 LoadFile (files [index]);
             };
 
@@ -293,8 +295,7 @@ internal sealed class MarkdownClet : IViewerClet
         {
             if (files.Count > 0)
             {
-                // Initial load — skip history push
-                LoadFile (files [0], isHistoryNavigation: true);
+                LoadFile (files [0]);
             }
             else if (!string.IsNullOrEmpty (content))
             {
@@ -323,23 +324,9 @@ internal sealed class MarkdownClet : IViewerClet
 
         return new () { Status = CletRunStatus.Ok };
 
-        void LoadFile (string filePath, string? fragment = null, bool isHistoryNavigation = false)
+        void LoadFile (string filePath, string? fragment = null)
         {
             string fullPath = Path.GetFullPath (filePath);
-
-            if (browseBar is not null)
-            {
-                if (isHistoryNavigation)
-                {
-                    browseBar.SetCurrent (fullPath);
-                }
-                else
-                {
-                    browseBar.Push (fullPath);
-                }
-
-                browseBar.SetLocationTitle (GetRelativeBreadcrumb (fullPath));
-            }
 
             string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (fullPath))!;
             markdownView.Text = fileContent;
@@ -352,7 +339,8 @@ internal sealed class MarkdownClet : IViewerClet
             statusLink.Text = Path.GetFileName (fullPath);
             statusLink.Url = string.Empty;
 
-            // Scroll to fragment anchor if specified
+            browseBar?.SetLocationTitle (GetRelativeBreadcrumb (fullPath));
+
             if (!string.IsNullOrEmpty (fragment))
             {
                 markdownView.ScrollToAnchor (fragment);
