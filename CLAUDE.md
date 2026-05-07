@@ -17,7 +17,24 @@ dotnet build --no-restore
 # Tests use xunit.v3 via dotnet run (not dotnet test)
 dotnet run --project tests/Clet.UnitTests --no-build
 dotnet run --project tests/Clet.IntegrationTests --no-build
+dotnet run --project tests/Clet.SmokeTests --no-build
 ```
+
+### Makefile (local convenience)
+
+A `Makefile` at the repo root wraps the common loops. CI is the source of truth for releases; the Makefile is only for local builds.
+
+| Target | What it does |
+|--------|-------------|
+| `make restore` | `dotnet restore` |
+| `make build` | Debug build (depends on restore) |
+| `make build-release` | Release build |
+| `make test` | Runs all three test projects (unit, integration, smoke) |
+| `make publish` | AOT publish for current platform to `publish/<rid>/`. Override RID with `make publish RID=linux-x64` |
+| `make publish-all` | AOT publish for `osx-arm64`, `linux-x64`, `win-x64` |
+| `make clean` | Removes `publish/` and runs `dotnet clean` |
+
+RID is auto-detected from `uname` (Darwin/arm64 → `osx-arm64`, Linux/x86_64 → `linux-x64`, etc.). On Windows, run from a POSIX shell (Git Bash, WSL) or set `RID` explicitly.
 
 **Zero warnings policy.** `dotnet build` must produce zero warnings in both Debug and Release configurations. Fix warnings at their source — do not suppress unless the warning is a false positive (document why in the suppression comment). Check with `dotnet build -c Release` before pushing.
 
