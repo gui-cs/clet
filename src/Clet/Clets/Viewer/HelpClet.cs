@@ -59,6 +59,11 @@ internal sealed class HelpClet : IViewerClet
 
         // --- Build TUI ---
 
+        bool browseMode = !options.NoBrowse;
+        Stack<string?> backStack = new ();
+        Stack<string?> forwardStack = new ();
+        string? currentAlias = alias;
+
         Runnable window = new ()
         {
             Title = title,
@@ -77,6 +82,46 @@ internal sealed class HelpClet : IViewerClet
 
         Shortcut statusShortcut = new (Key.Empty, title, null) { MouseHighlightStates = MouseState.None };
 
+        // --- Top bar (browser mode) ---
+        Shortcut? backShortcut = null;
+        Shortcut? forwardShortcut = null;
+        Shortcut? locationShortcut = null;
+
+        if (browseMode)
+        {
+            backShortcut = new Shortcut
+            {
+                Title = Glyphs.LeftArrow.ToString (),
+                Key = Key.CursorLeft.WithCtrl,
+                Enabled = false,
+            };
+            backShortcut.Accepting += (_, _) => NavigateBack ();
+
+            forwardShortcut = new Shortcut
+            {
+                Title = Glyphs.RightArrow.ToString (),
+                Key = Key.CursorRight.WithCtrl,
+                Enabled = false,
+            };
+            forwardShortcut.Accepting += (_, _) => NavigateForward ();
+
+            locationShortcut = new Shortcut
+            {
+                Title = title,
+                MouseHighlightStates = MouseState.None,
+                Enabled = false,
+            };
+
+            StatusBar topBar = new ([backShortcut, forwardShortcut, locationShortcut])
+            {
+                Y = 0,
+            };
+
+            markdownView.Y = 1;
+
+            window.Add (topBar);
+        }
+
         markdownView.LinkClicked += (_, e) =>
         {
             if (e.Url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
@@ -85,10 +130,7 @@ internal sealed class HelpClet : IViewerClet
                     ? e.Url ["clet:help:".Length..]
                     : null;
 
-                (string md, string t) = BuildHelpContent (linkAlias);
-                markdownView.Text = md;
-                window.Title = t;
-                statusShortcut.Title = t;
+                NavigateTo (linkAlias);
                 e.Handled = true;
 
                 return;
@@ -114,6 +156,61 @@ internal sealed class HelpClet : IViewerClet
         {
             markdownView.Text = markdown;
         };
+
+        void NavigateTo (string? targetAlias, bool isHistoryNavigation = false)
+        {
+            if (!isHistoryNavigation)
+            {
+                backStack.Push (currentAlias);
+                forwardStack.Clear ();
+            }
+
+            currentAlias = targetAlias;
+            (string md, string t) = BuildHelpContent (targetAlias);
+            markdownView.Text = md;
+            window.Title = t;
+            statusShortcut.Title = t;
+
+            if (browseMode && locationShortcut is not null)
+            {
+                locationShortcut.Title = t;
+            }
+
+            UpdateNavigationButtons ();
+        }
+
+        void NavigateBack ()
+        {
+            if (backStack.Count == 0)
+            {
+                return;
+            }
+
+            forwardStack.Push (currentAlias);
+            NavigateTo (backStack.Pop (), isHistoryNavigation: true);
+        }
+
+        void NavigateForward ()
+        {
+            if (forwardStack.Count == 0)
+            {
+                return;
+            }
+
+            backStack.Push (currentAlias);
+            NavigateTo (forwardStack.Pop (), isHistoryNavigation: true);
+        }
+
+        void UpdateNavigationButtons ()
+        {
+            if (!browseMode)
+            {
+                return;
+            }
+
+            backShortcut!.Enabled = backStack.Count > 0;
+            forwardShortcut!.Enabled = forwardStack.Count > 0;
+        }
 
         try
         {
