@@ -448,99 +448,11 @@ internal sealed class CommandLineRoot
         MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
     }
 
-    private static string GetVersion ()
-    {
-        string? informational = typeof (Program).Assembly
-            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
-            .FirstOrDefault ()
-            ?.InformationalVersion;
+    private static string GetVersion () => VersionInfo.GetCletVersion ();
 
-        if (!string.IsNullOrWhiteSpace (informational))
-        {
-            int plus = informational.IndexOf ('+');
+    private static string GetTerminalGuiVersion () => VersionInfo.GetTerminalGuiVersion ();
 
-            return plus >= 0 ? informational [..plus] : informational;
-        }
-
-        return typeof (Program).Assembly.GetName ().Version?.ToString (3) ?? "0.0.0";
-    }
-
-    private static string GetTerminalGuiVersion ()
-    {
-        System.Reflection.Assembly tg = typeof (Terminal.Gui.App.Application).Assembly;
-        string? informational = tg
-            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
-            .FirstOrDefault ()
-            ?.InformationalVersion;
-
-        if (!string.IsNullOrWhiteSpace (informational))
-        {
-            int plus = informational.IndexOf ('+');
-
-            return plus >= 0 ? informational [..plus] : informational;
-        }
-
-        return tg.GetName ().Version?.ToString (3) ?? "unknown";
-    }
-
-    private static string ResultTypeName (Type type)
-    {
-        Type underlying = Nullable.GetUnderlyingType (type) ?? type;
-
-        if (underlying == typeof (string))
-        {
-            return "string";
-        }
-
-        if (underlying == typeof (int) || underlying == typeof (long) || underlying == typeof (short))
-        {
-            return "int";
-        }
-
-        if (underlying == typeof (decimal) || underlying == typeof (double) || underlying == typeof (float))
-        {
-            return "decimal";
-        }
-
-        if (underlying == typeof (bool))
-        {
-            return "bool";
-        }
-
-        if (underlying == typeof (DateTime) || underlying == typeof (DateOnly))
-        {
-            return "date";
-        }
-
-        if (underlying == typeof (TimeOnly))
-        {
-            return "time";
-        }
-
-        if (underlying == typeof (TimeSpan))
-        {
-            return "duration";
-        }
-
-        if (underlying == typeof (JsonArray))
-        {
-            return "array";
-        }
-
-        if (underlying == typeof (JsonObject))
-        {
-            return "object";
-        }
-
-        if (underlying == typeof (JsonNode))
-        {
-            return "json";
-        }
-
-        return underlying.Name;
-    }
+    private static string ResultTypeName (Type type) => CletTypeNames.WireName (type);
 
     public static bool TryParseTimeout (string input, out TimeSpan timeout)
     {

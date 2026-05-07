@@ -168,31 +168,33 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.LinkClicked += (_, e) =>
         {
-            if (browseMode)
-            {
-                // Navigate local .md files within the sandbox
-                if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath, out string? fragment))
+            LinkNavigationHelper.HandleLinkClicked (
+                e,
+                customSchemeHandler: url =>
                 {
-                    browseBar!.Push (resolvedPath);
-                    LoadFile (resolvedPath, fragment);
-                    e.Handled = true;
+                    if (!browseMode)
+                    {
+                        return false;
+                    }
 
-                    return;
-                }
-            }
+                    // Navigate local .md files within the sandbox
+                    if (currentFileDir is not null && TryResolveLocalMarkdownLink (url, currentFileDir, linkPolicy, out string? resolvedPath, out string? fragment))
+                    {
+                        browseBar!.Push (resolvedPath);
+                        LoadFile (resolvedPath, fragment);
 
-            // Open http/https links in the default browser — they're safe
-            if (e.Url.StartsWith ("http://", StringComparison.OrdinalIgnoreCase)
-                || e.Url.StartsWith ("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                Link.OpenUrl (e.Url);
-            }
+                        return true;
+                    }
 
-            // Show URL in status bar as a clickable link
-            statusLink.Text = e.Url;
-            statusLink.Url = e.Url;
-            statusShortcut.MouseHighlightStates = MouseState.In;
-            e.Handled = true;
+                    return false;
+                },
+                openHttpLinks: true,
+                statusUpdater: url =>
+                {
+                    statusLink.Text = url;
+                    statusLink.Url = url;
+                    statusShortcut.MouseHighlightStates = MouseState.In;
+                });
         };
 
         markdownView.SubViewsLaidOut += (_, _) =>

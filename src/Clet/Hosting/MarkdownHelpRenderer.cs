@@ -249,19 +249,5 @@ internal static class MarkdownHelpRenderer
         return parts.Count == 0 ? "" : string.Join (", ", parts);
     }
 
-    private static string ResultTypeName (Type type)
-    {
-        Type underlying = Nullable.GetUnderlyingType (type) ?? type;
-
-        if (underlying == typeof (string)) return "string";
-        if (underlying == typeof (int) || underlying == typeof (long) || underlying == typeof (short)) return "int";
-        if (underlying == typeof (decimal) || underlying == typeof (double) || underlying == typeof (float)) return "decimal";
-        if (underlying == typeof (bool)) return "bool";
-        if (underlying == typeof (DateTime) || underlying == typeof (DateOnly)) return "date";
-        if (underlying == typeof (TimeOnly)) return "time";
-        if (underlying == typeof (TimeSpan)) return "duration";
-        if (underlying == typeof (void)) return "none";
-
-        return underlying.Name;
-    }
+    private static string ResultTypeName (Type type) => CletTypeNames.WireName (type);
 }
