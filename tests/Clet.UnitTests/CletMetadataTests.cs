@@ -1,3 +1,5 @@
+#pragma warning disable xUnit1026 // Theory methods sharing MemberData intentionally ignore unused columns
+
 using Xunit;
 
 namespace Clet.UnitTests;
