@@ -10,7 +10,7 @@ This is the implementation spec. It assumes the PR/FAQ is broadly accepted and c
 
 - New repo `gui-cs/clet` containing all clet code: abstractions, registry, JSON, source generator placeholder, built-in clets, CLI binary, release automation.
 - Targeted changes to `gui-cs/Terminal.Gui` core (§3) that benefit TG generally and unblock clet specifically.
-- Fourteen input clets and one viewer clet (`md`) statically registered in v1.0.
+- Fourteen input clets and one browser clet (`md`) statically registered in v1.0.
 - Native installer channels: Homebrew (gui-cs tap), WinGet, .NET tool. NativeAOT for native channels.
 - Independent SemVer; major version tied to `schemaVersion` changes per §4.3.1 (see [D-022](decisions.md)).
 - JSON output contract (schemaVersion 1).
@@ -280,7 +280,7 @@ clet --version
 
 **`--cat` (non-interactive rendering).** When `--cat` is passed to a viewer clet (currently `md`), content is rendered as ANSI-formatted text directly to stdout — no alt-screen, no interactive session. Useful for piping (`clet md --cat README.md | less -R`), CI logs, and AI agents. Content is resolved from file arguments, `--initial`, or stdin, same as the normal viewer path. If no content is available, exits with usage error (exit 2). See [D-027](decisions.md).
 
-**`--no-browse` (disable browser mode).** When `--no-browse` is passed to the `md` viewer, the top navigation bar (back/forward buttons, breadcrumb) is hidden and clicking local `.md` links shows the URL in the status bar instead of navigating to the file. By default, `md` runs in browser mode: following local links navigates to them with a back/forward history stack (Ctrl+Left / Ctrl+Right), and fragment anchors (`file.md#heading`) scroll to the matching heading. See [D-034](decisions.md).
+**`--no-browse` (disable browser mode).** When `--no-browse` is passed to `md`, clicking local `.md` links shows the URL in the status bar instead of navigating. By default, `md` runs as a browser: following local links navigates to them with a back/forward history stack (Ctrl+Left / Ctrl+Right or ← → buttons in the status bar), and fragment anchors (`file.md#heading`) scroll to the matching heading.
 
 **`--output <path>` / `-o <path>` (file output).** Writes the clet's result (plain text or JSON) to the specified file instead of stdout. When `--output` is set, nothing is written to stdout by `OutputFormatter` — stdout stays fully available for TUI rendering. This works around the Terminal.Gui limitation where stdout redirection (`$()`, `|`, `>`) swallows the TUI (see gui-cs/Terminal.Gui#5207). If the file cannot be written, an error is emitted to stderr and the process exits with code 2. See [D-028](decisions.md).
 

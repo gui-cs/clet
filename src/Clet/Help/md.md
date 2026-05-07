@@ -1,10 +1,11 @@
 ## Browser mode
 
-By default, `md` runs in browser mode with a top navigation bar. Click local `.md`
-links to navigate to them. Use **Ctrl+Left** / **Ctrl+Right** to go back and forward.
-Fragment anchors (`file.md#heading`) scroll to the matching heading.
+By default, `md` runs in browser mode. Click local `.md` links to navigate to
+them. Use **Ctrl+Left** / **Ctrl+Right** (or the ← → buttons in the status bar)
+to go back and forward. Fragment anchors (`file.md#heading`) scroll to the
+matching heading.
 
-Use `--no-browse` to disable the top bar and local link navigation.
+Use `--no-browse` to disable browser mode (no link navigation, no back/forward).
 
 ## Examples
 

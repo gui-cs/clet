@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is clet
 
-`clet` is a CLI tool that exposes Terminal.Gui Views as shell commands with typed, JSON-serializable results. It targets shells, scripts, and AI agents. The binary is a thin host: parse args, look up a clet alias in the registry, init Terminal.Gui, call `RunAsync`, serialize the result, exit. Currently at v0.1-alpha with one clet (`select`); v1.0 targets 14 input clets and 1 viewer clet (`md`).
+`clet` is a CLI tool that exposes Terminal.Gui Views as shell commands with typed, JSON-serializable results. It targets shells, scripts, and AI agents. The binary is a thin host: parse args, look up a clet alias in the registry, init Terminal.Gui, call `RunAsync`, serialize the result, exit. Currently at v0.1-alpha with one clet (`select`); v1.0 targets 14 input clets and 1 browser clet (`md`).
 
 ## Build and Test
 
@@ -37,7 +37,7 @@ Four projects in two repos (this repo only contains the `clet` side):
 - `Registry/` — `CletRegistry` (instance-based, case-insensitive alias lookup, duplicate protection); `BuiltInClets.RegisterAll` (manual registration; D-004)
 - `Json/` — `SchemaV1` (the JSON envelope) and `CletJsonContext` (source-generated System.Text.Json)
 - `Clets/Input/` — Input clet implementations (currently `SelectClet`)
-- `Clets/Viewer/` — Viewer clet implementations (planned: `md`)
+- `Clets/Viewer/` — Viewer/browser clet implementations (`md`, `help`)
 - `Hosting/` — `Program.cs` entry point, `CommandLineRoot` (hand-rolled CLI parser; D-006), `AliasDispatcher`, `OutputFormatter`, `ExitCodes`
 
 ### Core patterns

@@ -16,7 +16,7 @@ internal sealed class MarkdownClet : IViewerClet
 
     public string PrimaryAlias => "md";
     public IReadOnlyList<string> Aliases => ["md", "markdown"];
-    public string Description => "Renders Markdown files in a themed, scrollable viewer.";
+    public string Description => "Browse and render Markdown files with link navigation and syntax highlighting.";
     public CletKind Kind => CletKind.Viewer;
     public Type ResultType => typeof (void);
 
@@ -132,7 +132,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         Runnable window = new ()
         {
-            Title = options.Title ?? (browseMode ? "Markdown Browser" : "Markdown Viewer"),
+            Title = options.Title ?? "Markdown Browser",
             Width = Dim.Fill (),
             Height = Dim.Fill (),
         };
