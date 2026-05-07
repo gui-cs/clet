@@ -57,10 +57,9 @@ There is no separate lint step. CI runs on ubuntu-latest with `dotnet-quality: p
 
 ## Architecture
 
-Four projects in two repos (this repo only contains the `clet` side):
+Projects in this repo:
 
-- **`src/Clet/`** — The CLI executable (net10.0). Depends on `Terminal.Gui` v2 (preview NuGet, currently `2.0.2-develop.24` — pin tracked in `src/Clet/Clet.csproj`, must be replaced with a release tag before v0.5 schema-lock per spec §8 risks). All abstractions are `internal` (not published until v2 plugin system).
-- **`src/Clet.SourceGen/`** — Roslyn source generator for static clet registration (planned `[Clet]` attribute). Currently a placeholder; `BuiltInClets.RegisterAll` is hand-written until the generator earns its keep — see `specs/decisions.md` D-004.
+- **`src/Clet/`** — The CLI executable (net10.0). Depends on `Terminal.Gui` v2 (preview NuGet, currently `2.0.2-develop.24` — pin tracked in `src/Clet/Clet.csproj`, must be replaced with a release tag before v0.5 schema-lock per spec §8 risks). All abstractions are `internal` (not published until v2 plugin system). `BuiltInClets.RegisterAll` registers the shipped clets by hand; auto-discovery via a source generator was explored and dropped.
 - **`tests/Clet.UnitTests/`** — Registry, JSON schema, host pipeline (CommandLineRoot, OutputFormatter, ExitCodes, BuiltInClets) tests.
 - **`tests/Clet.IntegrationTests/`** — In-process tests that init Terminal.Gui (`Application.Create()`, `app.Init("ansi")`).
 - **`tests/Clet.SmokeTests/`** — Process-level smoke tests (`Process.Start` against the built `Clet.dll`). The keystroke-driven cases land at v0.3 with TUIcast — see `specs/decisions.md` D-007.
@@ -68,7 +67,7 @@ Four projects in two repos (this repo only contains the `clet` side):
 ### Key directory layout inside `src/Clet/`
 
 - `Abstractions/` — `IClet`, `IClet<TValue>`, `IViewerClet`, `ICletRegistry`, `CletKind`, `CletRunResult<T>`, `CletRunOptions`, `CletOptionDescriptor`, `BoxedCletResult` (non-generic dispatch type — see decisions D-005)
-- `Registry/` — `CletRegistry` (instance-based, case-insensitive alias lookup, duplicate protection); `BuiltInClets.RegisterAll` (manual registration; D-004)
+- `Registry/` — `CletRegistry` (instance-based, case-insensitive alias lookup, duplicate protection); `BuiltInClets.RegisterAll` (manual registration)
 - `Json/` — `SchemaV1` (the JSON envelope) and `CletJsonContext` (source-generated System.Text.Json)
 - `Clets/Input/` — Input clet implementations (currently `SelectClet`)
 - `Clets/Viewer/` — Viewer/browser clet implementations (`md`, `help`)

@@ -8,7 +8,7 @@ This is the implementation spec. It assumes the PR/FAQ is broadly accepted and c
 
 ### In scope (v1.0)
 
-- New repo `gui-cs/clet` containing all clet code: abstractions, registry, JSON, source generator placeholder, built-in clets, CLI binary, release automation.
+- New repo `gui-cs/clet` containing all clet code: abstractions, registry, JSON, built-in clets, CLI binary, release automation.
 - Targeted changes to `gui-cs/Terminal.Gui` core (§3) that benefit TG generally and unblock clet specifically.
 - Fourteen input clets and one browser clet (`md`) statically registered in v1.0.
 - Native installer channels: Homebrew (gui-cs tap), WinGet, .NET tool. NativeAOT for native channels.
@@ -33,15 +33,14 @@ Two repos. One assembly that matters (the CLI exe). One release cadence.
 ```
 gui-cs/Terminal.Gui                           gui-cs/clet
 ├── Terminal.Gui/                             ├── src/
-│     (core; §3 tweaks land here,             │   ├── Clet/
-│      no clet-specific types)                │   │     Abstractions/  (IClet, ICletRegistry, ...)
-├── Tests/                                    │   │     Registry/
-│     (TG core tests only;                    │   │     Json/          (CletJsonContext, SchemaV1)
-│      clet tests live in gui-cs/clet)        │   │     Clets/Input/   (14 input clets)
-└── .github/workflows/                        │   │     Clets/Viewer/  (MarkdownClet)
-      notify-clet-on-release.yml (NEW)        │   │     Hosting/       (Program.cs, CLI parser)
-                                              │   │     Help/          (overview.md)
-                                              │   └── Clet.SourceGen/  (placeholder; D-021)
+│     (core; §3 tweaks land here,             │   └── Clet/
+│      no clet-specific types)                │         Abstractions/  (IClet, ICletRegistry, ...)
+├── Tests/                                    │         Registry/
+│     (TG core tests only;                    │         Json/          (CletJsonContext, SchemaV1)
+│      clet tests live in gui-cs/clet)        │         Clets/Input/   (14 input clets)
+└── .github/workflows/                        │         Clets/Viewer/  (MarkdownClet)
+      notify-clet-on-release.yml (NEW)        │         Hosting/       (Program.cs, CLI parser)
+                                              │         Help/          (overview.md)
                                               ├── tests/
                                               │     Clet.UnitTests/
                                               │     Clet.IntegrationTests/
@@ -99,7 +98,7 @@ On cancel, clet emits `{"schemaVersion":1,"status":"cancelled"}` and nothing els
 
 ## 4. `gui-cs/clet` Repo
 
-This repo holds everything: abstractions, registry, JSON, source generator placeholder, built-in clets, the CLI binary, and release automation. One assembly is published; everything else is build-time only or test-only.
+This repo holds everything: abstractions, registry, JSON, built-in clets, the CLI binary, and release automation. One assembly is published; everything else is build-time only or test-only.
 
 ### 4.1 Project layout
 
@@ -107,46 +106,45 @@ This repo holds everything: abstractions, registry, JSON, source generator place
 gui-cs/clet/
 ├── Clet.slnx
 ├── src/
-│   ├── Clet/                              (single Exe; PublishAot=true; net10.0)
-│   │   ├── Abstractions/
-│   │   │     IClet.cs                     (IClet + IClet<T> with RunBoxedAsync DIM)
-│   │   │     IViewerClet.cs               (with RunBoxedAsync DIM)
-│   │   │     ICletRegistry.cs
-│   │   │     BoxedCletResult.cs
-│   │   │     CletKind.cs                  (Input | Viewer)
-│   │   │     CletRunOptions.cs
-│   │   │     CletRunResult.cs             (non-generic + generic)
-│   │   │     CletRunStatus.cs
-│   │   │     CletOptionDescriptor.cs
-│   │   ├── Registry/
-│   │   │     CletRegistry.cs
-│   │   │     BuiltInClets.cs              (hand-written; D-004/D-021)
-│   │   ├── Json/
-│   │   │     CletJsonContext.cs           ([JsonSerializable] source-gen)
-│   │   │     SchemaV1.cs
-│   │   ├── Clets/
-│   │   │   ├── Input/
-│   │   │   │     SelectClet.cs, TextClet.cs, IntClet.cs, DecimalClet.cs,
-│   │   │   │     ConfirmClet.cs, MultiSelectClet.cs, PickFileClet.cs,
-│   │   │   │     PickDirectoryClet.cs, DateClet.cs, TimeClet.cs,
-│   │   │   │     DurationClet.cs, ColorClet.cs, AttributePickerClet.cs,
-│   │   │   │     RangeClet.cs
-│   │   │   │     (+ helpers: LabelParser.cs, FileFilterParser.cs, RangeView.cs)
-│   │   │   └── Viewer/
-│   │   │         MarkdownClet.cs
-│   │   ├── Help/
-│   │   │     overview.md                  (embedded resource for --help)
-│   │   ├── Hosting/
-│   │   │     Program.cs
-│   │   │     CommandLineRoot.cs           (hand-rolled CLI parser; D-006)
-│   │   │     AliasDispatcher.cs
-│   │   │     OutputFormatter.cs
-│   │   │     ExitCodes.cs
-│   │   │     MarkdownHelpRenderer.cs
-│   │   │     CletStyling.cs
-│   │   └── Properties/
-│   │         AssemblyInfo.cs              (InternalsVisibleTo)
-│   └── Clet.SourceGen/                    (placeholder; D-021)
+│   └── Clet/                              (single Exe; PublishAot=true; net10.0)
+│       ├── Abstractions/
+│       │     IClet.cs                     (IClet + IClet<T> with RunBoxedAsync DIM)
+│       │     IViewerClet.cs               (with RunBoxedAsync DIM)
+│       │     ICletRegistry.cs
+│       │     BoxedCletResult.cs
+│       │     CletKind.cs                  (Input | Viewer)
+│       │     CletRunOptions.cs
+│       │     CletRunResult.cs             (non-generic + generic)
+│       │     CletRunStatus.cs
+│       │     CletOptionDescriptor.cs
+│       ├── Registry/
+│       │     CletRegistry.cs
+│       │     BuiltInClets.cs              (hand-written)
+│       ├── Json/
+│       │     CletJsonContext.cs           ([JsonSerializable] source-gen)
+│       │     SchemaV1.cs
+│       ├── Clets/
+│       │   ├── Input/
+│       │   │     SelectClet.cs, TextClet.cs, IntClet.cs, DecimalClet.cs,
+│       │   │     ConfirmClet.cs, MultiSelectClet.cs, PickFileClet.cs,
+│       │   │     PickDirectoryClet.cs, DateClet.cs, TimeClet.cs,
+│       │   │     DurationClet.cs, ColorClet.cs, AttributePickerClet.cs,
+│       │   │     RangeClet.cs
+│       │   │     (+ helpers: LabelParser.cs, FileFilterParser.cs, RangeView.cs)
+│       │   └── Viewer/
+│       │         MarkdownClet.cs
+│       ├── Help/
+│       │     overview.md                  (embedded resource for --help)
+│       ├── Hosting/
+│       │     Program.cs
+│       │     CommandLineRoot.cs           (hand-rolled CLI parser; D-006)
+│       │     AliasDispatcher.cs
+│       │     OutputFormatter.cs
+│       │     ExitCodes.cs
+│       │     MarkdownHelpRenderer.cs
+│       │     CletStyling.cs
+│       └── Properties/
+│             AssemblyInfo.cs              (InternalsVisibleTo)
 ├── tests/
 │   ├── SPEC.md                            (testing spec)
 │   ├── Clet.UnitTests/
@@ -158,7 +156,7 @@ gui-cs/clet/
     └── runbooks/release-rollback.md
 ```
 
-**One src project (`Clet`).** Abstractions, registry, JSON, built-in clets, and `Program.Main` all compile into one assembly. The source generator is a separate project because Roslyn analyzers must be (build-time only).
+**One src project (`Clet`).** Abstractions, registry, JSON, built-in clets, and `Program.Main` all compile into one assembly.
 
 ### 4.2 Core types
 
@@ -239,7 +237,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias.
 
 ### 4.4 Registration
 
-`BuiltInClets.RegisterAll(ICletRegistry)` hand-registers all 15 clets. The `Clet.SourceGen` project is a placeholder; auto-discovery is deferred to v2 per [D-021](decisions.md). There is no `[Clet]` attribute in shipped code.
+`BuiltInClets.RegisterAll(ICletRegistry)` hand-registers all 15 clets. Auto-discovery via a source generator was explored and dropped — there is no `[Clet]` attribute in shipped code, and no source-generator project in the repo.
 
 ### 4.5 Built-in clet implementation pattern
 
