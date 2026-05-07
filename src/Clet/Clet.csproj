@@ -37,6 +37,15 @@
 
   <ItemGroup>
     <PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />
+    <!--
+      Workaround: TG's transitive TextMateSharp reference doesn't flow into
+      `dotnet publish` output (only TextMateSharp.Grammars does), so the
+      markdown viewer's syntax highlighter throws FileNotFoundException at
+      runtime in a published binary. Pin matches what TextMateSharp.Grammars
+      already brings in via its own dependency. Remove once upstream TG
+      fixes the package's asset flow.
+    -->
+    <PackageReference Include="TextMateSharp" Version="2.0.3" />
   </ItemGroup>
 
   <ItemGroup>
