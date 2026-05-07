@@ -167,7 +167,7 @@ internal sealed class MarkdownClet : IViewerClet
         {
             backShortcut = new Shortcut
             {
-                Title = "\u2190",
+                Title = Glyphs.LeftArrow.ToString (),
                 Key = Key.CursorLeft.WithCtrl,
                 Enabled = false,
             };
@@ -175,7 +175,7 @@ internal sealed class MarkdownClet : IViewerClet
 
             forwardShortcut = new Shortcut
             {
-                Title = "\u2192",
+                Title = Glyphs.RightArrow.ToString (),
                 Key = Key.CursorRight.WithCtrl,
                 Enabled = false,
             };
@@ -188,13 +188,9 @@ internal sealed class MarkdownClet : IViewerClet
                 Enabled = false,
             };
 
-            Bar topBar = new ([backShortcut, forwardShortcut, locationShortcut])
+            StatusBar topBar = new ([backShortcut, forwardShortcut, locationShortcut])
             {
                 Y = 0,
-                Width = Dim.Fill (),
-                Height = 1,
-                CanFocus = false,
-                TabStop = TabBehavior.NoStop,
             };
 
             markdownView.Y = 1;
@@ -321,24 +317,6 @@ internal sealed class MarkdownClet : IViewerClet
         StatusBar statusBar = new (statusItems) { AlignmentModes = AlignmentModes.IgnoreFirstOrLast };
 
         window.Add (markdownView, statusBar);
-
-        // Register Ctrl+Left/Right key bindings on the window for back/forward navigation
-        if (browseMode)
-        {
-            window.KeyDown += (_, e) =>
-            {
-                if (e == Key.CursorLeft.WithCtrl)
-                {
-                    NavigateBack ();
-                    e.Handled = true;
-                }
-                else if (e == Key.CursorRight.WithCtrl)
-                {
-                    NavigateForward ();
-                    e.Handled = true;
-                }
-            };
-        }
 
         // Load content after initial layout
         window.Initialized += (_, _) =>
