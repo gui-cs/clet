@@ -90,7 +90,7 @@ internal static class TerminalEscapeSanitizer
     {
         if (string.IsNullOrEmpty (renderedAnsi))
         {
-            return renderedAnsi ?? string.Empty;
+            return string.Empty;
         }
 
         // Single-pass: scan and only allocate StringBuilder when the first dangerous byte is found
@@ -121,7 +121,7 @@ internal static class TerminalEscapeSanitizer
                                 sb?.Append (seqChar);
 
                                 // CSI terminates at bytes 0x40–0x7E
-                                if (seqChar >= '@' && seqChar <= '~')
+                                if (seqChar is >= '@' and <= '~')
                                 {
                                     break;
                                 }
@@ -193,7 +193,7 @@ internal static class TerminalEscapeSanitizer
                                 }
                             }
                         }
-                        else if (next >= '@' && next <= '_')
+                        else if (next is >= '@' and <= '_')
                         {
                             // Other C1 7-bit pair (ESC @ through ESC _, excluding ESC [ and ESC ]).
                             // Includes DCS (ESC P), etc. Strip the pair.

@@ -67,17 +67,17 @@ public class LinkNavigationHelperTests
     }
 
     [Fact]
-    public void HandleLinkClicked_HttpLink_OpenHttpLinksTrue_UpdatesStatus ()
+    public void HandleLinkClicked_HttpLink_OpenHttpLinksFalse_UpdatesStatus ()
     {
-        // We can't easily test that Link.OpenUrl is called, but we can verify
-        // that the status updater is always called and Handled is set.
+        // Verify that the status updater is always called and Handled is set.
+        // openHttpLinks is false to avoid launching a real browser in tests.
         var args = CreateArgs ("https://example.com");
         string? statusUrl = null;
 
         LinkNavigationHelper.HandleLinkClicked (
             args,
             customSchemeHandler: null,
-            openHttpLinks: true,
+            openHttpLinks: false,
             url => statusUrl = url);
 
         Assert.True (args.Handled);

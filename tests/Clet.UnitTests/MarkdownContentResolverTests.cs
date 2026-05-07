@@ -68,7 +68,6 @@ public class MarkdownContentResolverTests
     [Fact]
     public void Resolve_FileArgs_ReadsExistingFiles ()
     {
-        // Create a temp markdown file
         string tempDir = Path.Combine (Path.GetTempPath (), "clet-test-" + Guid.NewGuid ().ToString ("N"));
         Directory.CreateDirectory (tempDir);
 
@@ -77,24 +76,14 @@ public class MarkdownContentResolverTests
             string file = Path.Combine (tempDir, "test.md");
             File.WriteAllText (file, "# Test File");
 
-            // Need to set CWD to tempDir so the file access policy allows access
-            string originalDir = Directory.GetCurrentDirectory ();
-            Directory.SetCurrentDirectory (tempDir);
+            // Use AllowedFiles to bypass CWD confinement — avoids process-global CWD race
+            CletRunOptions options = new () { Arguments = [file], AllowedFiles = [tempDir] };
 
-            try
-            {
-                CletRunOptions options = new () { Arguments = [file] };
+            var result = MarkdownContentResolver.Resolve (null, options, stdinReader: null);
 
-                var result = MarkdownContentResolver.Resolve (null, options, stdinReader: null);
-
-                Assert.True (result.IsSuccess);
-                Assert.Equal ("# Test File", result.Content);
-                Assert.Single (result.Files);
-            }
-            finally
-            {
-                Directory.SetCurrentDirectory (originalDir);
-            }
+            Assert.True (result.IsSuccess);
+            Assert.Equal ("# Test File", result.Content);
+            Assert.Single (result.Files);
         }
         finally
         {
@@ -123,22 +112,12 @@ public class MarkdownContentResolverTests
             string file = Path.Combine (tempDir, "priority.md");
             File.WriteAllText (file, "# From File");
 
-            string originalDir = Directory.GetCurrentDirectory ();
-            Directory.SetCurrentDirectory (tempDir);
+            CletRunOptions options = new () { Arguments = [file], AllowedFiles = [tempDir] };
 
-            try
-            {
-                CletRunOptions options = new () { Arguments = [file] };
+            var result = MarkdownContentResolver.Resolve ("# Inline", options, stdinReader: null);
 
-                var result = MarkdownContentResolver.Resolve ("# Inline", options, stdinReader: null);
-
-                Assert.True (result.IsSuccess);
-                Assert.Equal ("# From File", result.Content);
-            }
-            finally
-            {
-                Directory.SetCurrentDirectory (originalDir);
-            }
+            Assert.True (result.IsSuccess);
+            Assert.Equal ("# From File", result.Content);
         }
         finally
         {
