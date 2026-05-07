@@ -38,8 +38,9 @@ internal sealed class AliasDispatcher
             ? CancellationTokenSource.CreateLinkedTokenSource (cancellationToken)
             : CancellationTokenSource.CreateLinkedTokenSource (cancellationToken, timeoutSource.Token);
 
-        // --cat mode: render viewer content directly to stdout without TUI
-        if (options.Cat && clet is IViewerClet)
+        // --cat mode: render viewer content directly to stdout without TUI.
+        // Skip for HelpClet — it builds content dynamically and handles --cat in RunAsync.
+        if (options.Cat && clet is IViewerClet and not HelpClet)
         {
             string? markdown = ResolveViewerContent (initial, options, stderr);
 
@@ -49,9 +50,6 @@ internal sealed class AliasDispatcher
 
                 return ExitCodes.Ok;
             }
-
-            // No static content resolved — fall through to RunAsync.
-            // The clet may handle --cat internally (e.g. HelpClet builds content dynamically).
         }
 
         BoxedCletResult result;
