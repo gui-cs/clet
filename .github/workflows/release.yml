@@ -251,6 +251,78 @@ jobs:
             git push origin "v${CLET_VERSION}"
           fi
 
+  # Create a GitHub Release with downloadable AOT binaries for each RID.
+  # Prerelease (alpha, develop) versions are flagged so they are not the
+  # default download target.
+  release:
+    needs: [resolve-version, build, tag]
+    runs-on: ubuntu-latest
+    env:
+      CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Package release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          package_unix() {
+            local rid="$1"
+            local src="artifacts/clet-${rid}"
+            if [ ! -d "$src" ]; then
+              echo "::warning::No artifact for ${rid}, skipping"
+              return 0
+            fi
+            chmod +x "$src/clet" 2>/dev/null || true
+            tar -czf "dist/clet-${CLET_VERSION}-${rid}.tar.gz" -C "$src" .
+            echo "Created dist/clet-${CLET_VERSION}-${rid}.tar.gz"
+          }
+
+          package_windows() {
+            local rid="$1"
+            local src="artifacts/clet-${rid}"
+            if [ ! -d "$src" ]; then
+              echo "::warning::No artifact for ${rid}, skipping"
+              return 0
+            fi
+            (cd "$src" && zip -r "../../dist/clet-${CLET_VERSION}-${rid}.zip" .)
+            echo "Created dist/clet-${CLET_VERSION}-${rid}.zip"
+          }
+
+          package_unix   osx-arm64
+          package_unix   linux-x64
+          package_windows win-x64
+
+          ls -la dist/
+
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRERELEASE_FLAG=""
+          if [[ "$CLET_VERSION" == *-* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          if gh release view "v${CLET_VERSION}" >/dev/null 2>&1; then
+            echo "Release v${CLET_VERSION} already exists; uploading assets with --clobber."
+            gh release upload "v${CLET_VERSION}" dist/* --clobber
+          else
+            gh release create "v${CLET_VERSION}" \
+              --title "clet v${CLET_VERSION}" \
+              --generate-notes \
+              $PRERELEASE_FLAG \
+              dist/*
+          fi
+
   # NuGet publish runs on both channels. Prerelease versions (alpha/develop)
   # are hidden from default resolution; consumers opt in via --prerelease.
   publish-nuget:
@@ -324,7 +396,7 @@ jobs:
         shell: pwsh
 
   notify-failure:
-    needs: [resolve-version, build, tag, publish-nuget, publish-homebrew, publish-winget]
+    needs: [resolve-version, build, tag, release, publish-nuget, publish-homebrew, publish-winget]
     if: failure()
     runs-on: ubuntu-latest
     env:

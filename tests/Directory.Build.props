@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Test projects are buildable but not publishable. Without this, a
+    solution-wide `dotnet publish` (no project arg) walks the solution and
+    tries to publish each test project. The tests `<ProjectReference>` Clet,
+    which becomes self-contained under AOT publish — and a non-self-contained
+    project cannot reference a self-contained one (NETSDK1151). The error
+    surfaces on win-arm64 (and any other RID where the user runs a bare
+    `dotnet publish`) but the diagnosis is the same everywhere.
+  -->
+  <PropertyGroup>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+</Project>

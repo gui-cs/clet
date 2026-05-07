@@ -55,3 +55,14 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Visual Studio cache / IDE state
+.vs/
+
+# Local AOT publish output (`make publish`) and release archives
+publish/
+publish-nonaot/
+dist/
+
+# VS-generated local launch profiles (not shared)
+**/Properties/launchSettings.json

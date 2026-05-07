@@ -1,0 +1,7 @@
+# Force LF on files that break with CRLF endings.
+# Makefiles require tab indentation and LF line endings; shell scripts must be
+# LF for the shebang parser. Without this, Windows checkouts of these files
+# silently break on Linux/macOS via Git's autocrlf.
+Makefile        text eol=lf
+*.sh            text eol=lf
+*.mk            text eol=lf

@@ -493,3 +493,17 @@ For `pick-file`/`pick-directory`, `--root` remains a starting directory, not a s
 **Status.** Active.
 
 **Pointers.** `src/Clet/Hosting/FileAccessPolicy.cs`, `src/Clet/Hosting/AliasDispatcher.cs` (`ResolveViewerContent`), `src/Clet/Clets/Viewer/MarkdownClet.cs` (`ExpandFiles`), `src/Clet/Hosting/CommandLineRoot.cs` (`--allow-file`, `--allow-binary` parsing), `docs/threat-model.md` ("File access scope" section), issue #38.
+
+## D-034: Explicit `TextMateSharp` PackageReference to repair publish output (Active)
+
+**Context.** `dotnet publish` of a clet binary (AOT or non-AOT, self-contained) was dropping `TextMateSharp.dll` from the output directory while keeping `TextMateSharp.Grammars.dll`. At runtime, the markdown viewer's syntax highlighter throws `FileNotFoundException: TextMateSharp` the first time anything tries to render highlighted code (e.g. `clet help select --cat`). This blocked PR #110's bar of "non-AOT and AOT binaries actually run on this machine," which is the only way to verify the release pipeline produces something users can run.
+
+The asset-flow break is upstream: Terminal.Gui transitively pulls in `TextMateSharp` via `TextMateSharp.Grammars`, but something about how the package is composed prevents the runtime DLL from appearing in publish output even though it is present in `bin/` after `dotnet build`. Reproducible on `2.0.2-develop.57` and `2.0.2-develop.24`.
+
+**Decision.** Add a direct `<PackageReference Include="TextMateSharp" Version="2.0.3" />` to `src/Clet/Clet.csproj` so publish picks it up. Pin matches what `TextMateSharp.Grammars` 2.0.3 already brings in transitively; we are not introducing a new version surface.
+
+**Why not push entirely upstream.** PR #110's release pipeline is the user-visible deliverable; we cannot ship until the published binary works. A clet-side workaround is one line and fully reversible. We will remove the explicit reference once the upstream packaging is fixed.
+
+**Status.** Active. Remove once Terminal.Gui's package correctly flows the `TextMateSharp` runtime asset into downstream publish output. Re-test on every TG bump until then.
+
+**Pointers.** `src/Clet/Clet.csproj` (`<PackageReference Include="TextMateSharp" />`), PR #110.
