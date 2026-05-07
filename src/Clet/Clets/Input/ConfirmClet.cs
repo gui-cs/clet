@@ -51,7 +51,7 @@ internal sealed class ConfirmClet : IClet<bool?>
         }
 
         // --prompt option overrides --title for the window title
-        string defaultTitle = options.CletOptions?.TryGetValue ("prompt", out string? promptValue) == true && promptValue is not null
+        string effectiveTitle = options.CletOptions?.TryGetValue ("prompt", out string? promptValue) == true && promptValue is not null
             ? promptValue
             : "Confirm (Enter to accept, Esc to cancel)";
 
@@ -59,7 +59,7 @@ internal sealed class ConfirmClet : IClet<bool?>
 
         return await InputCletRunner.RunAsync<OptionSelector, int?, bool?> (
             app, wrapper, options,
-            defaultTitle,
+            effectiveTitle,
             cancellationToken,
             result =>
             {
