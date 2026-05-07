@@ -82,21 +82,26 @@ case "$uname_s" in
            "Install Visual Studio Build Tools 2022 with the 'Desktop development with C++' workload: https://aka.ms/vs/17/release/vs_BuildTools.exe"
     fi
 
+    # What AOT actually needs is the MSVC linker (link.exe). Check for it directly
+    # rather than querying a workload component ID — that drifts between VS
+    # editions (Build Tools, Community, Enterprise, Insiders/preview).
+    link_via_vswhere=""
     if [ -n "$VSWHERE" ]; then
-      # Look for an installation that has the MSVC linker (link.exe) — what AOT actually needs.
-      vs_install="$("$VSWHERE" -latest -products '*' \
-        -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
-        -property installationPath 2>/dev/null | tr -d '\r')"
-      if [ -n "$vs_install" ]; then
-        ok "MSVC C++ toolchain at $vs_install"
-      else
-        miss "Visual Studio C++ workload (VC.Tools.x86.x64) not installed" \
-             "In the VS Installer, modify your install and add 'Desktop development with C++'."
-      fi
+      # -prerelease is required to discover VS Insiders / preview installs.
+      link_via_vswhere="$("$VSWHERE" -latest -prerelease -products '*' \
+        -find 'VC\Tools\MSVC\**\Hostx64\x64\link.exe' 2>/dev/null | tr -d '\r' | head -1)"
     fi
 
-    # The Windows 10/11 SDK is implied by the C++ workload but worth noting.
-    info "If 'make publish' still fails after installing the C++ workload, also ensure a Windows 10/11 SDK is checked in the VS Installer."
+    if command -v link.exe >/dev/null 2>&1; then
+      ok "link.exe on PATH (Developer Command Prompt)"
+    elif [ -n "$link_via_vswhere" ]; then
+      ok "MSVC linker discoverable via vswhere: $link_via_vswhere"
+    else
+      miss "MSVC linker (link.exe) not found via PATH or vswhere" \
+           "Install VS Build Tools 2022 with 'Desktop development with C++', or run from a Developer Command Prompt where link.exe is on PATH."
+    fi
+
+    info "If AOT still fails with 'vswhere.exe is not recognized', that's a PATH issue: launch the build from a Developer Command Prompt or PowerShell where vswhere.exe (and link.exe) are reachable."
     ;;
 
   *)

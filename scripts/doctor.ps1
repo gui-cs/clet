@@ -60,20 +60,28 @@ if (Get-Command vswhere.exe -ErrorAction SilentlyContinue) {
                "Install Visual Studio Build Tools 2022 with the 'Desktop development with C++' workload: https://aka.ms/vs/17/release/vs_BuildTools.exe"
 }
 
+# What AOT actually needs is the MSVC linker (link.exe). Check for it directly.
+# This is more robust than querying a workload component ID, which can drift
+# between VS editions (Build Tools, Community, Enterprise, Insiders/preview, etc.).
+$linkOnPath = Get-Command link.exe -ErrorAction SilentlyContinue
+$linkViaVswhere = $null
 if ($vswhere) {
-    # Look for an installation that has the MSVC linker — that's what AOT actually needs.
-    $vsInstall = & $vswhere -latest -products '*' `
-        -requires 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' `
-        -property installationPath 2>$null
-    if ($vsInstall) {
-        Write-Ok "MSVC C++ toolchain at $vsInstall"
-    } else {
-        Write-Miss "Visual Studio C++ workload (VC.Tools.x86.x64) not installed" `
-                   "In the VS Installer, modify your install and add 'Desktop development with C++'."
-    }
+    # vswhere -find is what the dotnet AOT MSBuild target ultimately uses.
+    # -prerelease is required to discover VS Insiders / preview installs.
+    $linkViaVswhere = & $vswhere -latest -prerelease -products '*' `
+        -find 'VC\Tools\MSVC\**\Hostx64\x64\link.exe' 2>$null | Select-Object -First 1
 }
 
-Write-Info "If 'make publish' still fails after installing the C++ workload, also ensure a Windows 10/11 SDK is checked in the VS Installer."
+if ($linkOnPath) {
+    Write-Ok ("link.exe on PATH: " + $linkOnPath.Source + " (Developer Command Prompt)")
+} elseif ($linkViaVswhere) {
+    Write-Ok ("MSVC linker discoverable via vswhere: " + $linkViaVswhere)
+} else {
+    Write-Miss "MSVC linker (link.exe) not found via PATH or vswhere" `
+               "Install VS Build Tools 2022 with 'Desktop development with C++', or run from a Developer Command Prompt where link.exe is on PATH."
+}
+
+Write-Info "If AOT still fails with 'vswhere.exe is not recognized', that's a PATH issue: launch the build from a Developer Command Prompt or PowerShell where vswhere.exe (and link.exe) are reachable."
 Write-Host ""
 
 Write-Host ("Summary: {0} ok, {1} missing" -f $script:Pass, $script:Fail)

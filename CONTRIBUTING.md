@@ -46,7 +46,15 @@ Or use **WSL** / **Git Bash**, both of which can run the Makefile directly.
 
 ### Common Windows AOT failure
 
-If `dotnet publish ... -p:PublishAot=true` (or `make publish`) fails with `vswhere.exe is not recognized` or `MSB3073`, the C++ workload is missing — `.\scripts\doctor.ps1` will say so.
+If `dotnet publish ... -p:PublishAot=true` (or `make publish`) fails with `vswhere.exe is not recognized` or `MSB3073`:
+
+1. **MSVC linker not installed** — install the C++ workload (above). `.\scripts\doctor.ps1` will say so.
+2. **`vswhere.exe` not on PATH** — the linker is installed, but the AOT MSBuild target shells out via `cmd.exe`, where `vswhere.exe` isn't reachable. Doctor will pass, but publish will still fail with the same MSB3073. Two fixes:
+   - Run from a **Developer Command Prompt for VS 2022** (or `Developer PowerShell for VS 2022`) — these set the right PATH.
+   - Or prepend the VS Installer dir to PATH in your current session:
+     ```pwsh
+     $env:PATH = "C:\Program Files (x86)\Microsoft Visual Studio\Installer;" + $env:PATH
+     ```
 
 ## Quick start
 
