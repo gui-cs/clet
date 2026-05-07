@@ -61,6 +61,7 @@ nunit-*.xml
 
 # Local AOT publish output (`make publish`) and release archives
 publish/
+publish-nonaot/
 dist/
 
 # VS-generated local launch profiles (not shared)
