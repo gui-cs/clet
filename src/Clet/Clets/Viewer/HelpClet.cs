@@ -108,24 +108,27 @@ internal sealed class HelpClet : IViewerClet
 
         markdownView.LinkClicked += (_, e) =>
         {
-            if (e.Url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
-            {
-                string? linkAlias = e.Url.Length > "clet:help:".Length
-                    ? e.Url ["clet:help:".Length..]
-                    : null;
+            LinkNavigationHelper.HandleLinkClicked (
+                e,
+                customSchemeHandler: url =>
+                {
+                    if (!url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
 
-                string key = linkAlias ?? "(overview)";
-                browseBar?.Push (key);
-                NavigateTo (key);
-                e.Handled = true;
+                    string? linkAlias = url.Length > "clet:help:".Length
+                        ? url ["clet:help:".Length..]
+                        : null;
 
-                return;
-            }
+                    string key = linkAlias ?? "(overview)";
+                    browseBar?.Push (key);
+                    NavigateTo (key);
 
-            // Help content is authored by us — links are safe to open.
-            Link.OpenUrl (e.Url);
-            statusShortcut.Title = e.Url;
-            e.Handled = true;
+                    return true;
+                },
+                openHttpLinks: true,
+                statusUpdater: url => statusShortcut.Title = url);
         };
 
         List<Shortcut> statusItems =
@@ -225,40 +228,7 @@ internal sealed class HelpClet : IViewerClet
         return (markdown, "clet");
     }
 
-    private static string GetVersion ()
-    {
-        string? informational = typeof (Program).Assembly
-            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
-            .FirstOrDefault ()
-            ?.InformationalVersion;
+    private static string GetVersion () => VersionInfo.GetCletVersion ();
 
-        if (!string.IsNullOrWhiteSpace (informational))
-        {
-            int plus = informational.IndexOf ('+');
-
-            return plus >= 0 ? informational [..plus] : informational;
-        }
-
-        return typeof (Program).Assembly.GetName ().Version?.ToString (3) ?? "0.0.0";
-    }
-
-    private static string GetTerminalGuiVersion ()
-    {
-        System.Reflection.Assembly tg = typeof (Application).Assembly;
-        string? informational = tg
-            .GetCustomAttributes (typeof (System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .OfType<System.Reflection.AssemblyInformationalVersionAttribute> ()
-            .FirstOrDefault ()
-            ?.InformationalVersion;
-
-        if (!string.IsNullOrWhiteSpace (informational))
-        {
-            int plus = informational.IndexOf ('+');
-
-            return plus >= 0 ? informational [..plus] : informational;
-        }
-
-        return tg.GetName ().Version?.ToString (3) ?? "unknown";
-    }
+    private static string GetTerminalGuiVersion () => VersionInfo.GetTerminalGuiVersion ();
 }

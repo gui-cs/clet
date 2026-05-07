@@ -1,9 +1,9 @@
 using System.Runtime.CompilerServices;
 
-namespace Clet.IntegrationTests;
+namespace Clet.UnitTests;
 
 /// <summary>
-/// Disables real driver I/O so tests never interact with the terminal or launch processes.
+/// Disables real driver I/O so unit tests never interact with the terminal or launch processes.
 /// </summary>
 internal static class TestSetup
 {

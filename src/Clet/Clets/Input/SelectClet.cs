@@ -53,34 +53,20 @@ internal sealed class SelectClet : IClet<string?>
             }
         }
 
-        RunnableWrapper<OptionSelector, int?> wrapper = new (selector)
-        {
-            Title = options.Title ?? "Select an option (Enter to accept, Esc to cancel)",
-            Width = Dim.Fill (),
-            BorderStyle = LineStyle.Rounded,
-            SchemeName = CletStyling.BaseSchemeName,
-        };
-        wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
+        RunnableWrapper<OptionSelector, int?> wrapper = new (selector);
 
-        try
-        {
-            await app.RunAsync (wrapper, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
+        return await InputCletRunner.RunAsync<OptionSelector, int?, string?> (
+            app, wrapper, options,
+            "Select an option (Enter to accept, Esc to cancel)",
+            cancellationToken,
+            result =>
+            {
+                string? selectedText = result is >= 0 and var idx && idx < labels.Length
+                    ? labels [idx]
+                    : null;
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return new () { Status = CletRunStatus.Cancelled };
-        }
-
-        int? selectedIndex = wrapper.Result;
-        string? selectedText = selectedIndex is >= 0 and var idx && idx < labels.Length
-            ? labels [idx]
-            : null;
-
-        return new () { Status = CletRunStatus.Ok, Value = selectedText };
+                return new () { Status = CletRunStatus.Ok, Value = selectedText };
+            },
+            addEnterBinding: false);
     }
 }

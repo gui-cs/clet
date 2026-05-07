@@ -19,6 +19,20 @@ dotnet run --project tests/Clet.UnitTests --no-build
 dotnet run --project tests/Clet.IntegrationTests --no-build
 ```
 
+**Zero warnings policy.** `dotnet build` must produce zero warnings in both Debug and Release configurations. Fix warnings at their source — do not suppress unless the warning is a false positive (document why in the suppression comment). Check with `dotnet build -c Release` before pushing.
+
+**Code style.** Follow `.editorconfig` and match existing patterns in the file you're editing. Key conventions:
+
+- Space before parentheses in calls/declarations: `Method (arg)`, `new ()`, `if (x)`.
+- File-scoped namespaces (`namespace Clet;`).
+- **Always use braces** — no `if (x) y();`. Even single-line bodies get `{ }`.
+- **Early returns** — guard clauses at the top, avoid deep nesting.
+- **Specify the created type** unless it's completely obvious: `List<string> items = new ()` not `var items = new List<string> ()`. Use `var` only when the type is apparent from the right-hand side (e.g. `var fi = new FileInfo (path)`).
+- **Use latest C# and runtime features** — collection expressions, primary constructors, pattern matching, `is not null`, etc.
+- **One type per file.** File name matches the type name.
+- **Avoid nested types.** Extract to a separate file.
+- **Keep files under ~750 lines.** If a file approaches 1000 lines, split it.
+
 There is no separate lint step. CI runs on ubuntu-latest with `dotnet-quality: preview`.
 
 ## Architecture

@@ -1,6 +1,4 @@
-using System.Linq;
 using System.Text;
-using System.Linq;
 
 namespace Clet;
 
@@ -35,13 +33,8 @@ internal static class TerminalEscapeSanitizer
             return string.Empty;
         }
 
-        // Fast path: check if any dangerous bytes exist before allocating
-        if (!ContainsDangerousBytes (input))
-        {
-            return input;
-        }
-
-        StringBuilder sb = new (input.Length);
+        // Single-pass: scan and only allocate StringBuilder when the first dangerous byte is found
+        StringBuilder? sb = null;
 
         for (int i = 0; i < input.Length; i++)
         {
@@ -50,6 +43,8 @@ internal static class TerminalEscapeSanitizer
             switch (c)
             {
                 case '\x1b': // ESC
+                    sb ??= new StringBuilder (input.Length).Append (input, 0, i);
+
                     // Check for C1 7-bit pair: ESC followed by @ through _
                     if (i + 1 < input.Length && input [i + 1] >= '@' && input [i + 1] <= '_')
                     {
@@ -63,17 +58,19 @@ internal static class TerminalEscapeSanitizer
                 case '\x07': // BEL
                 case '\x9b': // 8-bit CSI
                 case '\x9d': // 8-bit OSC
+                    sb ??= new StringBuilder (input.Length).Append (input, 0, i);
+
                     // Strip these single-byte controls
                     break;
 
                 default:
-                    sb.Append (c);
+                    sb?.Append (c);
 
                     break;
             }
         }
 
-        return sb.ToString ();
+        return sb?.ToString () ?? input;
     }
 
     /// <summary>
@@ -93,16 +90,11 @@ internal static class TerminalEscapeSanitizer
     {
         if (string.IsNullOrEmpty (renderedAnsi))
         {
-            return renderedAnsi ?? string.Empty;
+            return string.Empty;
         }
 
-        // Fast path: if no dangerous bytes exist beyond normal ESC[, skip processing
-        if (!ContainsDangerousOutputBytes (renderedAnsi))
-        {
-            return renderedAnsi;
-        }
-
-        StringBuilder sb = new (renderedAnsi.Length);
+        // Single-pass: scan and only allocate StringBuilder when the first dangerous byte is found
+        StringBuilder? sb = null;
 
         for (int i = 0; i < renderedAnsi.Length; i++)
         {
@@ -119,17 +111,17 @@ internal static class TerminalEscapeSanitizer
                         {
                             // CSI sequence — this is legitimate renderer output (SGR, cursor, erase)
                             // Pass through the entire sequence up to the terminating byte (0x40-0x7E)
-                            sb.Append ('\x1b');
-                            sb.Append ('[');
+                            sb?.Append ('\x1b');
+                            sb?.Append ('[');
                             i += 2;
 
                             while (i < renderedAnsi.Length)
                             {
                                 char seqChar = renderedAnsi [i];
-                                sb.Append (seqChar);
+                                sb?.Append (seqChar);
 
                                 // CSI terminates at bytes 0x40–0x7E
-                                if (seqChar >= '@' && seqChar <= '~')
+                                if (seqChar is >= '@' and <= '~')
                                 {
                                     break;
                                 }
@@ -145,8 +137,8 @@ internal static class TerminalEscapeSanitizer
                             if (i + 2 < renderedAnsi.Length && renderedAnsi [i + 2] == '8')
                             {
                                 // OSC 8 hyperlink — pass through until ST (ESC \ or BEL)
-                                sb.Append ('\x1b');
-                                sb.Append (']');
+                                sb?.Append ('\x1b');
+                                sb?.Append (']');
                                 i += 2;
 
                                 while (i < renderedAnsi.Length)
@@ -156,7 +148,7 @@ internal static class TerminalEscapeSanitizer
                                     if (osc == '\x07')
                                     {
                                         // BEL terminates OSC
-                                        sb.Append (osc);
+                                        sb?.Append (osc);
 
                                         break;
                                     }
@@ -164,20 +156,21 @@ internal static class TerminalEscapeSanitizer
                                     if (osc == '\x1b' && i + 1 < renderedAnsi.Length && renderedAnsi [i + 1] == '\\')
                                     {
                                         // ST (ESC \) terminates OSC
-                                        sb.Append ('\x1b');
-                                        sb.Append ('\\');
+                                        sb?.Append ('\x1b');
+                                        sb?.Append ('\\');
                                         i++;
 
                                         break;
                                     }
 
-                                    sb.Append (osc);
+                                    sb?.Append (osc);
                                     i++;
                                 }
                             }
                             else
                             {
-                                // Non-hyperlink OSC — strip until ST or BEL
+                                // Non-hyperlink OSC — dangerous, strip it
+                                sb ??= new StringBuilder (renderedAnsi.Length).Append (renderedAnsi, 0, i);
                                 i += 2;
 
                                 while (i < renderedAnsi.Length)
@@ -200,65 +193,42 @@ internal static class TerminalEscapeSanitizer
                                 }
                             }
                         }
-                        else if (next >= '@' && next <= '_')
+                        else if (next is >= '@' and <= '_')
                         {
                             // Other C1 7-bit pair (ESC @ through ESC _, excluding ESC [ and ESC ]).
                             // Includes DCS (ESC P), etc. Strip the pair.
+                            sb ??= new StringBuilder (renderedAnsi.Length).Append (renderedAnsi, 0, i);
                             i++;
                         }
                         else
                         {
                             // Other ESC sequences — strip the ESC
+                            sb ??= new StringBuilder (renderedAnsi.Length).Append (renderedAnsi, 0, i);
                         }
                     }
+                    else
+                    {
+                        // Trailing ESC at end of string — strip it
+                        sb ??= new StringBuilder (renderedAnsi.Length).Append (renderedAnsi, 0, i);
+                    }
 
-                    // Trailing ESC at end of string — strip it
                     break;
 
                 case '\x07': // BEL (used as OSC terminator)
                 case '\x9b': // 8-bit CSI
                 case '\x9d': // 8-bit OSC
+                    sb ??= new StringBuilder (renderedAnsi.Length).Append (renderedAnsi, 0, i);
+
                     // Strip these
                     break;
 
                 default:
-                    sb.Append (c);
+                    sb?.Append (c);
 
                     break;
             }
         }
 
-        return sb.ToString ();
-    }
-
-    private static bool ContainsDangerousBytes (string s)
-    {
-        return s.Any (c => c is '\x1b' or '\x07' or '\x9b' or '\x9d');
-    }
-
-    private static bool ContainsDangerousOutputBytes (string s)
-    {
-        if (s.Any (c => c is '\x07' or '\x9b' or '\x9d'))
-        {
-            return true;
-        }
-
-        // Also check for dangerous ESC sequences (not just ESC[)
-        for (int i = 0; i < s.Length; i++)
-        {
-            if (s [i] == '\x1b' && i + 1 < s.Length)
-            {
-                char next = s [i + 1];
-
-                // ESC ] is OSC — dangerous. Other C1 pairs (ESC @ through ESC _) excluding
-                // ESC [ (which is CSI, handled separately in SanitizeRenderedOutput) are also dangerous.
-                if (next >= '@' && next <= '_' && next != '[')
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return sb?.ToString () ?? renderedAnsi;
     }
 }
