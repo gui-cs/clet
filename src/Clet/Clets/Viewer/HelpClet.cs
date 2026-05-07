@@ -23,6 +23,24 @@ internal sealed class HelpClet : IViewerClet
 
     public IReadOnlyList<CletOptionDescriptor> Options => [];
 
+    /// <summary>Handles --cat mode without TUI init. Called by the dispatcher.</summary>
+    public int RenderCat (CletRunOptions options, TextWriter stdout, TextWriter stderr)
+    {
+        string? alias = options.Arguments?.FirstOrDefault ();
+
+        if (alias is not null and not "help" && !_registry.TryResolve (alias, out _))
+        {
+            stderr.WriteLine ($"error: Unknown alias '{alias}'. Try 'clet list' to see available clets.");
+
+            return ExitCodes.UsageError;
+        }
+
+        (string markdown, _) = BuildHelpContent (alias);
+        MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
+
+        return ExitCodes.Ok;
+    }
+
     public async Task<CletRunResult> RunAsync (
         IApplication app,
         string? content,
@@ -59,6 +77,10 @@ internal sealed class HelpClet : IViewerClet
 
         // --- Build TUI ---
 
+        bool browseMode = !options.NoBrowse;
+        string? currentAlias = alias;
+        BrowseBar? browseBar = null;
+
         Runnable window = new ()
         {
             Title = title,
@@ -77,6 +99,13 @@ internal sealed class HelpClet : IViewerClet
 
         Shortcut statusShortcut = new (Key.Empty, title, null) { MouseHighlightStates = MouseState.None };
 
+        if (browseMode)
+        {
+            string key = alias ?? "(overview)";
+            browseBar = new BrowseBar (key);
+            browseBar.OnNavigate = NavigateTo;
+        }
+
         markdownView.LinkClicked += (_, e) =>
         {
             if (e.Url.StartsWith ("clet:help", StringComparison.OrdinalIgnoreCase))
@@ -85,10 +114,9 @@ internal sealed class HelpClet : IViewerClet
                     ? e.Url ["clet:help:".Length..]
                     : null;
 
-                (string md, string t) = BuildHelpContent (linkAlias);
-                markdownView.Text = md;
-                window.Title = t;
-                statusShortcut.Title = t;
+                string key = linkAlias ?? "(overview)";
+                browseBar?.Push (key);
+                NavigateTo (key);
                 e.Handled = true;
 
                 return;
@@ -100,13 +128,24 @@ internal sealed class HelpClet : IViewerClet
             e.Handled = true;
         };
 
-        StatusBar statusBar = new ([
+        List<Shortcut> statusItems =
+        [
             new (Application.GetDefaultKey (Command.Quit), "Quit", window.RequestStop),
-            statusShortcut,
-        ])
+        ];
+
+        if (browseBar is not null)
+        {
+            statusItems.Insert (0, browseBar.Forward);
+            statusItems.Insert (0, browseBar.Back);
+        }
+
+        statusItems.Add (statusShortcut);
+
+        StatusBar statusBar = new (statusItems)
         {
             AlignmentModes = AlignmentModes.IgnoreFirstOrLast,
         };
+        browseBar?.ApplyStyle ();
 
         window.Add (markdownView, statusBar);
 
@@ -114,6 +153,16 @@ internal sealed class HelpClet : IViewerClet
         {
             markdownView.Text = markdown;
         };
+
+        void NavigateTo (string key)
+        {
+            string? targetAlias = key == "(overview)" ? null : key;
+            currentAlias = targetAlias;
+            (string md, string t) = BuildHelpContent (targetAlias);
+            markdownView.Text = md;
+            window.Title = t;
+            statusShortcut.Title = t;
+        }
 
         try
         {

@@ -81,6 +81,7 @@ internal sealed class CommandLineRoot
         bool fullscreen = false;
         bool cat = false;
         bool allowBinary = false;
+        bool noBrowse = false;
         TimeSpan? timeout = null;
         int? rows = null;
         Dictionary<string, string> cletOptions = new (StringComparer.OrdinalIgnoreCase);
@@ -115,6 +116,13 @@ internal sealed class CommandLineRoot
             if (arg == "--allow-binary")
             {
                 allowBinary = true;
+
+                continue;
+            }
+
+            if (arg == "--no-browse")
+            {
+                noBrowse = true;
 
                 continue;
             }
@@ -258,6 +266,7 @@ internal sealed class CommandLineRoot
             Arguments = positionalArgs.Count > 0 ? positionalArgs : null,
             AllowedFiles = allowedFiles.Count > 0 ? allowedFiles : null,
             AllowBinary = allowBinary,
+            NoBrowse = noBrowse,
         };
 
         // Validate positional args before dispatching.

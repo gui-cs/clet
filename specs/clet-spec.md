@@ -10,7 +10,7 @@ This is the implementation spec. It assumes the PR/FAQ is broadly accepted and c
 
 - New repo `gui-cs/clet` containing all clet code: abstractions, registry, JSON, source generator placeholder, built-in clets, CLI binary, release automation.
 - Targeted changes to `gui-cs/Terminal.Gui` core (§3) that benefit TG generally and unblock clet specifically.
-- Fourteen input clets and one viewer clet (`md`) statically registered in v1.0.
+- Fourteen input clets and one browser clet (`md`) statically registered in v1.0.
 - Native installer channels: Homebrew (gui-cs tap), WinGet, .NET tool. NativeAOT for native channels.
 - Independent SemVer; major version tied to `schemaVersion` changes per §4.3.1 (see [D-022](decisions.md)).
 - JSON output contract (schemaVersion 1).
@@ -259,7 +259,7 @@ See `src/Clet/Hosting/Program.cs`. The host creates a `CancellationTokenSource`,
 ### 4.7 CLI surface
 
 ```
-clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--cat] [--rows <n>] [--output <path>] [--<opt> <value>]...
+clet <alias> [positional...] [--initial <value>] [--title <text>] [--json] [--timeout 30s] [--fullscreen] [--cat] [--no-browse] [--rows <n>] [--output <path>] [--<opt> <value>]...
 clet list [--json]
 clet help <alias>
 clet --help
@@ -276,9 +276,11 @@ clet --version
   ╚═╝╩═╝╚═╝ ╩
 ```
 
-**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, `--fullscreen`, `--cat`, `--rows`, and `--output` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`, `md`); clets that do not consume positional args reject them with a usage error (exit 2) before the clet runs. See [D-025](decisions.md) for the `AcceptsPositionalArgs` design and [D-014](decisions.md) for why `--title` is a host flag.
+**Built-in flags.** `--initial`, `--title`, `--json`, `--timeout`, `--fullscreen`, `--cat`, `--no-browse`, `--rows`, and `--output` are parsed at the host level and apply to every clet. Anything else of the form `--<name> <value>` is forwarded as a clet-specific option (see each clet's `clet help <alias>`). Bare positional tokens are forwarded as `CletRunOptions.Arguments` for clets that consume them (e.g. `select`, `multi-select`, `md`); clets that do not consume positional args reject them with a usage error (exit 2) before the clet runs. See [D-025](decisions.md) for the `AcceptsPositionalArgs` design and [D-014](decisions.md) for why `--title` is a host flag.
 
 **`--cat` (non-interactive rendering).** When `--cat` is passed to a viewer clet (currently `md`), content is rendered as ANSI-formatted text directly to stdout — no alt-screen, no interactive session. Useful for piping (`clet md --cat README.md | less -R`), CI logs, and AI agents. Content is resolved from file arguments, `--initial`, or stdin, same as the normal viewer path. If no content is available, exits with usage error (exit 2). See [D-027](decisions.md).
+
+**`--no-browse` (disable browser mode).** When `--no-browse` is passed to `md`, clicking local `.md` links shows the URL in the status bar instead of navigating. By default, `md` runs as a browser: following local links navigates to them with a back/forward history stack (Ctrl+Left / Ctrl+Right or ← → buttons in the status bar), and fragment anchors (`file.md#heading`) scroll to the matching heading.
 
 **`--output <path>` / `-o <path>` (file output).** Writes the clet's result (plain text or JSON) to the specified file instead of stdout. When `--output` is set, nothing is written to stdout by `OutputFormatter` — stdout stays fully available for TUI rendering. This works around the Terminal.Gui limitation where stdout redirection (`$()`, `|`, `>`) swallows the TUI (see gui-cs/Terminal.Gui#5207). If the file cannot be written, an error is emitted to stderr and the process exits with code 2. See [D-028](decisions.md).
 

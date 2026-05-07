@@ -16,7 +16,7 @@ internal sealed class MarkdownClet : IViewerClet
 
     public string PrimaryAlias => "md";
     public IReadOnlyList<string> Aliases => ["md", "markdown"];
-    public string Description => "Renders Markdown files in a themed, scrollable viewer.";
+    public string Description => "Browse and render Markdown files with link navigation and syntax highlighting.";
     public CletKind Kind => CletKind.Viewer;
     public Type ResultType => typeof (void);
 
@@ -27,6 +27,9 @@ internal sealed class MarkdownClet : IViewerClet
             false, nameof (ThemeName.DarkPlus)),
         new ("cat", null, typeof (bool),
             "Render markdown to stdout without launching the TUI viewer.",
+            false, "false"),
+        new ("no-browse", null, typeof (bool),
+            "Disable browser mode (back/forward navigation, top bar).",
             false, "false"),
     ];
 
@@ -113,6 +116,11 @@ internal sealed class MarkdownClet : IViewerClet
             options.AllowedFiles,
             options.AllowBinary);
 
+        // Browser mode
+        bool browseMode = !options.NoBrowse;
+        string? currentFile = files.Count > 0 ? Path.GetFullPath (files [0]) : null;
+        BrowseBar? browseBar = null;
+
         // Parse --theme option
         ThemeName syntaxTheme = ThemeName.DarkPlus;
 
@@ -124,7 +132,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         Runnable window = new ()
         {
-            Title = options.Title ?? "Markdown Viewer",
+            Title = options.Title ?? "Markdown Browser",
             Width = Dim.Fill (),
             Height = Dim.Fill (),
         };
@@ -138,7 +146,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         markdownView.ViewportSettings |= ViewportSettingsFlags.HasHorizontalScrollBar;
 
-        // --- StatusBar items ---
+        // --- StatusBar items (declared early so local functions can capture them) ---
 
         Shortcut lineCountShortcut = new () { Title = "0 lines", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut fileSizeShortcut = new () { Title = "0 B", MouseHighlightStates = MouseState.None, Enabled = false };
@@ -149,17 +157,28 @@ internal sealed class MarkdownClet : IViewerClet
         Link statusLink = new () { Text = "Ready", CanFocus = false };
         Shortcut statusShortcut = new () { CommandView = statusLink, MouseHighlightStates = MouseState.None };
 
+        // Browser mode: back/forward shortcuts for bottom StatusBar
+        if (browseMode)
+        {
+            browseBar = new BrowseBar (currentFile);
+            browseBar.OnNavigate = path => LoadFile (path);
+        }
+
         // --- MarkdownView event wiring ---
 
         markdownView.LinkClicked += (_, e) =>
         {
-            // Navigate local .md files within the sandbox
-            if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath))
+            if (browseMode)
             {
-                LoadFile (resolvedPath);
-                e.Handled = true;
+                // Navigate local .md files within the sandbox
+                if (currentFileDir is not null && TryResolveLocalMarkdownLink (e.Url, currentFileDir, linkPolicy, out string? resolvedPath, out string? fragment))
+                {
+                    browseBar!.Push (resolvedPath);
+                    LoadFile (resolvedPath, fragment);
+                    e.Handled = true;
 
-                return;
+                    return;
+                }
             }
 
             // Open http/https links in the default browser — they're safe
@@ -187,6 +206,12 @@ internal sealed class MarkdownClet : IViewerClet
         [
             new (Application.GetDefaultKey (Command.Quit), "Quit", window.RequestStop),
         ];
+
+        if (browseBar is not null)
+        {
+            statusItems.Insert (0, browseBar.Forward);
+            statusItems.Insert (0, browseBar.Back);
+        }
 
         // Theme selector
         DropDownList<ThemeName> themeDropDown = new () { Value = syntaxTheme, CanFocus = false };
@@ -255,6 +280,7 @@ internal sealed class MarkdownClet : IViewerClet
                     return;
                 }
 
+                browseBar?.Push (files [index]);
                 LoadFile (files [index]);
             };
 
@@ -263,6 +289,7 @@ internal sealed class MarkdownClet : IViewerClet
         }
 
         StatusBar statusBar = new (statusItems) { AlignmentModes = AlignmentModes.IgnoreFirstOrLast };
+        browseBar?.ApplyStyle ();
 
         window.Add (markdownView, statusBar);
 
@@ -282,7 +309,6 @@ internal sealed class MarkdownClet : IViewerClet
                 statusLink.Url = string.Empty;
                 statusShortcut.MouseHighlightStates = MouseState.None;
             }
-
         };
 
         try
@@ -301,19 +327,27 @@ internal sealed class MarkdownClet : IViewerClet
 
         return new () { Status = CletRunStatus.Ok };
 
-        void LoadFile (string filePath)
+        void LoadFile (string filePath, string? fragment = null)
         {
             string fullPath = Path.GetFullPath (filePath);
+
             string fileContent = TerminalEscapeSanitizer.Sanitize (File.ReadAllText (fullPath))!;
             markdownView.Text = fileContent;
 
+            currentFile = fullPath;
             currentFileDir = Path.GetDirectoryName (fullPath);
 
             FileInfo fileInfo = new (fullPath);
             fileSizeShortcut.Title = FormatFileSize (fileInfo.Length);
             statusLink.Text = Path.GetFileName (fullPath);
             statusLink.Url = string.Empty;
+
+            if (!string.IsNullOrEmpty (fragment))
+            {
+                markdownView.ScrollToAnchor (fragment);
+            }
         }
+
     }
 
     /// <summary>
@@ -323,13 +357,20 @@ internal sealed class MarkdownClet : IViewerClet
         string url,
         string currentDir,
         FileAccessPolicy policy,
-        out string? resolvedPath)
+        out string? resolvedPath,
+        out string? fragment)
     {
         resolvedPath = null;
+        fragment = null;
 
-        // Strip fragment (e.g. #section)
+        // Extract fragment (e.g. #section) before resolving the path
         int fragmentIndex = url.IndexOf ('#');
         string pathPart = fragmentIndex >= 0 ? url [..fragmentIndex] : url;
+
+        if (fragmentIndex >= 0)
+        {
+            fragment = url [(fragmentIndex + 1)..];
+        }
 
         if (string.IsNullOrWhiteSpace (pathPart))
         {

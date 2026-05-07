@@ -25,7 +25,7 @@ Works for humans and AI agents alike.
 | `pick-file`, `file` | Opens a file picker dialog and returns the selected file path(s). | `--multi`, `--root`, `--filter` |
 | `pick-directory`, `dir` | Opens a directory picker dialog and returns the selected directory path. | `--root` |
 | `linear-range`, `range` | Presents a linear range selector (single, multi, or bounded range) over labelled options. | `--mode`, `--options`, `--range-kind`, `args...` |
-| `md`, `markdown` | Renders Markdown files in a themed, scrollable viewer. | `--theme`, `--cat`, `args...` |
+| `md`, `markdown` | Browse and render Markdown files with link navigation and syntax highlighting. | `--theme`, `--cat`, `--no-browse`, `args...` |
 
 ## Install
 
@@ -132,7 +132,7 @@ For a shell user who only needs `read`-with-validation, `gum` is fine. We are no
 ### Q: What's the difference between an input clet and a viewer clet?
 
 - **Input clets** (`select`, `text`, `pick-file`, …) prompt for a value and return a typed result: exit 0, `{"schemaVersion":1,"status":"ok","value":…}`.
-- **Viewer clets** (`md`) render content for the user to read and return on dismiss: exit 0, `{"schemaVersion":1,"status":"ok"}`.
+- **Browser clets** (`md`) render content with link navigation, back/forward history, and return on dismiss: exit 0, `{"schemaVersion":1,"status":"ok"}`.
 
 Both share theming, keybindings, mouse support, and the JSON envelope.
 
@@ -160,7 +160,7 @@ Esc and Ctrl-C cancel input clets; `q`, Esc, and Ctrl-C dismiss viewer clets. `-
 
 **Input (14):** `text`, `int`, `decimal`, `select`, `multi-select`, `confirm`, `pick-file`, `pick-directory`, `date`, `time`, `duration`, `color`, `attribute-picker`, `linear-range`
 
-**Viewer (1):** `md` (Markdown via Terminal.Gui's built-in `Markdown` View)
+**Browser (1):** `md` (Markdown browser with link navigation, back/forward history, and syntax highlighting)
 
 Run `clet list` to see what's available in your installed version.
 
