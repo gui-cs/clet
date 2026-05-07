@@ -23,6 +23,24 @@ internal sealed class HelpClet : IViewerClet
 
     public IReadOnlyList<CletOptionDescriptor> Options => [];
 
+    /// <summary>Handles --cat mode without TUI init. Called by the dispatcher.</summary>
+    public int RenderCat (CletRunOptions options, TextWriter stdout, TextWriter stderr)
+    {
+        string? alias = options.Arguments?.FirstOrDefault ();
+
+        if (alias is not null and not "help" && !_registry.TryResolve (alias, out _))
+        {
+            stderr.WriteLine ($"error: Unknown alias '{alias}'. Try 'clet list' to see available clets.");
+
+            return ExitCodes.UsageError;
+        }
+
+        (string markdown, _) = BuildHelpContent (alias);
+        MarkdownHelpRenderer.RenderToAnsi (markdown, stdout);
+
+        return ExitCodes.Ok;
+    }
+
     public async Task<CletRunResult> RunAsync (
         IApplication app,
         string? content,
