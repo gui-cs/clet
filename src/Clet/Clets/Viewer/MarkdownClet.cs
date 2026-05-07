@@ -209,8 +209,8 @@ internal sealed class MarkdownClet : IViewerClet
 
         if (browseBar is not null)
         {
-            statusItems.Add (browseBar.Back);
-            statusItems.Add (browseBar.Forward);
+            statusItems.Insert (0, browseBar.Forward);
+            statusItems.Insert (0, browseBar.Back);
         }
 
         // Theme selector
