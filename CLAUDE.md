@@ -19,6 +19,10 @@ dotnet run --project tests/Clet.UnitTests --no-build
 dotnet run --project tests/Clet.IntegrationTests --no-build
 ```
 
+**Zero warnings policy.** `dotnet build` must produce zero warnings in both Debug and Release configurations. Fix warnings at their source — do not suppress unless the warning is a false positive (document why in the suppression comment). Check with `dotnet build -c Release` before pushing.
+
+**Code style.** Follow `.editorconfig` and match existing patterns in the file you're editing. Key conventions: space before parentheses in calls/declarations (`Method (arg)`, `new ()`), file-scoped namespaces, target-typed `new ()`, braces on their own line for multi-line blocks.
+
 There is no separate lint step. CI runs on ubuntu-latest with `dotnet-quality: preview`.
 
 ## Architecture
