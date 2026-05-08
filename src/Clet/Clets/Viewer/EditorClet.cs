@@ -13,17 +13,17 @@ internal sealed class EditorClet : IViewerClet
     public IReadOnlyList<string> Aliases => ["edit", "editor"];
     public string Description => "Edit a text file with menus, undo/redo, and find/replace.";
     public CletKind Kind => CletKind.Viewer;
-    public Type ResultType => typeof (void);
+    public Type ResultType => typeof(void);
     public bool AcceptsPositionalArgs => true;
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
-        new ("readonly", "r", typeof (bool),
+        new("readonly", "r", typeof(bool),
             "Open the file in read-only mode.",
             false, "false"),
     ];
 
-    public async Task<CletRunResult> RunAsync (
+    public async Task<CletRunResult> RunAsync(
         IApplication app,
         string? content,
         CletRunOptions options,
@@ -31,113 +31,115 @@ internal sealed class EditorClet : IViewerClet
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return new () { Status = CletRunStatus.Cancelled };
+            return new() { Status = CletRunStatus.Cancelled };
         }
 
         // Resolve file path from positional args
-        string? filePath = options.Arguments?.FirstOrDefault ();
+        string? filePath = options.Arguments?.FirstOrDefault();
         string? fileName = null;
         string? lastDirectory = null;
         string? savedText = string.Empty;
 
-        bool readOnly = options.CletOptions?.TryGetValue ("readonly", out string? roVal) == true
+        bool readOnly = options.CletOptions?.TryGetValue("readonly", out string? roVal) == true
                         && roVal is "true" or "1";
 
         if (filePath is not null)
         {
-            filePath = Path.GetFullPath (filePath);
-            fileName = Path.GetFileName (filePath);
-            lastDirectory = Path.GetDirectoryName (filePath);
+            filePath = Path.GetFullPath(filePath);
+            fileName = Path.GetFileName(filePath);
+            lastDirectory = Path.GetDirectoryName(filePath);
         }
 
         // --- Build the UI ---
 
-        Runnable window = new ()
+        Runnable window = new()
         {
             Title = fileName ?? "Untitled",
-            Width = Dim.Fill (),
-            Height = Dim.Fill (),
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
             BorderStyle = LineStyle.None,
         };
 
-        TextView textView = new ()
+        TextView textView = new()
         {
             X = 0,
             Y = 1, // below MenuBar
-            Width = Dim.Fill (),
-            Height = Dim.Fill (1), // above StatusBar
+            Width = Dim.Fill(),
+            Height = Dim.Fill(1), // above StatusBar
             ReadOnly = readOnly,
         };
 
         // --- StatusBar shortcuts (declared early for capture) ---
 
-        Shortcut cursorPositionShortcut = new () { Title = "Ln 1, Col 1", MouseHighlightStates = MouseState.None, Enabled = false };
-        Shortcut fileInfoShortcut = new () { Title = fileName ?? "Untitled", MouseHighlightStates = MouseState.None, Enabled = false };
-        Shortcut modifiedShortcut = new () { Title = "", MouseHighlightStates = MouseState.None, Enabled = false };
+        Shortcut cursorPositionShortcut = new()
+            { Title = "Ln 1, Col 1", MouseHighlightStates = MouseState.None, Enabled = false };
+        Shortcut fileInfoShortcut = new()
+            { Title = fileName ?? "Untitled", MouseHighlightStates = MouseState.None, Enabled = false };
+        Shortcut modifiedShortcut = new() { Title = "", MouseHighlightStates = MouseState.None, Enabled = false };
 
         // --- Local state helpers ---
 
-        bool UnsavedChanges () => !string.Equals (savedText, textView.Text, StringComparison.Ordinal);
+        bool UnsavedChanges() => !string.Equals(savedText, textView.Text, StringComparison.Ordinal);
 
-        void UpdateModifiedIndicator ()
+        void UpdateModifiedIndicator()
         {
-            bool dirty = UnsavedChanges ();
+            bool dirty = UnsavedChanges();
             modifiedShortcut.Title = dirty ? "Modified" : "";
             window.Title = dirty ? $"{fileName ?? "Untitled"}*" : fileName ?? "Untitled";
         }
 
-        void UpdateTitle ()
+        void UpdateTitle()
         {
             fileInfoShortcut.Title = fileName ?? "Untitled";
-            UpdateModifiedIndicator ();
+            UpdateModifiedIndicator();
         }
 
         // --- File operations ---
 
-        void LoadFile (string path)
+        void LoadFile(string path)
         {
-            string fullPath = Path.GetFullPath (path);
+            string fullPath = Path.GetFullPath(path);
 
-            if (!File.Exists (fullPath))
+            if (!File.Exists(fullPath))
             {
                 // New file — just set metadata
                 filePath = fullPath;
-                fileName = Path.GetFileName (fullPath);
-                lastDirectory = Path.GetDirectoryName (fullPath);
+                fileName = Path.GetFileName(fullPath);
+                lastDirectory = Path.GetDirectoryName(fullPath);
                 savedText = string.Empty;
                 textView.Text = string.Empty;
-                UpdateTitle ();
+                UpdateTitle();
 
                 return;
             }
 
-            string text = File.ReadAllText (fullPath);
+            string text = File.ReadAllText(fullPath);
             filePath = fullPath;
-            fileName = Path.GetFileName (fullPath);
-            lastDirectory = Path.GetDirectoryName (fullPath);
+            fileName = Path.GetFileName(fullPath);
+            lastDirectory = Path.GetDirectoryName(fullPath);
             savedText = text;
             textView.Text = text;
-            textView.ClearHistoryChanges ();
-            UpdateTitle ();
+            textView.ClearHistoryChanges();
+            UpdateTitle();
         }
 
-        bool SaveFile ()
+        bool SaveFile()
         {
             if (filePath is null)
             {
-                return SaveAs ();
+                return SaveAs();
             }
 
             try
             {
-                File.WriteAllText (filePath, textView.Text);
+                File.WriteAllText(filePath, textView.Text);
                 savedText = textView.Text;
-                textView.ClearHistoryChanges ();
-                UpdateModifiedIndicator ();
+                textView.ClearHistoryChanges();
+                UpdateModifiedIndicator();
             }
             catch (Exception ex)
             {
-                MessageBox.ErrorQuery (app, "Error", ex.Message, "Ok");
+                MessageBox.ErrorQuery(app, "Error", ex.Message, "Ok");
 
                 return false;
             }
@@ -145,9 +147,9 @@ internal sealed class EditorClet : IViewerClet
             return true;
         }
 
-        bool SaveAs ()
+        bool SaveAs()
         {
-            SaveDialog sd = new ();
+            SaveDialog sd = new();
 
             if (lastDirectory is not null)
             {
@@ -156,35 +158,35 @@ internal sealed class EditorClet : IViewerClet
 
             if (fileName is not null)
             {
-                sd.Path = Path.Combine (sd.Path ?? ".", fileName);
+                sd.Path = Path.Combine(sd.Path ?? ".", fileName);
             }
 
-            app.Run (sd);
+            app.Run(sd);
             bool canceled = sd.Canceled;
             string path = sd.Path;
             string sdFileName = sd.FileName ?? string.Empty;
-            sd.Dispose ();
+            sd.Dispose();
 
-            if (canceled || string.IsNullOrWhiteSpace (path))
+            if (canceled || string.IsNullOrWhiteSpace(path))
             {
                 return false;
             }
 
-            filePath = Path.GetFullPath (path);
+            filePath = Path.GetFullPath(path);
             fileName = sdFileName;
-            lastDirectory = Path.GetDirectoryName (filePath);
+            lastDirectory = Path.GetDirectoryName(filePath);
 
-            return SaveFile ();
+            return SaveFile();
         }
 
-        bool PromptSaveIfDirty ()
+        bool PromptSaveIfDirty()
         {
-            if (!UnsavedChanges ())
+            if (!UnsavedChanges())
             {
                 return true;
             }
 
-            int? result = MessageBox.Query (
+            int? result = MessageBox.Query(
                 app,
                 "Unsaved Changes",
                 $"Save changes to {fileName ?? "Untitled"}?",
@@ -197,15 +199,15 @@ internal sealed class EditorClet : IViewerClet
 
             if (result == 2)
             {
-                return SaveFile (); // Yes
+                return SaveFile(); // Yes
             }
 
             return true; // No — discard
         }
 
-        void NewFile ()
+        void NewFile()
         {
-            if (!PromptSaveIfDirty ())
+            if (!PromptSaveIfDirty())
             {
                 return;
             }
@@ -214,22 +216,22 @@ internal sealed class EditorClet : IViewerClet
             fileName = null;
             savedText = string.Empty;
             textView.Text = string.Empty;
-            textView.ClearHistoryChanges ();
-            UpdateTitle ();
+            textView.ClearHistoryChanges();
+            UpdateTitle();
         }
 
-        void OpenFile ()
+        void OpenFile()
         {
-            if (!PromptSaveIfDirty ())
+            if (!PromptSaveIfDirty())
             {
                 return;
             }
 
-            OpenDialog od = new ()
+            OpenDialog od = new()
             {
                 Title = "Open",
                 AllowsMultipleSelection = false,
-                AllowedTypes = [new AllowedTypeAny ()],
+                AllowedTypes = [new AllowedTypeAny()],
                 MustExist = true,
                 OpenMode = OpenMode.File,
             };
@@ -239,57 +241,57 @@ internal sealed class EditorClet : IViewerClet
                 od.Path = lastDirectory;
             }
 
-            app.Run (od);
+            app.Run(od);
 
             if (!od.Canceled && od.FilePaths.Count > 0)
             {
-                string selectedPath = od.FilePaths [0];
-                lastDirectory = Path.GetDirectoryName (Path.GetFullPath (selectedPath));
-                LoadFile (selectedPath);
+                string selectedPath = od.FilePaths[0];
+                lastDirectory = Path.GetDirectoryName(Path.GetFullPath(selectedPath));
+                LoadFile(selectedPath);
             }
 
-            od.Dispose ();
+            od.Dispose();
         }
 
-        void QuitEditor ()
+        void QuitEditor()
         {
-            if (!PromptSaveIfDirty ())
+            if (!PromptSaveIfDirty())
             {
                 return;
             }
 
-            window.RequestStop ();
+            window.RequestStop();
         }
 
         // --- MenuBar ---
 
-        MenuBar menu = new ();
+        MenuBar menu = new();
 
-        menu.Add (new MenuBarItem ("_File",
+        menu.Add(new MenuBarItem("_File",
         [
             new MenuItem { Title = "_New", Key = Key.N.WithCtrl, Action = NewFile },
             new MenuItem { Title = "_Open", Key = Key.O.WithCtrl, Action = OpenFile },
-            new MenuItem { Title = "_Save", Key = Key.S.WithCtrl, Action = () => SaveFile () },
-            new MenuItem { Title = "Save _As", Action = () => SaveAs () },
+            new MenuItem { Title = "_Save", Key = Key.S.WithCtrl, Action = () => SaveFile() },
+            new MenuItem { Title = "Save _As", Action = () => SaveAs() },
             null!, // separator
             new MenuItem { Title = "_Quit", Key = Key.Q.WithCtrl, Action = QuitEditor },
         ]));
 
-        menu.Add (new MenuBarItem ("_Edit",
+        menu.Add(new MenuBarItem("_Edit",
         [
-            new MenuItem { Title = "_Undo", Key = Key.Z.WithCtrl, Action = () => textView.Undo () },
-            new MenuItem { Title = "_Redo", Key = Key.Y.WithCtrl, Action = () => textView.Redo () },
+            new MenuItem { Title = "_Undo", Key = Key.Z.WithCtrl, Action = () => textView.Undo() },
+            new MenuItem { Title = "_Redo", Key = Key.Y.WithCtrl, Action = () => textView.Redo() },
             null!, // separator
-            new MenuItem { Title = "Cu_t", Key = Key.X.WithCtrl, Action = () => textView.Cut () },
-            new MenuItem { Title = "_Copy", Key = Key.C.WithCtrl, Action = () => textView.Copy () },
-            new MenuItem { Title = "_Paste", Key = Key.V.WithCtrl, Action = () => textView.Paste () },
+            new MenuItem { Title = "Cu_t", Key = Key.X.WithCtrl, Action = () => textView.Cut() },
+            new MenuItem { Title = "_Copy", Key = Key.C.WithCtrl, Action = () => textView.Copy() },
+            new MenuItem { Title = "_Paste", Key = Key.V.WithCtrl, Action = () => textView.Paste() },
             null!, // separator
-            new MenuItem { Title = "Select _All", Key = Key.A.WithCtrl, Action = () => textView.SelectAll () },
+            new MenuItem { Title = "Select _All", Key = Key.A.WithCtrl, Action = () => textView.SelectAll() },
         ]));
 
         // --- Wire events ---
 
-        textView.ContentsChanged += (_, _) => UpdateModifiedIndicator ();
+        textView.ContentsChanged += (_, _) => UpdateModifiedIndicator();
 
         textView.UnwrappedCursorPositionChanged += (_, e) =>
         {
@@ -298,11 +300,11 @@ internal sealed class EditorClet : IViewerClet
 
         // --- StatusBar ---
 
-        StatusBar statusBar = new (
+        StatusBar statusBar = new(
         [
-            new Shortcut (Application.GetDefaultKey (Command.Quit), "Quit", QuitEditor),
-            new Shortcut (Key.F2, "Open", OpenFile),
-            new Shortcut (Key.F3, "Save", () => SaveFile ()),
+            new Shortcut(Application.GetDefaultKey(Command.Quit), "Quit", QuitEditor),
+            new Shortcut(Key.F2, "Open", OpenFile),
+            new Shortcut(Key.F3, "Save", () => SaveFile()),
             modifiedShortcut,
             cursorPositionShortcut,
             fileInfoShortcut,
@@ -310,50 +312,50 @@ internal sealed class EditorClet : IViewerClet
 
         // --- Assemble window ---
 
-        window.Add (menu, textView, statusBar);
+        window.Add(menu, textView, statusBar);
 
         // --- Load content after layout ---
 
         window.Initialized += (_, _) =>
         {
-            if (filePath is not null && File.Exists (filePath))
+            if (filePath is not null && File.Exists(filePath))
             {
-                LoadFile (filePath);
+                LoadFile(filePath);
             }
             else if (filePath is not null)
             {
                 // File doesn't exist yet — treat as new file at that path
                 savedText = string.Empty;
                 textView.Text = string.Empty;
-                UpdateTitle ();
+                UpdateTitle();
             }
             else if (content is not null)
             {
                 // Piped content via --initial
                 textView.Text = content;
                 savedText = string.Empty; // Mark as unsaved
-                UpdateModifiedIndicator ();
+                UpdateModifiedIndicator();
             }
 
-            textView.SetFocus ();
+            textView.SetFocus();
         };
 
         // --- Run ---
 
         try
         {
-            await app.RunAsync (window, cancellationToken);
+            await app.RunAsync(window, cancellationToken);
         }
         catch (OperationCanceledException)
         {
-            return new () { Status = CletRunStatus.Cancelled };
+            return new() { Status = CletRunStatus.Cancelled };
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return new () { Status = CletRunStatus.Cancelled };
+            return new() { Status = CletRunStatus.Cancelled };
         }
 
-        return new () { Status = CletRunStatus.Ok };
+        return new() { Status = CletRunStatus.Ok };
     }
 }
