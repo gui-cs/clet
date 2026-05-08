@@ -49,6 +49,8 @@ public class BuiltInCletsTests
     }
 
     [Theory]
+    [InlineData ("edit")]
+    [InlineData ("editor")]
     [InlineData ("md")]
     [InlineData ("markdown")]
     [InlineData ("help")]
@@ -63,11 +65,11 @@ public class BuiltInCletsTests
     }
 
     [Fact]
-    public void RegisterAll_Registers17Clets ()
+    public void RegisterAll_Registers18Clets ()
     {
         CletRegistry registry = new ();
         BuiltInClets.RegisterAll (registry);
 
-        Assert.Equal (17, registry.All.Count);
+        Assert.Equal (18, registry.All.Count);
     }
 }

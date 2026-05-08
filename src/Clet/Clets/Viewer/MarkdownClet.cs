@@ -135,8 +135,8 @@ internal sealed class MarkdownClet : IViewerClet
                     // Navigate local .md files within the sandbox
                     if (currentFileDir is not null && TryResolveLocalMarkdownLink (url, currentFileDir, linkPolicy, out string? resolvedPath, out string? fragment))
                     {
-                        browseBar!.Push (resolvedPath);
-                        LoadFile (resolvedPath, fragment);
+                        browseBar!.Push (resolvedPath!);
+                        LoadFile (resolvedPath!, fragment);
 
                         return true;
                     }
