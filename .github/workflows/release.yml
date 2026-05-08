@@ -1,23 +1,20 @@
 name: Release
 
-# Versioning scheme (mirrors Terminal.Gui):
+# Versioning scheme:
 #
 #   main branch  → v1.0.0-alpha.1, v1.0.0-alpha.2, ...
 #                   (base from csproj <Version>, build number auto-increments)
-#   develop branch → v1.0.0-develop.1, v1.0.0-develop.2, ...
-#                   (tracks main's base version, own build number sequence)
 #
 #   When alpha phase ends, change csproj <Version> to 1.0.0 (no suffix).
 #   Then main produces: v1.0.0, v1.0.1, ... (patch auto-increment).
-#   Develop continues: v1.0.1-develop.1, ...
 #
 # Triggers:
-#   1. Push to main or develop that changes code
+#   1. Push to main that changes code
 #   2. repository_dispatch from gui-cs/Terminal.Gui (any main-branch publish: rc, beta, stable)
 #   3. Manual workflow_dispatch
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths: ['src/**', 'tests/**']
   repository_dispatch:
     types: [tg-main-published]
@@ -74,32 +71,15 @@ jobs:
           # --- Determine TG version ---
           TG_VERSION="$TG_VERSION_INPUT"
 
-          # --- Determine channel (main vs develop) ---
-          BRANCH="${GITHUB_REF_NAME}"
-          # For repository_dispatch (tg-released), target main channel
-          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
-            BRANCH="main"
-          fi
-          if [ "$BRANCH" = "main" ]; then
-            CHANNEL="main"
-          else
-            CHANNEL="develop"
-          fi
+          # --- Channel is always main ---
+          CHANNEL="main"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
 
           # --- Resolve TG version ---
           # Dispatch/manual: use the explicitly provided version.
-          # Develop channel with no explicit version: float to latest TG develop package
-          #   (e.g. "2.0.2-develop.37" → "2.0.2-develop.*", resolved by dotnet restore).
-          # Main channel with no explicit version: use the csproj pin (known-good).
+          # Otherwise: use the csproj pin (known-good).
           if [ -z "$TG_VERSION" ]; then
-            CSPROJ_TG=$(sed -n 's/.*<TerminalGuiVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
-            if [ "$CHANNEL" = "develop" ]; then
-              TG_VERSION="${CSPROJ_TG%.*}.*"
-              echo "::notice::Floating TG version: $TG_VERSION (from csproj pin $CSPROJ_TG)"
-            else
-              TG_VERSION="$CSPROJ_TG"
-            fi
+            TG_VERSION=$(sed -n 's/.*<TerminalGuiVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
           fi
           echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
 
@@ -128,38 +108,26 @@ jobs:
           MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
           PATCH=$(echo "$BASE_VERSION" | cut -d. -f3)
 
-          if [ "$CHANNEL" = "main" ]; then
-            if [ -n "$PHASE" ]; then
-              # Alpha/beta/rc phase: version is BASE-PHASE.N, auto-increment N
-              # Find latest tag matching v1.0.0-alpha.*
-              LATEST_TAG=$(git tag --list "v${BASE_VERSION}-${PHASE}.*" --sort=-v:refname | head -1)
-              if [ -n "$LATEST_TAG" ]; then
-                # Extract the build number (last dot-separated segment)
-                BUILD_NUM=$(echo "$LATEST_TAG" | sed "s/.*${PHASE}\.//" | sed 's/-.*//')
-                BUILD_NUM=$((BUILD_NUM + 1))
-              else
-                BUILD_NUM=1
-              fi
-              CLET_VERSION="${BASE_VERSION}-${PHASE}.${BUILD_NUM}"
-            else
-              # Stable phase: version is MAJOR.MINOR.PATCH, auto-increment patch
-              LATEST_TAG=$(git tag --list "v${MAJOR}.${MINOR}.*" --sort=-v:refname | grep -v '-' | head -1)
-              if [ -n "$LATEST_TAG" ]; then
-                LATEST_PATCH=$(echo "$LATEST_TAG" | sed 's/^v//' | cut -d. -f3)
-                PATCH=$((LATEST_PATCH + 1))
-              fi
-              CLET_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            fi
-          else
-            # Develop channel: version is BASE-develop.N
-            LATEST_TAG=$(git tag --list "v${BASE_VERSION}-develop.*" --sort=-v:refname | head -1)
+          if [ -n "$PHASE" ]; then
+            # Alpha/beta/rc phase: version is BASE-PHASE.N, auto-increment N
+            # Find latest tag matching v1.0.0-alpha.*
+            LATEST_TAG=$(git tag --list "v${BASE_VERSION}-${PHASE}.*" --sort=-v:refname | head -1)
             if [ -n "$LATEST_TAG" ]; then
-              BUILD_NUM=$(echo "$LATEST_TAG" | sed 's/.*develop\.//' | sed 's/-.*//')
+              # Extract the build number (last dot-separated segment)
+              BUILD_NUM=$(echo "$LATEST_TAG" | sed "s/.*${PHASE}\.//" | sed 's/-.*//')
               BUILD_NUM=$((BUILD_NUM + 1))
             else
               BUILD_NUM=1
             fi
-            CLET_VERSION="${BASE_VERSION}-develop.${BUILD_NUM}"
+            CLET_VERSION="${BASE_VERSION}-${PHASE}.${BUILD_NUM}"
+          else
+            # Stable phase: version is MAJOR.MINOR.PATCH, auto-increment patch
+            LATEST_TAG=$(git tag --list "v${MAJOR}.${MINOR}.*" --sort=-v:refname | grep -v '-' | head -1)
+            if [ -n "$LATEST_TAG" ]; then
+              LATEST_PATCH=$(echo "$LATEST_TAG" | sed 's/^v//' | cut -d. -f3)
+              PATCH=$((LATEST_PATCH + 1))
+            fi
+            CLET_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           fi
 
           echo "clet_version=$CLET_VERSION" >> "$GITHUB_OUTPUT"
@@ -229,8 +197,7 @@ jobs:
           retention-days: 30
 
   # Tag every successful build so future runs can find the latest build number.
-  # Main tags: v1.0.0-alpha.3, v1.0.0 (stable)
-  # Develop tags: v1.0.0-develop.5
+  # Tags: v1.0.0-alpha.3, v1.0.0 (stable)
   tag:
     needs: [resolve-version, build]
     runs-on: ubuntu-latest
@@ -252,7 +219,7 @@ jobs:
           fi
 
   # Create a GitHub Release with downloadable AOT binaries for each RID.
-  # Prerelease (alpha, develop) versions are flagged so they are not the
+  # Prerelease (alpha/beta/rc) versions are flagged so they are not the
   # default download target.
   release:
     needs: [resolve-version, build, tag]
@@ -323,7 +290,7 @@ jobs:
               dist/*
           fi
 
-  # NuGet publish runs on both channels. Prerelease versions (alpha/develop)
+  # NuGet publish runs on main only. Prerelease versions (alpha/beta/rc)
   # are hidden from default resolution; consumers opt in via --prerelease.
   publish-nuget:
     needs: [resolve-version, build]

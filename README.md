@@ -39,11 +39,16 @@ dotnet tool install -g clet   # any platform with .NET SDK
 
 ### Pre-Release
 
-Tracks Terminal.Gui's `develop` channel — a new clet prerelease lands on NuGet for every TG develop publish.
-
 ```sh
 dotnet tool install -g clet --prerelease
 ```
+
+> **Upgrading from a `-develop` build?** Develop prereleases are no longer published to NuGet. If you previously installed a `-develop` version, clear the NuGet cache before reinstalling:
+> ```sh
+> dotnet tool uninstall -g clet
+> dotnet nuget locals http-cache --clear
+> dotnet tool install -g clet --prerelease
+> ```
 
 > **zsh/bash users:** If `clet` isn't found after `dotnet tool install`, add the tools directory to your PATH:
 > ```sh
@@ -115,7 +120,7 @@ Exit codes:
 
 ### Demo
 
-![date](./docs/images/date.gif)
+![demo](./docs/images/demo.gif)
 
 ## Alpha feedback
 
@@ -224,7 +229,7 @@ This changes the quit/dismiss key for all clets. `clet md` shows the active quit
 
 ### Q: What's the `--prerelease` channel?
 
-Every push to `develop` triggers a matching `clet` prerelease push to NuGet (versioned `1.x.y-develop.NN`). Stable users see no churn — `dotnet tool install -g clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship stable main releases. If you want the bleeding edge, pass `--prerelease`. 
+Releases from `main` publish prerelease packages to NuGet (versioned `1.x.y-alpha.N` during alpha, then `-beta.N`, `-rc.N`). Stable users see no churn — `dotnet tool install -g clet` still resolves to the latest non-prerelease, and `brew`/`winget` only ship stable main releases. If you want the bleeding edge, pass `--prerelease`.
 
 ### Q: How do I report a bug or give feedback during alpha?
 
