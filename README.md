@@ -29,7 +29,7 @@ Works for humans and AI agents alike.
 
 ## Install
 
-### Release
+### Release (not available until v1.0 is released)
 
 ```sh
 brew install gui-cs/tap/clet  # macOS / Linux
