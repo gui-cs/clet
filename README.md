@@ -120,7 +120,7 @@ Exit codes:
 
 ### Demo
 
-![date](./docs/images/date.gif)
+![demo](./docs/images/demo.gif)
 
 ## Alpha feedback
 
