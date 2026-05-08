@@ -39,7 +39,7 @@ RID is auto-detected from `uname` (Darwin/arm64 → `osx-arm64`, Linux/x86_64 �
 
 **AOT publishing requires a native toolchain** (Xcode CLT on macOS, `clang`+`zlib1g-dev` on Linux, Visual Studio Build Tools 2022 with the *Desktop development with C++* workload on Windows). See `CONTRIBUTING.md` → Prerequisites for the per-platform install commands, or run `make doctor` to check your box.
 
-**Zero warnings policy.** `dotnet build` must produce zero warnings in both Debug and Release configurations. Fix warnings at their source — do not suppress unless the warning is a false positive (document why in the suppression comment). Check with `dotnet build -c Release` before pushing.
+**Zero warnings policy.** `dotnet build` must produce zero warnings in both Debug and Release configurations. Fix warnings at their source — do not suppress unless the warning is a false positive (document why in the suppression comment). Check with `dotnet build -c Release` before pushing. When editing or creating code, ensure no new warnings are introduced — if the build reports warnings in files you touched, fix them before considering the task done. Also fix any pre-existing warnings you encounter in files you're already modifying.
 
 **Code style.** Follow `.editorconfig` and match existing patterns in the file you're editing. Key conventions:
 
