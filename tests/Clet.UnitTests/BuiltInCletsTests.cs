@@ -54,6 +54,7 @@ public class BuiltInCletsTests
     [InlineData ("md")]
     [InlineData ("markdown")]
     [InlineData ("help")]
+    [InlineData ("config")]
     public void RegisterAll_RegistersViewerClet (string alias)
     {
         ICletRegistry registry = new CletRegistry ();
@@ -65,11 +66,11 @@ public class BuiltInCletsTests
     }
 
     [Fact]
-    public void RegisterAll_Registers18Clets ()
+    public void RegisterAll_Registers19Clets ()
     {
         CletRegistry registry = new ();
         BuiltInClets.RegisterAll (registry);
 
-        Assert.Equal (18, registry.All.Count);
+        Assert.Equal (19, registry.All.Count);
     }
 }

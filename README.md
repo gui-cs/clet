@@ -26,6 +26,8 @@ Works for humans and AI agents alike.
 | `pick-directory`, `dir` | Opens a directory picker dialog and returns the selected directory path. | `--root` |
 | `linear-range`, `range` | Presents a linear range selector (single, multi, or bounded range) over labelled options. | `--mode`, `--options`, `--range-kind`, `args...` |
 | `md`, `markdown` | Browse and render Markdown files with link navigation and syntax highlighting. | `--theme`, `--cat`, `--no-browse`, `args...` |
+| `edit`, `editor` | Opens a full-screen text editor for files or piped content. | `args...` |
+| `config` | Edit the clet configuration file (`~/.tui/clet.config.json`). | |
 
 ## Install
 
@@ -69,6 +71,7 @@ Standalone NativeAOT binaries (no .NET runtime required) are available for macOS
 | Pick a file | `gum file` (fuzzy filter) | `clet pick-file` (real tree dialog) |
 | Confirm an action | `read -p "Sure? [y/N]"` | `clet confirm "Deploy to prod?"` |
 | Render Markdown | `glow` / `bat` / `mdcat` | `clet md ./CHANGELOG.md` |
+| Quick text editing | `nano` / `vi` / `micro` | `clet edit ./notes.txt` |
 | Multiple tools, mismatched exit codes | `read` + `dialog` + `fzf` + `glow` | `clet` — one tool, one contract |
 
 ## Usage
@@ -87,6 +90,12 @@ clet confirm "This will delete 40k rows. Continue?"
 
 # Render a Markdown file — full-screen, dismiss with q / Esc
 clet md ./CHANGELOG.md
+
+# Edit a file in the built-in editor
+clet edit ./notes.txt
+
+# Open the configuration editor (theming, keybindings, etc.)
+clet config
 
 # See all available clets
 clet list
@@ -169,7 +178,7 @@ Esc and Ctrl-C cancel input clets; `q`, Esc, and Ctrl-C dismiss viewer clets. `-
 
 **Input (14):** `text`, `int`, `decimal`, `select`, `multi-select`, `confirm`, `pick-file`, `pick-directory`, `date`, `time`, `duration`, `color`, `attribute-picker`, `linear-range`
 
-**Browser (1):** `md` (Markdown browser with link navigation, back/forward history, and syntax highlighting)
+**Viewer (4):** `md` (Markdown browser with link navigation, back/forward history, and syntax highlighting), `edit` (full-screen text editor), `config` (configuration editor for `~/.tui/clet.config.json`), `help`
 
 Run `clet list` to see what's available in your installed version.
 

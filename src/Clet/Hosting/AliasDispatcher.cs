@@ -1,3 +1,4 @@
+using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 
@@ -59,7 +60,21 @@ internal sealed class AliasDispatcher
         BoxedCletResult result;
 
         {
-            ConfigurationManager.Enable (ConfigLocations.All);
+            try
+            {
+                Logging.Information ("AliasDispatcher: calling ConfigurationManager.Enable(All)");
+                ConfigurationManager.Enable (ConfigLocations.All);
+                Logging.Information ("AliasDispatcher: Enable(All) succeeded");
+            }
+            catch (Exception ex)
+            {
+                Logging.Error ($"AliasDispatcher: Enable(All) threw {ex.GetType ().Name}: {ex.Message}");
+
+                // Bad config should not prevent clet from running — fall back to defaults
+                ConfigurationManager.Disable (resetToHardCodedDefaults: true);
+                ConfigurationManager.Enable (ConfigLocations.None);
+                Logging.Information ("AliasDispatcher: fell back to hard-coded defaults");
+            }
 
             bool useFullscreen = options.Fullscreen || clet.Kind == CletKind.Viewer;
             Application.AppModel = useFullscreen ? AppModel.FullScreen : AppModel.Inline;
@@ -69,14 +84,18 @@ internal sealed class AliasDispatcher
 
             try
             {
+                Logging.Information ("AliasDispatcher: calling RunBoxedAsync");
                 result = await clet.RunBoxedAsync (app, initial, options, linkedSource.Token);
+                Logging.Information ($"AliasDispatcher: RunBoxedAsync returned {result.Status}");
             }
             catch (OperationCanceledException)
             {
+                Logging.Information ("AliasDispatcher: RunBoxedAsync was cancelled");
                 result = new (CletRunStatus.Cancelled, null, null, null);
             }
             catch (Exception ex)
             {
+                Logging.Error ($"AliasDispatcher: RunBoxedAsync threw {ex.GetType ().Name}: {ex.Message}\n{ex.StackTrace}");
                 result = new (CletRunStatus.Error, null, "io", ex.Message);
             }
         }

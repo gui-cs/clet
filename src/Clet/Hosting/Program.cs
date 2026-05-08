@@ -1,9 +1,14 @@
+using Terminal.Gui.App;
+
 namespace Clet;
 
 internal static class Program
 {
     public static async Task<int> Main (string[] args)
     {
+        CletLogging.Initialize ();
+        Logging.Information ($"clet starting with args: [{string.Join (", ", args)}]");
+
         using CancellationTokenSource cts = new ();
         Console.CancelKeyPress += (_, e) =>
         {
