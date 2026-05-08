@@ -52,6 +52,10 @@ dotnet tool install -g clet --prerelease
 > ```
 > PowerShell does this automatically; zsh and bash do not.
 
+### Native binaries (direct download)
+
+Standalone NativeAOT binaries (no .NET runtime required) are available for macOS, Linux, and Windows. See [full install instructions](#native-binaries-install) at the bottom of this file.
+
 ## What it replaces
 
 | Task | Before `clet` | With `clet` |
@@ -214,7 +218,7 @@ This changes the quit/dismiss key for all clets. `clet md` shows the active quit
 
 ### Q: Do I need .NET installed?
 
-**No** - for `brew install` and `winget install` — those ship a self-contained NativeAOT binary (~8 MB, no runtime needed).
+**No** - for `brew install`, `winget install`, and the [direct-download native binaries](#native-binaries-install) on the GitHub Releases page — all three ship a self-contained NativeAOT binary (~8 MB, no runtime needed). The direct-download binaries are *not yet code-signed*; the `brew` and `winget` channels stay signed.
 
 **Yes** - for `dotnet tool install -g clet`.
 
@@ -225,6 +229,58 @@ Every push to `develop` triggers a matching `clet` prerelease push to NuGet (ver
 ### Q: How do I report a bug or give feedback during alpha?
 
 [File an issue](https://github.com/gui-cs/clet/issues/new). That's the only feedback channel — no Discussions, no forum. See the [Alpha feedback](#alpha-feedback) section above for what to include.
+
+## Native binaries install
+
+Every [GitHub release](https://github.com/gui-cs/clet/releases) ships standalone NativeAOT binaries for the three primary platforms. **No .NET runtime required** — single-file executable, ~20 MB, cold-start in tens of milliseconds.
+
+| Platform | Asset |
+|---|---|
+| macOS (Apple Silicon) | `clet-<version>-osx-arm64.tar.gz` |
+| Linux x64 | `clet-<version>-linux-x64.tar.gz` |
+| Windows x64 | `clet-<version>-win-x64.zip` |
+
+> **Not yet code-signed.** Apple/Windows code signing is deferred until after v1.0. macOS Gatekeeper will quarantine the binary on first run, and Windows SmartScreen may warn. If you don't want to bypass those prompts, use `brew` / `winget` / `dotnet tool install` instead — those channels stay signed.
+
+**macOS (Apple Silicon):**
+```sh
+# Replace <version> with the release tag, e.g. 1.0.0-develop.41
+curl -LO https://github.com/gui-cs/clet/releases/latest/download/clet-<version>-osx-arm64.tar.gz
+tar -xzf clet-<version>-osx-arm64.tar.gz
+xattr -d com.apple.quarantine ./clet  # clear Gatekeeper quarantine
+sudo mv clet /usr/local/bin/
+clet --version
+```
+
+**Linux x64:**
+```sh
+curl -LO https://github.com/gui-cs/clet/releases/latest/download/clet-<version>-linux-x64.tar.gz
+tar -xzf clet-<version>-linux-x64.tar.gz
+chmod +x ./clet
+sudo mv clet /usr/local/bin/
+clet --version
+```
+
+**Windows x64 (PowerShell):**
+```powershell
+# Replace <version> with the release tag
+Invoke-WebRequest -Uri "https://github.com/gui-cs/clet/releases/latest/download/clet-<version>-win-x64.zip" -OutFile clet.zip
+Expand-Archive clet.zip -DestinationPath $env:USERPROFILE\bin\clet
+# Add $env:USERPROFILE\bin\clet to your PATH, then:
+clet --version
+```
+
+If SmartScreen blocks the download, click **More info → Run anyway**, or unblock the file with `Unblock-File .\clet.exe`.
+
+### About `libonigwrap`
+
+Each archive includes a native library (`libonigwrap.dylib` on macOS, `libonigwrap.so` on Linux, `onigwrap.dll` on Windows). This is the [Oniguruma](https://github.com/kkos/oniguruma) regex engine used by TextMateSharp for **syntax highlighting in code blocks** when viewing Markdown (`clet md`).
+
+The `clet` binary runs fine without it — everything works except syntax highlighting in fenced code blocks will be plain text. If you want syntax highlighting, keep the library in the same directory as the `clet` binary. On macOS, clear its quarantine flag too:
+
+```sh
+xattr -d com.apple.quarantine ./libonigwrap.dylib
+```
 
 ## Further reading
 
