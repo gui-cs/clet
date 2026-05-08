@@ -13,14 +13,14 @@ name: Release
 #
 # Triggers:
 #   1. Push to main or develop that changes code
-#   2. repository_dispatch from gui-cs/Terminal.Gui
+#   2. repository_dispatch from gui-cs/Terminal.Gui (stable releases only)
 #   3. Manual workflow_dispatch
 on:
   push:
     branches: [main, develop]
     paths: ['src/**', 'tests/**']
   repository_dispatch:
-    types: [tg-released, tg-develop-published]
+    types: [tg-released]
   workflow_dispatch:
     inputs:
       tg_version:
@@ -76,9 +76,9 @@ jobs:
 
           # --- Determine channel (main vs develop) ---
           BRANCH="${GITHUB_REF_NAME}"
-          # For repository_dispatch, default to develop; for workflow_dispatch, use current branch
+          # For repository_dispatch (tg-released), target main channel
           if [ "$EVENT_NAME" = "repository_dispatch" ]; then
-            BRANCH="develop"
+            BRANCH="main"
           fi
           if [ "$BRANCH" = "main" ]; then
             CHANNEL="main"
