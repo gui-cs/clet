@@ -21,6 +21,7 @@ internal static class BuiltInClets
         registry.Register (new LinearRangeClet ());
         registry.Register (new EditorClet ());
         registry.Register (new MarkdownClet ());
+        registry.Register (new ConfigClet ());
         registry.Register (new HelpClet (registry));
     }
 }
