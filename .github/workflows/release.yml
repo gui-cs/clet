@@ -13,14 +13,14 @@ name: Release
 #
 # Triggers:
 #   1. Push to main or develop that changes code
-#   2. repository_dispatch from gui-cs/Terminal.Gui (stable releases only)
+#   2. repository_dispatch from gui-cs/Terminal.Gui (any main-branch publish: rc, beta, stable)
 #   3. Manual workflow_dispatch
 on:
   push:
     branches: [main, develop]
     paths: ['src/**', 'tests/**']
   repository_dispatch:
-    types: [tg-released]
+    types: [tg-main-published]
   workflow_dispatch:
     inputs:
       tg_version:
