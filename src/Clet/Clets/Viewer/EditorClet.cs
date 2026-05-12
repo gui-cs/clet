@@ -1,6 +1,7 @@
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
+using Terminal.Gui.Text.Document;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Command = Terminal.Gui.Input.Command;
@@ -60,13 +61,15 @@ internal sealed class EditorClet : IViewerClet
             BorderStyle = LineStyle.None,
         };
 
-        TextView textView = new()
+        Editor editor = new()
         {
             X = 0,
             Y = 1, // below MenuBar
             Width = Dim.Fill(),
             Height = Dim.Fill(1), // above StatusBar
             ReadOnly = readOnly,
+            ShowLineNumbers = true,
+            ConvertTabsToSpaces = true,
         };
 
         // --- StatusBar shortcuts (declared early for capture) ---
@@ -79,7 +82,7 @@ internal sealed class EditorClet : IViewerClet
 
         // --- Local state helpers ---
 
-        bool UnsavedChanges() => !string.Equals(savedText, textView.Text, StringComparison.Ordinal);
+        bool UnsavedChanges() => editor.Document?.UndoStack.IsOriginalFile == false;
 
         void UpdateModifiedIndicator()
         {
@@ -92,6 +95,21 @@ internal sealed class EditorClet : IViewerClet
         {
             fileInfoShortcut.Title = fileName ?? "Untitled";
             UpdateModifiedIndicator();
+        }
+
+        void UpdateLocShortcut()
+        {
+            TextDocument? document = editor.Document;
+
+            if (document is null)
+            {
+                cursorPositionShortcut.Title = "Ln 1, Col 1";
+            }
+            else
+            {
+                DocumentLine line = document.GetLineByOffset(editor.CaretOffset);
+                cursorPositionShortcut.Title = $"Ln {line.LineNumber}, Col {editor.CaretOffset - line.Offset + 1}";
+            }
         }
 
         // --- File operations ---
@@ -107,7 +125,7 @@ internal sealed class EditorClet : IViewerClet
                 fileName = Path.GetFileName(fullPath);
                 lastDirectory = Path.GetDirectoryName(fullPath);
                 savedText = string.Empty;
-                textView.Text = string.Empty;
+                editor.Document = new TextDocument();
                 UpdateTitle();
 
                 return;
@@ -118,8 +136,9 @@ internal sealed class EditorClet : IViewerClet
             fileName = Path.GetFileName(fullPath);
             lastDirectory = Path.GetDirectoryName(fullPath);
             savedText = text;
-            textView.Text = text;
-            textView.ClearHistoryChanges();
+            editor.ClearSelection();
+            editor.Document = new TextDocument(text);
+            editor.CaretOffset = 0;
             UpdateTitle();
         }
 
@@ -132,9 +151,9 @@ internal sealed class EditorClet : IViewerClet
 
             try
             {
-                File.WriteAllText(filePath, textView.Text);
-                savedText = textView.Text;
-                textView.ClearHistoryChanges();
+                File.WriteAllText(filePath, editor.Document?.Text ?? string.Empty);
+                savedText = editor.Document?.Text ?? string.Empty;
+                editor.Document?.UndoStack.MarkAsOriginalFile();
                 UpdateModifiedIndicator();
             }
             catch (Exception ex)
@@ -215,8 +234,9 @@ internal sealed class EditorClet : IViewerClet
             filePath = null;
             fileName = null;
             savedText = string.Empty;
-            textView.Text = string.Empty;
-            textView.ClearHistoryChanges();
+            editor.ClearSelection();
+            editor.Document = new TextDocument();
+            editor.CaretOffset = 0;
             UpdateTitle();
         }
 
@@ -263,6 +283,53 @@ internal sealed class EditorClet : IViewerClet
             window.RequestStop();
         }
 
+        // --- Clipboard helpers (Editor doesn't have built-in clipboard commands) ---
+
+        void Paste()
+        {
+            if (editor.ReadOnly)
+            {
+                return;
+            }
+
+            IClipboard? clipboard = app.Clipboard;
+
+            if (clipboard is null || !clipboard.TryGetClipboardData(out string contents))
+            {
+                return;
+            }
+
+            if (editor.HasSelection)
+            {
+                editor.ReplaceSelection(contents);
+            }
+            else
+            {
+                editor.Document?.Insert(editor.CaretOffset, contents);
+            }
+        }
+
+        void Copy()
+        {
+            if (!editor.HasSelection)
+            {
+                return;
+            }
+
+            app.Clipboard?.TrySetClipboardData(editor.SelectedText);
+        }
+
+        void Cut()
+        {
+            if (editor.ReadOnly || !editor.HasSelection)
+            {
+                return;
+            }
+
+            Copy();
+            editor.ReplaceSelection(string.Empty);
+        }
+
         // --- MenuBar ---
 
         MenuBar menu = new();
@@ -279,23 +346,22 @@ internal sealed class EditorClet : IViewerClet
 
         menu.Add(new MenuBarItem("_Edit",
         [
-            new MenuItem { Title = "_Undo", Key = Key.Z.WithCtrl, Action = () => textView.Undo() },
-            new MenuItem { Title = "_Redo", Key = Key.Y.WithCtrl, Action = () => textView.Redo() },
+            new MenuItem { Title = "_Undo", Key = Key.Z.WithCtrl, Action = () => editor.Document?.UndoStack.Undo() },
+            new MenuItem { Title = "_Redo", Key = Key.Y.WithCtrl, Action = () => editor.Document?.UndoStack.Redo() },
             null!, // separator
-            new MenuItem { Title = "Cu_t", Key = Key.X.WithCtrl, Action = () => textView.Cut() },
-            new MenuItem { Title = "_Copy", Key = Key.C.WithCtrl, Action = () => textView.Copy() },
-            new MenuItem { Title = "_Paste", Key = Key.V.WithCtrl, Action = () => textView.Paste() },
+            new MenuItem { Title = "Cu_t", Key = Key.X.WithCtrl, Action = Cut },
+            new MenuItem { Title = "_Copy", Key = Key.C.WithCtrl, Action = Copy },
+            new MenuItem { Title = "_Paste", Key = Key.V.WithCtrl, Action = Paste },
             null!, // separator
-            new MenuItem { Title = "Select _All", Key = Key.A.WithCtrl, Action = () => textView.SelectAll() },
+            new MenuItem { Title = "Select _All", Key = Key.A.WithCtrl, Action = () => editor.SelectAll() },
         ]));
 
         // --- Wire events ---
 
-        textView.ContentsChanged += (_, _) => UpdateModifiedIndicator();
-
-        textView.UnwrappedCursorPositionChanged += (_, e) =>
+        editor.CaretChanged += (_, _) =>
         {
-            cursorPositionShortcut.Title = $"Ln {e.Y + 1}, Col {e.X + 1}";
+            UpdateModifiedIndicator();
+            UpdateLocShortcut();
         };
 
         // --- StatusBar ---
@@ -312,7 +378,7 @@ internal sealed class EditorClet : IViewerClet
 
         // --- Assemble window ---
 
-        window.Add(menu, textView, statusBar);
+        window.Add(menu, editor, statusBar);
 
         // --- Load content after layout ---
 
@@ -326,18 +392,18 @@ internal sealed class EditorClet : IViewerClet
             {
                 // File doesn't exist yet — treat as new file at that path
                 savedText = string.Empty;
-                textView.Text = string.Empty;
+                editor.Document = new TextDocument();
                 UpdateTitle();
             }
             else if (content is not null)
             {
                 // Piped content via --initial
-                textView.Text = content;
+                editor.Document = new TextDocument(content);
                 savedText = string.Empty; // Mark as unsaved
                 UpdateModifiedIndicator();
             }
 
-            textView.SetFocus();
+            editor.SetFocus();
         };
 
         // --- Run ---

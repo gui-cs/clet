@@ -3,6 +3,7 @@ using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
+using Terminal.Gui.Text.Document;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Command = Terminal.Gui.Input.Command;
@@ -52,24 +53,32 @@ internal sealed class ConfigClet : IViewerClet
             Height = Dim.Fill (),
         };
 
-        TextView editor = new ()
+        Editor editor = new ()
         {
             Width = Dim.Fill (),
             Height = Dim.Fill (1), // leave room for StatusBar
-            Text = configText,
-            Multiline = true,
-            TabWidth = 2,
+            ConvertTabsToSpaces = true,
+            IndentationSize = 2,
+            ShowLineNumbers = true,
         };
 
-        editor.ContentsChanged += (_, _) =>
+        editor.Document = new TextDocument (configText);
+
+        editor.CaretChanged += (_, _) =>
+        {
+            TextDocument? document = editor.Document;
+
+            if (document is not null)
+            {
+                DocumentLine line = document.GetLineByOffset (editor.CaretOffset);
+                cursorPosition.Title = $"Ln {line.LineNumber}, Col {editor.CaretOffset - line.Offset + 1}";
+            }
+        };
+
+        editor.Document.TextChanged += (_, _) =>
         {
             isDirty = true;
             UpdateTitle ();
-        };
-
-        editor.UnwrappedCursorPositionChanged += (_, _) =>
-        {
-            cursorPosition.Title = $"Ln {editor.CurrentRow + 1}, Col {editor.CurrentColumn + 1}";
         };
 
         // --- StatusBar ---
@@ -138,7 +147,7 @@ internal sealed class ConfigClet : IViewerClet
 
             try
             {
-                File.WriteAllText (configPath, editor.Text);
+                File.WriteAllText (configPath, editor.Document?.Text ?? string.Empty);
                 isDirty = false;
                 UpdateTitle ();
                 Logging.Information ("ConfigClet: file written successfully");
@@ -183,7 +192,7 @@ internal sealed class ConfigClet : IViewerClet
 
         void ShowJsonErrorDialog (JsonException ex)
         {
-            // Extract line number (0-based in JsonException, convert to 0-based row for TextView)
+            // Extract line number (0-based in JsonException)
             int errorRow = ex.LineNumber.HasValue ? (int)ex.LineNumber.Value : 0;
             int errorCol = ex.BytePositionInLine.HasValue ? (int)ex.BytePositionInLine.Value : 0;
 
@@ -206,8 +215,15 @@ internal sealed class ConfigClet : IViewerClet
                 "Go to Error");
 
             // Navigate the cursor to the error location
-            editor.MoveHome ();
-            editor.InsertionPoint = new System.Drawing.Point (errorCol, errorRow);
+            TextDocument? document = editor.Document;
+
+            if (document is not null && errorRow < document.LineCount)
+            {
+                DocumentLine line = document.GetLineByNumber (errorRow + 1); // 1-based
+                int offset = line.Offset + Math.Min (errorCol, line.Length);
+                editor.CaretOffset = offset;
+            }
+
             editor.SetFocus ();
         }
 

@@ -37,6 +37,7 @@
 
   <ItemGroup>
     <PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />
+    <PackageReference Include="Terminal.Gui.Editor" Version="2.1.1-develop.*" />
     <!--
       Workaround: TG's transitive TextMateSharp reference doesn't flow into
       `dotnet publish` output (only TextMateSharp.Grammars does), so the
