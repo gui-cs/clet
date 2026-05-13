@@ -45,7 +45,8 @@ internal sealed class EditorClet : IViewerClet
             FileAccessPolicy policy = new (
                 Directory.GetCurrentDirectory (),
                 options.AllowedFiles,
-                options.AllowBinary);
+                options.AllowBinary,
+                allowAllExtensions: true);
 
             files = MarkdownContentResolver.ExpandFiles (args, policy, out string? policyError);
 

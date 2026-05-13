@@ -248,18 +248,39 @@ public class FileAccessPolicyTests
     }
 
     [Fact]
-    public void MarkdownExtension_IsAllowed ()
+    public void AllowAllExtensions_BypassesExtensionCheck ()
     {
         string cwd = Path.GetTempPath ();
-        string file = Path.Combine (cwd, "readme.markdown");
-        File.WriteAllText (file, "# hello");
+        string file = Path.Combine (cwd, "program.cs");
+        File.WriteAllText (file, "namespace Foo;");
 
         try
         {
-            FileAccessPolicy policy = new (cwd, allowedFiles: null, allowBinary: false);
+            FileAccessPolicy policy = new (cwd, allowedFiles: null, allowBinary: false, allowAllExtensions: true);
             string? error = policy.CheckFile (file);
 
             Assert.Null (error);
+        }
+        finally
+        {
+            File.Delete (file);
+        }
+    }
+
+    [Fact]
+    public void AllowAllExtensions_False_StillEnforcesExtensionCheck ()
+    {
+        string cwd = Path.GetTempPath ();
+        string file = Path.Combine (cwd, "secrets.conf");
+        File.WriteAllText (file, "key=value");
+
+        try
+        {
+            FileAccessPolicy policy = new (cwd, allowedFiles: null, allowBinary: false, allowAllExtensions: false);
+            string? error = policy.CheckFile (file);
+
+            Assert.NotNull (error);
+            Assert.Contains ("not in the allowlist", error);
         }
         finally
         {
