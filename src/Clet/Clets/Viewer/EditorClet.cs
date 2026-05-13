@@ -77,12 +77,7 @@ internal sealed class EditorClet : IViewerClet
 
         if (filePath is not null)
         {
-            string ext = Path.GetExtension (filePath);
-
-            if (!string.IsNullOrEmpty (ext))
-            {
-                editor.SyntaxLanguage = ext;
-            }
+            editor.SyntaxLanguage = Path.GetExtension (filePath);
         }
 #pragma warning restore CS0618
 
@@ -114,12 +109,7 @@ internal sealed class EditorClet : IViewerClet
 #pragma warning disable CS0618 // SyntaxLanguage is a stopgap API (see gui-cs/Text #32)
         void UpdateSyntaxLanguage (string path)
         {
-            string ext = Path.GetExtension (path);
-
-            if (!string.IsNullOrEmpty (ext))
-            {
-                editor.SyntaxLanguage = ext;
-            }
+            editor.SyntaxLanguage = Path.GetExtension (path);
         }
 #pragma warning restore CS0618
 
