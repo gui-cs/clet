@@ -11,17 +11,21 @@ name: Release
 # Triggers:
 #   1. Push to main that changes code
 #   2. repository_dispatch from gui-cs/Terminal.Gui (any main-branch publish: rc, beta, stable)
-#   3. Manual workflow_dispatch
+#   3. repository_dispatch from gui-cs/Editor (any main-branch publish)
+#   4. Manual workflow_dispatch
 on:
   push:
     branches: [main]
     paths: ['src/**', 'tests/**']
   repository_dispatch:
-    types: [tg-main-published]
+    types: [tg-main-published, editor-main-published]
   workflow_dispatch:
     inputs:
       tg_version:
         description: 'Terminal.Gui version to build against. Leave empty for csproj default.'
+        required: false
+      tge_version:
+        description: 'Terminal.Gui.Editor version to build against. Leave empty for csproj default.'
         required: false
       version_override:
         description: 'Override clet version entirely. Leave empty for auto-computed.'
@@ -41,6 +45,7 @@ jobs:
     outputs:
       clet_version: ${{ steps.version.outputs.clet_version }}
       tg_version: ${{ steps.version.outputs.tg_version }}
+      tge_version: ${{ steps.version.outputs.tge_version }}
       channel: ${{ steps.version.outputs.channel }}
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +58,7 @@ jobs:
         shell: bash
         env:
           TG_VERSION_INPUT: ${{ github.event.client_payload.tg_version || github.event.inputs.tg_version }}
+          TGE_VERSION_INPUT: ${{ github.event.client_payload.tge_version || github.event.inputs.tge_version }}
           VERSION_OVERRIDE: ${{ github.event.inputs.version_override }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
@@ -61,6 +67,10 @@ jobs:
           VERSION_PATTERN='^[0-9A-Za-z._+*-]+$'
           if [ -n "$TG_VERSION_INPUT" ] && ! [[ "$TG_VERSION_INPUT" =~ $VERSION_PATTERN ]]; then
             echo "::error::tg_version input contains invalid characters: $TG_VERSION_INPUT"
+            exit 2
+          fi
+          if [ -n "$TGE_VERSION_INPUT" ] && ! [[ "$TGE_VERSION_INPUT" =~ $VERSION_PATTERN ]]; then
+            echo "::error::tge_version input contains invalid characters: $TGE_VERSION_INPUT"
             exit 2
           fi
           if [ -n "$VERSION_OVERRIDE" ] && ! [[ "$VERSION_OVERRIDE" =~ $VERSION_PATTERN ]]; then
@@ -83,6 +93,15 @@ jobs:
           fi
           echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
 
+          # --- Resolve TGE version ---
+          # Dispatch/manual: use the explicitly provided version.
+          # Otherwise: use the csproj pin (known-good).
+          TGE_VERSION="$TGE_VERSION_INPUT"
+          if [ -z "$TGE_VERSION" ]; then
+            TGE_VERSION=$(sed -n 's/.*<TerminalGuiEditorVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
+          fi
+          echo "tge_version=$TGE_VERSION" >> "$GITHUB_OUTPUT"
+
           # --- Determine clet version ---
           if [ -n "$VERSION_OVERRIDE" ]; then
             CLET_VERSION="$VERSION_OVERRIDE"
@@ -90,6 +109,7 @@ jobs:
             echo "## Version Resolution" >> "$GITHUB_STEP_SUMMARY"
             echo "- clet version: \`$CLET_VERSION\` (manual override)" >> "$GITHUB_STEP_SUMMARY"
             echo "- TG version: \`$TG_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- TGE version: \`$TGE_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
             echo "- channel: \`$CHANNEL\`" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -134,6 +154,7 @@ jobs:
           echo "## Version Resolution" >> "$GITHUB_STEP_SUMMARY"
           echo "- clet version: \`$CLET_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- TG version: \`$TG_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- TGE version: \`$TGE_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- channel: \`$CHANNEL\`" >> "$GITHUB_STEP_SUMMARY"
 
   build:
@@ -152,6 +173,7 @@ jobs:
     env:
       CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
       TG_VERSION: ${{ needs.resolve-version.outputs.tg_version }}
+      TGE_VERSION: ${{ needs.resolve-version.outputs.tge_version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -162,10 +184,10 @@ jobs:
           dotnet-quality: 'preview'
 
       - name: Restore
-        run: dotnet restore -p:TerminalGuiVersion=${{ env.TG_VERSION }}
+        run: dotnet restore -p:TerminalGuiVersion=${{ env.TG_VERSION }} -p:TerminalGuiEditorVersion=${{ env.TGE_VERSION }}
 
       - name: Build
-        run: dotnet build --no-restore -c Release -p:TerminalGuiVersion=${{ env.TG_VERSION }} -p:Version=${{ env.CLET_VERSION }}
+        run: dotnet build --no-restore -c Release -p:TerminalGuiVersion=${{ env.TG_VERSION }} -p:TerminalGuiEditorVersion=${{ env.TGE_VERSION }} -p:Version=${{ env.CLET_VERSION }}
 
       - name: Unit Tests
         shell: bash
@@ -182,6 +204,7 @@ jobs:
           --self-contained
           -p:PublishAot=true
           -p:TerminalGuiVersion=${{ env.TG_VERSION }}
+          -p:TerminalGuiEditorVersion=${{ env.TGE_VERSION }}
           -p:Version=${{ env.CLET_VERSION }}
           -o publish/${{ matrix.rid }}
 
@@ -298,6 +321,7 @@ jobs:
     env:
       CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
       TG_VERSION: ${{ needs.resolve-version.outputs.tg_version }}
+      TGE_VERSION: ${{ needs.resolve-version.outputs.tge_version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -311,6 +335,7 @@ jobs:
         run: >
           dotnet pack src/Clet -c Release
           -p:TerminalGuiVersion=${{ env.TG_VERSION }}
+          -p:TerminalGuiEditorVersion=${{ env.TGE_VERSION }}
           -p:Version=${{ env.CLET_VERSION }}
           -o packages/
 
