@@ -248,7 +248,27 @@ public class FileAccessPolicyTests
     }
 
     [Fact]
-    public void AllowAllExtensions_BypassesExtensionCheck ()
+    public void MarkdownExtension_IsAllowed ()
+    {
+        string cwd = Path.GetTempPath ();
+        string file = Path.Combine (cwd, "readme.markdown");
+        File.WriteAllText (file, "# hello");
+
+        try
+        {
+            FileAccessPolicy policy = new (cwd, allowedFiles: null, allowBinary: false);
+            string? error = policy.CheckFile (file);
+
+            Assert.Null (error);
+        }
+        finally
+        {
+            File.Delete (file);
+        }
+    }
+
+    [Fact]
+    public void DisallowedExtension_IsAllowed_WhenAllowAllExtensionsTrue ()
     {
         string cwd = Path.GetTempPath ();
         string file = Path.Combine (cwd, "program.cs");
@@ -268,7 +288,7 @@ public class FileAccessPolicyTests
     }
 
     [Fact]
-    public void AllowAllExtensions_False_StillEnforcesExtensionCheck ()
+    public void DisallowedExtension_IsRefused_WhenAllowAllExtensionsFalse ()
     {
         string cwd = Path.GetTempPath ();
         string file = Path.Combine (cwd, "secrets.conf");
