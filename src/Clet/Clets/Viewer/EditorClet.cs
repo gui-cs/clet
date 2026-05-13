@@ -58,6 +58,25 @@ internal sealed class EditorClet : IViewerClet
                     ErrorMessage = policyError,
                 };
             }
+
+            // Preserve explicit (non-glob) paths for files that don't exist yet.
+            // ExpandFiles skips missing files with a warning; for edit we want to
+            // open a new empty buffer bound to the given path.
+            foreach (string arg in args)
+            {
+                // Skip glob patterns (only * and ? are wildcards — matching ExpandFiles / Directory.GetFiles semantics).
+                if (arg.Contains ('*') || arg.Contains ('?'))
+                {
+                    continue;
+                }
+
+                string fullPath = Path.GetFullPath (arg);
+
+                if (!files.Contains (fullPath))
+                {
+                    files.Add (fullPath);
+                }
+            }
         }
 
         string? filePath = files.Count > 0 ? files [0] : null;
@@ -416,14 +435,22 @@ internal sealed class EditorClet : IViewerClet
 
         if (files.Count > 1)
         {
-            List<string> fileNames = [.. files.Select (f => Path.GetFileName (f) ?? f)];
-            ObservableCollection<string> fileNamesOc = new (fileNames!);
+            // Use basenames when they are all distinct; fall back to relative paths
+            // so that files like a/readme.md and b/readme.md get unique labels.
+            List<string> basenames = [.. files.Select (f => Path.GetFileName (f) ?? f)];
+            bool hasCollisions = basenames.Count != basenames.Distinct (StringComparer.OrdinalIgnoreCase).Count ();
+            string cwd = Directory.GetCurrentDirectory ();
+            List<string> displayNames = hasCollisions
+                ? [.. files.Select (f => Path.GetRelativePath (cwd, f))]
+                : basenames;
+
+            ObservableCollection<string> displayNamesOc = new (displayNames);
 
             fileSelector = new DropDownList ()
             {
-                Source = new ListWrapper<string> (fileNamesOc),
+                Source = new ListWrapper<string> (displayNamesOc),
                 ReadOnly = true,
-                Text = fileNames [0] ?? string.Empty,
+                Text = displayNames [0],
                 Width = Dim.Auto (DimAutoStyle.Text, minimumContentDim: 20),
             };
 
@@ -436,8 +463,9 @@ internal sealed class EditorClet : IViewerClet
                     return;
                 }
 
-                string selectedName = fileSelector.Text;
-                int index = fileNames.IndexOf (selectedName);
+                // Use the unique display name list — since labels are guaranteed distinct,
+                // IndexOf is unambiguous even when files share the same basename.
+                int index = displayNames.IndexOf (fileSelector.Text);
 
                 if (index < 0 || index >= files.Count)
                 {
@@ -452,7 +480,7 @@ internal sealed class EditorClet : IViewerClet
 
                     if (currentIndex >= 0)
                     {
-                        fileSelector.Text = fileNames [currentIndex];
+                        fileSelector.Text = displayNames [currentIndex];
                     }
 
                     switchingFile = false;
