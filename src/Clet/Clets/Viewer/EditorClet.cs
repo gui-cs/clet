@@ -1,7 +1,7 @@
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
-using Terminal.Gui.Text.Document;
+using Terminal.Gui.Document;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Command = Terminal.Gui.Input.Command;
@@ -61,16 +61,30 @@ internal sealed class EditorClet : IViewerClet
             BorderStyle = LineStyle.None,
         };
 
-        Editor editor = new()
+        Editor editor = new ()
         {
             X = 0,
             Y = 1, // below MenuBar
-            Width = Dim.Fill(),
-            Height = Dim.Fill(1), // above StatusBar
+            Width = Dim.Fill (),
+            Height = Dim.Fill (1), // above StatusBar
             ReadOnly = readOnly,
             ShowLineNumbers = true,
             ConvertTabsToSpaces = true,
         };
+
+#pragma warning disable CS0618 // SyntaxHighlighter/SyntaxLanguage are stopgap APIs (see gui-cs/Text #32)
+        editor.SyntaxHighlighter = new TextMateSyntaxHighlighter ();
+
+        if (filePath is not null)
+        {
+            string ext = Path.GetExtension (filePath);
+
+            if (!string.IsNullOrEmpty (ext))
+            {
+                editor.SyntaxLanguage = ext;
+            }
+        }
+#pragma warning restore CS0618
 
         // --- StatusBar shortcuts (declared early for capture) ---
 
@@ -91,11 +105,23 @@ internal sealed class EditorClet : IViewerClet
             window.Title = dirty ? $"{fileName ?? "Untitled"}*" : fileName ?? "Untitled";
         }
 
-        void UpdateTitle()
+        void UpdateTitle ()
         {
             fileInfoShortcut.Title = fileName ?? "Untitled";
-            UpdateModifiedIndicator();
+            UpdateModifiedIndicator ();
         }
+
+#pragma warning disable CS0618 // SyntaxLanguage is a stopgap API (see gui-cs/Text #32)
+        void UpdateSyntaxLanguage (string path)
+        {
+            string ext = Path.GetExtension (path);
+
+            if (!string.IsNullOrEmpty (ext))
+            {
+                editor.SyntaxLanguage = ext;
+            }
+        }
+#pragma warning restore CS0618
 
         void UpdateLocShortcut()
         {
@@ -136,10 +162,11 @@ internal sealed class EditorClet : IViewerClet
             fileName = Path.GetFileName(fullPath);
             lastDirectory = Path.GetDirectoryName(fullPath);
             savedText = text;
-            editor.ClearSelection();
-            editor.Document = new TextDocument(text);
+            editor.ClearSelection ();
+            editor.Document = new TextDocument (text);
             editor.CaretOffset = 0;
-            UpdateTitle();
+            UpdateSyntaxLanguage (fullPath);
+            UpdateTitle ();
         }
 
         bool SaveFile()
