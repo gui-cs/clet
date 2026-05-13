@@ -3,6 +3,8 @@ using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.Document;
+using Terminal.Gui.Editor;
+using Terminal.Gui.Highlighting;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Command = Terminal.Gui.Input.Command;
@@ -105,18 +107,13 @@ internal sealed class EditorClet : IViewerClet
             Width = Dim.Fill (),
             Height = Dim.Fill (1), // above StatusBar
             ReadOnly = readOnly,
-            ShowLineNumbers = true,
+            GutterOptions = GutterOptions.LineNumbers,
             ConvertTabsToSpaces = true,
         };
 
-#pragma warning disable CS0618 // SyntaxHighlighter/SyntaxLanguage are stopgap APIs (see gui-cs/Text #32)
-        editor.SyntaxHighlighter = new TextMateSyntaxHighlighter ();
-
-        if (filePath is not null)
-        {
-            editor.SyntaxLanguage = Path.GetExtension (filePath);
-        }
-#pragma warning restore CS0618
+        editor.HighlightingDefinition = filePath is not null
+            ? HighlightingManager.Instance.GetDefinitionByExtension (Path.GetExtension (filePath))
+            : null;
 
         // --- StatusBar shortcuts (declared early for capture) ---
 
@@ -135,12 +132,10 @@ internal sealed class EditorClet : IViewerClet
             window.Title = dirty ? $"{fileName ?? "Untitled"}*" : fileName ?? "Untitled";
         }
 
-#pragma warning disable CS0618 // SyntaxLanguage is a stopgap API (see gui-cs/Text #32)
         void UpdateSyntaxLanguage (string path)
         {
-            editor.SyntaxLanguage = Path.GetExtension (path);
+            editor.HighlightingDefinition = HighlightingManager.Instance.GetDefinitionByExtension (Path.GetExtension (path));
         }
-#pragma warning restore CS0618
 
         void UpdateLocShortcut ()
         {

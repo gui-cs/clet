@@ -1,10 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Clet</RootNamespace>
     <AssemblyName>clet</AssemblyName>
     <RollForward>LatestMajor</RollForward>
@@ -22,7 +19,6 @@
     <ToolCommandName>clet</ToolCommandName>
     <PackageId>clet</PackageId>
     <Version>1.0.0-alpha</Version>
-    <Authors>gui-cs</Authors>
     <Description>Turns every Terminal.Gui View into a CLI command — typed inputs, a real file picker, a Markdown browser — with consistent JSON output, predictable exit codes, and full keyboard/mouse support.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -30,11 +26,6 @@
     <RepositoryUrl>https://github.com/gui-cs/clet</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>terminal-gui;tui;cli;prompt;json;agent;select;file-picker;markdown</PackageTags>
-
-    <!-- TG version for local builds; release workflow overrides via -p:TerminalGuiVersion=<dispatched_tg_version>. See D-020. -->
-    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.1.0-rc.*</TerminalGuiVersion>
-    <!-- TGE version for local builds; release workflow overrides via -p:TerminalGuiEditorVersion=<dispatched_tge_version>. -->
-    <TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.1.1-develop.*</TerminalGuiEditorVersion>
   </PropertyGroup>
 
   <ItemGroup>

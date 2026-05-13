@@ -15,10 +15,10 @@ name: Release
 #   4. Manual workflow_dispatch
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths: ['src/**', 'tests/**']
   repository_dispatch:
-    types: [tg-main-published, editor-main-published]
+    types: [tg-main-published, editor-main-published, editor-develop-published]
   workflow_dispatch:
     inputs:
       tg_version:
@@ -81,24 +81,28 @@ jobs:
           # --- Determine TG version ---
           TG_VERSION="$TG_VERSION_INPUT"
 
-          # --- Channel is always main ---
-          CHANNEL="main"
+          # --- Channel detection ---
+          if [ "${{ github.ref }}" = "refs/heads/develop" ] || [ "${{ github.event.action }}" = "editor-develop-published" ]; then
+            CHANNEL="develop"
+          else
+            CHANNEL="main"
+          fi
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
 
           # --- Resolve TG version ---
           # Dispatch/manual: use the explicitly provided version.
-          # Otherwise: use the csproj pin (known-good).
+          # Otherwise: use the Directory.Build.props pin (known-good).
           if [ -z "$TG_VERSION" ]; then
-            TG_VERSION=$(sed -n 's/.*<TerminalGuiVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
+            TG_VERSION=$(sed -n 's/.*<TerminalGuiVersion[^>]*>\([^<]*\)<.*/\1/p' Directory.Build.props | head -1)
           fi
           echo "tg_version=$TG_VERSION" >> "$GITHUB_OUTPUT"
 
           # --- Resolve TGE version ---
           # Dispatch/manual: use the explicitly provided version.
-          # Otherwise: use the csproj pin (known-good).
+          # Otherwise: use the Directory.Build.props pin (known-good).
           TGE_VERSION="$TGE_VERSION_INPUT"
           if [ -z "$TGE_VERSION" ]; then
-            TGE_VERSION=$(sed -n 's/.*<TerminalGuiEditorVersion[^>]*>\([^<]*\)<.*/\1/p' src/Clet/Clet.csproj | head -1)
+            TGE_VERSION=$(sed -n 's/.*<TerminalGuiEditorVersion[^>]*>\([^<]*\)<.*/\1/p' Directory.Build.props | head -1)
           fi
           echo "tge_version=$TGE_VERSION" >> "$GITHUB_OUTPUT"
 
@@ -129,25 +133,49 @@ jobs:
           PATCH=$(echo "$BASE_VERSION" | cut -d. -f3)
 
           if [ -n "$PHASE" ]; then
-            # Alpha/beta/rc phase: version is BASE-PHASE.N, auto-increment N
-            # Find latest tag matching v1.0.0-alpha.*
-            LATEST_TAG=$(git tag --list "v${BASE_VERSION}-${PHASE}.*" --sort=-v:refname | head -1)
-            if [ -n "$LATEST_TAG" ]; then
-              # Extract the build number (last dot-separated segment)
-              BUILD_NUM=$(echo "$LATEST_TAG" | sed "s/.*${PHASE}\.//" | sed 's/-.*//')
-              BUILD_NUM=$((BUILD_NUM + 1))
+            if [ "$CHANNEL" = "develop" ]; then
+              # Develop channel: version is BASE-develop.N, auto-increment N
+              LATEST_TAG=$(git tag --list "v${BASE_VERSION}-develop.*" --sort=-v:refname | head -1)
+              if [ -n "$LATEST_TAG" ]; then
+                BUILD_NUM=$(echo "$LATEST_TAG" | sed 's/.*develop\.//' | sed 's/-.*//')
+                BUILD_NUM=$((BUILD_NUM + 1))
+              else
+                BUILD_NUM=1
+              fi
+              CLET_VERSION="${BASE_VERSION}-develop.${BUILD_NUM}"
             else
-              BUILD_NUM=1
+              # Main channel alpha/beta/rc phase: version is BASE-PHASE.N, auto-increment N
+              # Find latest tag matching v1.0.0-alpha.*
+              LATEST_TAG=$(git tag --list "v${BASE_VERSION}-${PHASE}.*" --sort=-v:refname | head -1)
+              if [ -n "$LATEST_TAG" ]; then
+                # Extract the build number (last dot-separated segment)
+                BUILD_NUM=$(echo "$LATEST_TAG" | sed "s/.*${PHASE}\.//" | sed 's/-.*//')
+                BUILD_NUM=$((BUILD_NUM + 1))
+              else
+                BUILD_NUM=1
+              fi
+              CLET_VERSION="${BASE_VERSION}-${PHASE}.${BUILD_NUM}"
             fi
-            CLET_VERSION="${BASE_VERSION}-${PHASE}.${BUILD_NUM}"
           else
-            # Stable phase: version is MAJOR.MINOR.PATCH, auto-increment patch
-            LATEST_TAG=$(git tag --list "v${MAJOR}.${MINOR}.*" --sort=-v:refname | grep -v '-' | head -1)
-            if [ -n "$LATEST_TAG" ]; then
-              LATEST_PATCH=$(echo "$LATEST_TAG" | sed 's/^v//' | cut -d. -f3)
-              PATCH=$((LATEST_PATCH + 1))
+            if [ "$CHANNEL" = "develop" ]; then
+              # Develop channel with stable base: version is MAJOR.MINOR.PATCH-develop.N
+              LATEST_TAG=$(git tag --list "v${BASE_VERSION}-develop.*" --sort=-v:refname | head -1)
+              if [ -n "$LATEST_TAG" ]; then
+                BUILD_NUM=$(echo "$LATEST_TAG" | sed 's/.*develop\.//' | sed 's/-.*//')
+                BUILD_NUM=$((BUILD_NUM + 1))
+              else
+                BUILD_NUM=1
+              fi
+              CLET_VERSION="${BASE_VERSION}-develop.${BUILD_NUM}"
+            else
+              # Stable phase: version is MAJOR.MINOR.PATCH, auto-increment patch
+              LATEST_TAG=$(git tag --list "v${MAJOR}.${MINOR}.*" --sort=-v:refname | grep -v '-' | head -1)
+              if [ -n "$LATEST_TAG" ]; then
+                LATEST_PATCH=$(echo "$LATEST_TAG" | sed 's/^v//' | cut -d. -f3)
+                PATCH=$((LATEST_PATCH + 1))
+              fi
+              CLET_VERSION="${MAJOR}.${MINOR}.${PATCH}"
             fi
-            CLET_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           fi
 
           echo "clet_version=$CLET_VERSION" >> "$GITHUB_OUTPUT"
@@ -174,6 +202,9 @@ jobs:
       CLET_VERSION: ${{ needs.resolve-version.outputs.clet_version }}
       TG_VERSION: ${{ needs.resolve-version.outputs.tg_version }}
       TGE_VERSION: ${{ needs.resolve-version.outputs.tge_version }}
+      # Tells Terminal.Gui drivers to skip real-terminal probing/IO
+      # so the ANSI driver runs on Windows runners without a TTY.
+      DisableRealDriverIO: "1"
     steps:
       - uses: actions/checkout@v4
 

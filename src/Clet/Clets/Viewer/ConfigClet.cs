@@ -4,6 +4,8 @@ using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.Document;
+using Terminal.Gui.Editor;
+using Terminal.Gui.Highlighting;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Command = Terminal.Gui.Input.Command;
@@ -59,13 +61,10 @@ internal sealed class ConfigClet : IViewerClet
             Height = Dim.Fill (1), // leave room for StatusBar
             ConvertTabsToSpaces = true,
             IndentationSize = 2,
-            ShowLineNumbers = true,
+            GutterOptions = GutterOptions.LineNumbers,
         };
 
-#pragma warning disable CS0618 // SyntaxHighlighter/SyntaxLanguage are stopgap APIs (see gui-cs/Text #32)
-        editor.SyntaxHighlighter = new TextMateSyntaxHighlighter ();
-        editor.SyntaxLanguage = ".json";
-#pragma warning restore CS0618
+        editor.HighlightingDefinition = HighlightingManager.Instance.GetDefinitionByExtension (".json");
 
         editor.Document = new TextDocument (configText);
 

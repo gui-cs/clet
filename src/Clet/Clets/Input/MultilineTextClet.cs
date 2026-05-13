@@ -1,5 +1,7 @@
 using Terminal.Gui.App;
+using Terminal.Gui.Document;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -29,26 +31,26 @@ internal sealed class MultilineTextClet : IClet<string?>
 
         int rows = options.Rows ?? 5;
 
-        TextView textView = new ()
+        Editor editor = new ()
         {
-            Text = initial ?? string.Empty,
+            Document = new TextDocument (initial ?? string.Empty),
             Width = Dim.Fill (),
             Height = rows,
-            TabKeyAddsTab = false,
+            ConvertTabsToSpaces = true,
         };
 
         Button okButton = new ()
         {
             Text = "_OK",
-            Y = Pos.Bottom (textView),
+            Y = Pos.Bottom (editor),
         };
 
-        RunnableWrapper<TextView, string?> wrapper = new (textView)
+        RunnableWrapper<Editor, string?> wrapper = new (editor)
         {
             Title = options.Title ?? "Enter text (OK to accept, Esc to cancel)",
             Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
-            ResultExtractor = tv => tv.Text,
+            ResultExtractor = e => e.Document?.Text,
             SchemeName = CletStyling.BaseSchemeName,
         };
         wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);

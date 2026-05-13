@@ -8,10 +8,21 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    env:
+      # Tells Terminal.Gui drivers to skip real-terminal probing/IO
+      # so the ANSI driver runs on Windows runners without a TTY.
+      DisableRealDriverIO: "1"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,10 +33,32 @@ jobs:
           dotnet-quality: 'preview'
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore Clet.slnx
+
+      - name: Restore dotnet tools
+        run: dotnet tool restore
 
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build Clet.slnx --no-restore
+
+      # Style gate runs once (Linux). dotnet format catches whitespace/analyzer drift;
+      # jb cleanupcode catches what dotnet format misses.
+      - name: Verify code style — dotnet format
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet format Clet.slnx --no-restore --verify-no-changes
+
+      - name: Verify code style — ReSharper cleanupcode
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet jb cleanupcode Clet.slnx \
+            --profile="Built-in: Full Cleanup" \
+            --no-build \
+            || true
+          if ! git diff --exit-code; then
+            echo "::error::ReSharper code cleanup found style drift. Run 'dotnet jb cleanupcode Clet.slnx --profile=\"Built-in: Full Cleanup\"' locally and commit the result."
+            exit 1
+          fi
 
       - name: Unit Tests
         run: dotnet run --project tests/Clet.UnitTests --no-build
