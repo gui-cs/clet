@@ -216,21 +216,30 @@ internal sealed class MarkdownClet : IViewerClet
         // File selector when multiple files are provided
         if (files.Count > 1)
         {
-            List<string?> fileNames = [.. files.Select (Path.GetFileName)];
-            ObservableCollection<string> fileNamesOc = new (fileNames!);
+            // Use basenames when they are all distinct; fall back to relative paths
+            // so that files like a/readme.md and b/readme.md get unique labels.
+            List<string> basenames = [.. files.Select (f => Path.GetFileName (f) ?? f)];
+            bool hasCollisions = basenames.Count != basenames.Distinct (StringComparer.OrdinalIgnoreCase).Count ();
+            string cwd = Directory.GetCurrentDirectory ();
+            List<string> displayNames = hasCollisions
+                ? [.. files.Select (f => Path.GetRelativePath (cwd, f))]
+                : basenames;
+
+            ObservableCollection<string> displayNamesOc = new (displayNames!);
 
             DropDownList fileSelector = new ()
             {
-                Source = new ListWrapper<string> (fileNamesOc),
+                Source = new ListWrapper<string> (displayNamesOc),
                 ReadOnly = true,
-                Text = fileNames [0] ?? string.Empty,
+                Text = displayNames [0] ?? string.Empty,
                 Width = 30,
             };
 
             fileSelector.ValueChanged += (_, _) =>
             {
-                string selectedName = fileSelector.Text;
-                int index = fileNames.IndexOf (selectedName);
+                // Use the unique display name list — since labels are guaranteed distinct,
+                // IndexOf is unambiguous even when files share the same basename.
+                int index = displayNames.IndexOf (fileSelector.Text);
 
                 if (index < 0 || index >= files.Count)
                 {

@@ -4,6 +4,7 @@ namespace Clet;
 /// Enforces file-access confinement for <c>clet md</c> to mitigate agent-context exfiltration.
 /// Files must pass extension allowlist + working-directory confinement unless explicitly opted in
 /// via <c>--allow-file</c>. Binary content and oversized files/aggregates are also rejected.
+/// Pass <c>allowAllExtensions: true</c> to skip the extension check (used by <c>clet edit</c>).
 /// </summary>
 internal sealed class FileAccessPolicy
 {
@@ -29,11 +30,13 @@ internal sealed class FileAccessPolicy
     private readonly HashSet<string> _allowedFiles;
     private readonly List<string> _allowedDirs;
     private readonly bool _allowBinary;
+    private readonly bool _allowAllExtensions;
 
-    public FileAccessPolicy (string workingDirectory, IReadOnlyList<string>? allowedFiles, bool allowBinary)
+    public FileAccessPolicy (string workingDirectory, IReadOnlyList<string>? allowedFiles, bool allowBinary, bool allowAllExtensions = false)
     {
         _workingDirectory = Path.GetFullPath (workingDirectory);
         _allowBinary = allowBinary;
+        _allowAllExtensions = allowAllExtensions;
         _allowedFiles = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
         _allowedDirs = [];
 
@@ -69,13 +72,16 @@ internal sealed class FileAccessPolicy
             return CheckSizeAndBinary (fullPath);
         }
 
-        // Extension allowlist
-        string ext = Path.GetExtension (fullPath);
-
-        if (!DefaultAllowedExtensions.Contains (ext))
+        // Extension allowlist (skipped when allowAllExtensions is true, e.g. for clet edit)
+        if (!_allowAllExtensions)
         {
-            return $"Refused: '{filePath}' has extension '{ext}' which is not in the allowlist " +
-                   $"({string.Join (", ", DefaultAllowedExtensions)}). Use --allow-file to override.";
+            string ext = Path.GetExtension (fullPath);
+
+            if (!DefaultAllowedExtensions.Contains (ext))
+            {
+                return $"Refused: '{filePath}' has extension '{ext}' which is not in the allowlist " +
+                       $"({string.Join (", ", DefaultAllowedExtensions)}). Use --allow-file to override.";
+            }
         }
 
         // Working directory confinement
