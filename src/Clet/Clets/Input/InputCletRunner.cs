@@ -33,7 +33,7 @@ internal static class InputCletRunner
         CancellationToken cancellationToken,
         Func<TRawResult?, CletRunResult<TValue>> resultMapper,
         bool addEnterBinding = true)
-        where TControl : View, new ()
+        where TControl : View, new()
     {
         if (cancellationToken.IsCancellationRequested)
         {
@@ -79,7 +79,7 @@ internal static class InputCletRunner
         string defaultTitle,
         CancellationToken cancellationToken,
         bool addEnterBinding = true)
-        where TControl : View, new ()
+        where TControl : View, new()
     {
         return RunAsync<TControl, TValue, TValue> (
             app, wrapper, options, defaultTitle, cancellationToken,

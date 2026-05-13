@@ -21,7 +21,7 @@ internal static class CletProcess
             CreateNoWindow = true,
         };
 
-        psi.Environment ["DisableRealDriverIO"] = "1";
+        psi.Environment["DisableRealDriverIO"] = "1";
 
         psi.ArgumentList.Add ("exec");
         psi.ArgumentList.Add (CletAssemblyPath);
@@ -84,7 +84,7 @@ internal static class CletProcess
         // configuration/RID paths.
         string testDir = Path.GetDirectoryName (typeof (CletProcess).Assembly.Location)!;
 
-        foreach (string name in new [] { "clet.dll", "Clet.dll" })
+        foreach (string name in new[] { "clet.dll", "Clet.dll" })
         {
             string candidate = Path.Combine (testDir, name);
 

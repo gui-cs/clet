@@ -62,7 +62,7 @@ internal sealed class SelectClet : IClet<string?>
             result =>
             {
                 string? selectedText = result is >= 0 and var idx && idx < labels.Length
-                    ? labels [idx]
+                    ? labels[idx]
                     : null;
 
                 return new () { Status = CletRunStatus.Ok, Value = selectedText };

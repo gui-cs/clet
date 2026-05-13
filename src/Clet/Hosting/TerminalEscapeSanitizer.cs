@@ -38,7 +38,7 @@ internal static class TerminalEscapeSanitizer
 
         for (int i = 0; i < input.Length; i++)
         {
-            char c = input [i];
+            char c = input[i];
 
             switch (c)
             {
@@ -46,7 +46,7 @@ internal static class TerminalEscapeSanitizer
                     sb ??= new StringBuilder (input.Length).Append (input, 0, i);
 
                     // Check for C1 7-bit pair: ESC followed by @ through _
-                    if (i + 1 < input.Length && input [i + 1] >= '@' && input [i + 1] <= '_')
+                    if (i + 1 < input.Length && input[i + 1] >= '@' && input[i + 1] <= '_')
                     {
                         // Skip the ESC and the following character (C1 7-bit pair)
                         i++;
@@ -98,14 +98,14 @@ internal static class TerminalEscapeSanitizer
 
         for (int i = 0; i < renderedAnsi.Length; i++)
         {
-            char c = renderedAnsi [i];
+            char c = renderedAnsi[i];
 
             switch (c)
             {
                 case '\x1b':
                     if (i + 1 < renderedAnsi.Length)
                     {
-                        char next = renderedAnsi [i + 1];
+                        char next = renderedAnsi[i + 1];
 
                         if (next == '[')
                         {
@@ -117,7 +117,7 @@ internal static class TerminalEscapeSanitizer
 
                             while (i < renderedAnsi.Length)
                             {
-                                char seqChar = renderedAnsi [i];
+                                char seqChar = renderedAnsi[i];
                                 sb?.Append (seqChar);
 
                                 // CSI terminates at bytes 0x40–0x7E
@@ -134,7 +134,7 @@ internal static class TerminalEscapeSanitizer
                             // OSC sequence (ESC ]). Preserve OSC 8 (hyperlinks) — they're
                             // legitimate renderer output for terminals that support them.
                             // Strip all other OSC sequences.
-                            if (i + 2 < renderedAnsi.Length && renderedAnsi [i + 2] == '8')
+                            if (i + 2 < renderedAnsi.Length && renderedAnsi[i + 2] == '8')
                             {
                                 // OSC 8 hyperlink — pass through until ST (ESC \ or BEL)
                                 sb?.Append ('\x1b');
@@ -143,7 +143,7 @@ internal static class TerminalEscapeSanitizer
 
                                 while (i < renderedAnsi.Length)
                                 {
-                                    char osc = renderedAnsi [i];
+                                    char osc = renderedAnsi[i];
 
                                     if (osc == '\x07')
                                     {
@@ -153,7 +153,7 @@ internal static class TerminalEscapeSanitizer
                                         break;
                                     }
 
-                                    if (osc == '\x1b' && i + 1 < renderedAnsi.Length && renderedAnsi [i + 1] == '\\')
+                                    if (osc == '\x1b' && i + 1 < renderedAnsi.Length && renderedAnsi[i + 1] == '\\')
                                     {
                                         // ST (ESC \) terminates OSC
                                         sb?.Append ('\x1b');
@@ -175,14 +175,14 @@ internal static class TerminalEscapeSanitizer
 
                                 while (i < renderedAnsi.Length)
                                 {
-                                    char osc = renderedAnsi [i];
+                                    char osc = renderedAnsi[i];
 
                                     if (osc == '\x07')
                                     {
                                         break;
                                     }
 
-                                    if (osc == '\x1b' && i + 1 < renderedAnsi.Length && renderedAnsi [i + 1] == '\\')
+                                    if (osc == '\x1b' && i + 1 < renderedAnsi.Length && renderedAnsi[i + 1] == '\\')
                                     {
                                         i++;
 

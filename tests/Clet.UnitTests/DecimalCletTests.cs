@@ -50,8 +50,8 @@ public class DecimalCletTests
         DecimalClet clet = new ();
 
         Assert.Single (clet.Options);
-        Assert.Equal ("step", clet.Options [0].Name);
-        Assert.False (clet.Options [0].Required);
+        Assert.Equal ("step", clet.Options[0].Name);
+        Assert.False (clet.Options[0].Required);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class DecimalCletTests
     {
         DecimalClet clet = new ();
 
-        Assert.Equal ("0.1", clet.Options [0].DefaultValue);
+        Assert.Equal ("0.1", clet.Options[0].DefaultValue);
     }
 
     [Fact]

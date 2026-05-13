@@ -50,8 +50,8 @@ public class IntCletTests
         IntClet clet = new ();
 
         Assert.Single (clet.Options);
-        Assert.Equal ("step", clet.Options [0].Name);
-        Assert.False (clet.Options [0].Required);
+        Assert.Equal ("step", clet.Options[0].Name);
+        Assert.False (clet.Options[0].Required);
     }
 
     [Fact]

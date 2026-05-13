@@ -50,10 +50,10 @@ public class PickFileCletTests
         PickFileClet clet = new ();
 
         Assert.Equal (3, clet.Options.Count);
-        Assert.Equal ("multi", clet.Options [0].Name);
-        Assert.Equal ("root", clet.Options [1].Name);
-        Assert.Equal ("filter", clet.Options [2].Name);
-        Assert.False (clet.Options [0].Required);
+        Assert.Equal ("multi", clet.Options[0].Name);
+        Assert.Equal ("root", clet.Options[1].Name);
+        Assert.Equal ("filter", clet.Options[2].Name);
+        Assert.False (clet.Options[0].Required);
     }
 
     [Fact]

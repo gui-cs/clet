@@ -58,12 +58,12 @@ public class MarkdownCletTests
         MarkdownClet clet = new ();
 
         Assert.Equal (3, clet.Options.Count);
-        Assert.Equal ("theme", clet.Options [0].Name);
-        Assert.False (clet.Options [0].Required);
-        Assert.Equal ("cat", clet.Options [1].Name);
-        Assert.False (clet.Options [1].Required);
-        Assert.Equal ("no-browse", clet.Options [2].Name);
-        Assert.False (clet.Options [2].Required);
+        Assert.Equal ("theme", clet.Options[0].Name);
+        Assert.False (clet.Options[0].Required);
+        Assert.Equal ("cat", clet.Options[1].Name);
+        Assert.False (clet.Options[1].Required);
+        Assert.Equal ("no-browse", clet.Options[2].Name);
+        Assert.False (clet.Options[2].Required);
     }
 
     [Fact]

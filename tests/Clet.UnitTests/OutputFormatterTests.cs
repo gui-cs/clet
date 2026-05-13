@@ -110,9 +110,9 @@ public class OutputFormatterTests
 
         string[] lines = stdout.ToString ().TrimEnd ().Split (Environment.NewLine);
         Assert.Equal (3, lines.Length);
-        Assert.Equal ("Apple", lines [0]);
-        Assert.Equal ("Banana", lines [1]);
-        Assert.Equal ("Cherry", lines [2]);
+        Assert.Equal ("Apple", lines[0]);
+        Assert.Equal ("Banana", lines[1]);
+        Assert.Equal ("Cherry", lines[2]);
     }
 
     [Fact]

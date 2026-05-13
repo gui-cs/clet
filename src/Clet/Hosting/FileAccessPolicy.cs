@@ -149,7 +149,7 @@ internal sealed class FileAccessPolicy
 
                 for (int i = 0; i < read; i++)
                 {
-                    if (probe [i] == 0)
+                    if (probe[i] == 0)
                     {
                         return $"Refused: '{fi.Name}' appears to be a binary file (NUL byte at offset {i}). Use --allow-binary to override.";
                     }

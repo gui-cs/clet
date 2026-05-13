@@ -31,7 +31,7 @@ internal sealed class CommandLineRoot
             return ExitCodes.Ok;
         }
 
-        switch (args [0])
+        switch (args[0])
         {
             case "--help":
             case "-h":
@@ -57,12 +57,12 @@ internal sealed class CommandLineRoot
         TextWriter stdout,
         TextWriter stderr)
     {
-        string alias = args [0];
+        string alias = args[0];
 
         // Support `clet <alias> help`, `clet <alias> --help`, `clet <alias> -h`
         // Rewrite as `clet help <alias> [--cat]` and re-dispatch.
         // Skip when alias is already "help" to avoid infinite recursion.
-        if (alias != "help" && args.Length >= 2 && args [1] is "help" or "--help" or "-h")
+        if (alias != "help" && args.Length >= 2 && args[1] is "help" or "--help" or "-h")
         {
             List<string> helpArgs = ["help", alias];
 
@@ -90,7 +90,7 @@ internal sealed class CommandLineRoot
 
         for (int i = 1; i < args.Length; i++)
         {
-            string arg = args [i];
+            string arg = args[i];
 
             if (arg is "--json" or "-j")
             {
@@ -136,7 +136,7 @@ internal sealed class CommandLineRoot
                     return ExitCodes.UsageError;
                 }
 
-                allowedFiles.Add (args [++i]);
+                allowedFiles.Add (args[++i]);
 
                 continue;
             }
@@ -150,9 +150,9 @@ internal sealed class CommandLineRoot
                     return ExitCodes.UsageError;
                 }
 
-                if (!TryParseTimeout (args [++i], out TimeSpan parsed))
+                if (!TryParseTimeout (args[++i], out TimeSpan parsed))
                 {
-                    stderr.WriteLine ($"error: invalid --timeout value '{args [i]}'. Use 30s, 1m, 500ms.");
+                    stderr.WriteLine ($"error: invalid --timeout value '{args[i]}'. Use 30s, 1m, 500ms.");
 
                     return ExitCodes.UsageError;
                 }
@@ -171,7 +171,7 @@ internal sealed class CommandLineRoot
                     return ExitCodes.UsageError;
                 }
 
-                initial = args [++i];
+                initial = args[++i];
 
                 // Cap --initial at 64 K characters to prevent OOM from untrusted input
                 if (initial.Length > MaxInitialChars)
@@ -196,7 +196,7 @@ internal sealed class CommandLineRoot
                     return ExitCodes.UsageError;
                 }
 
-                title = args [++i];
+                title = args[++i];
 
                 continue;
             }
@@ -210,7 +210,7 @@ internal sealed class CommandLineRoot
                     return ExitCodes.UsageError;
                 }
 
-                outputPath = args [++i];
+                outputPath = args[++i];
 
                 continue;
             }
@@ -224,9 +224,9 @@ internal sealed class CommandLineRoot
                     return ExitCodes.UsageError;
                 }
 
-                if (!int.TryParse (args [++i], out int parsedRows) || parsedRows < 1)
+                if (!int.TryParse (args[++i], out int parsedRows) || parsedRows < 1)
                 {
-                    stderr.WriteLine ($"error: invalid --rows value '{args [i]}'. Must be a positive integer.");
+                    stderr.WriteLine ($"error: invalid --rows value '{args[i]}'. Must be a positive integer.");
 
                     return ExitCodes.UsageError;
                 }
@@ -245,7 +245,7 @@ internal sealed class CommandLineRoot
                     return ExitCodes.UsageError;
                 }
 
-                cletOptions [arg [2..]] = args [++i];
+                cletOptions[arg[2..]] = args[++i];
 
                 continue;
             }
@@ -281,7 +281,7 @@ internal sealed class CommandLineRoot
 
             if (positionalArgs.Count == 1)
             {
-                stderr.WriteLine ($"hint: did you mean 'clet {alias} --initial {positionalArgs [0]}'?");
+                stderr.WriteLine ($"hint: did you mean 'clet {alias} --initial {positionalArgs[0]}'?");
             }
 
             return ExitCodes.UsageError;
@@ -292,7 +292,7 @@ internal sealed class CommandLineRoot
 
     private int WriteList (string[] args, TextWriter stdout)
     {
-        bool json = args.Length > 1 && args [1] is "--json" or "-j";
+        bool json = args.Length > 1 && args[1] is "--json" or "-j";
 
         if (json)
         {
@@ -469,22 +469,22 @@ internal sealed class CommandLineRoot
 
         if (input.EndsWith ("ms", StringComparison.OrdinalIgnoreCase))
         {
-            body = input [..^2];
+            body = input[..^2];
             factory = TimeSpan.FromMilliseconds;
         }
         else if (input.EndsWith ("s", StringComparison.OrdinalIgnoreCase))
         {
-            body = input [..^1];
+            body = input[..^1];
             factory = TimeSpan.FromSeconds;
         }
         else if (input.EndsWith ("m", StringComparison.OrdinalIgnoreCase))
         {
-            body = input [..^1];
+            body = input[..^1];
             factory = TimeSpan.FromMinutes;
         }
         else if (input.EndsWith ("h", StringComparison.OrdinalIgnoreCase))
         {
-            body = input [..^1];
+            body = input[..^1];
             factory = TimeSpan.FromHours;
         }
         else

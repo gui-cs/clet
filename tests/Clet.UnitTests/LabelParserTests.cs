@@ -19,42 +19,42 @@ public class LabelParserTests
     [Fact]
     public void Split_CommaSeparated_ReturnsTokens ()
     {
-        Assert.Equal (new [] { "a", "b", "c" }, LabelParser.Split ("a,b,c"));
+        Assert.Equal (new[] { "a", "b", "c" }, LabelParser.Split ("a,b,c"));
     }
 
     [Fact]
     public void Split_TrimsWhitespaceAroundCommas ()
     {
-        Assert.Equal (new [] { "a", "b", "c" }, LabelParser.Split ("a, b, c"));
+        Assert.Equal (new[] { "a", "b", "c" }, LabelParser.Split ("a, b, c"));
     }
 
     [Fact]
     public void Split_DropsEmptyEntries ()
     {
-        Assert.Equal (new [] { "a", "b" }, LabelParser.Split ("a,,b,"));
+        Assert.Equal (new[] { "a", "b" }, LabelParser.Split ("a,,b,"));
     }
 
     [Fact]
     public void Split_SpaceSeparatedArgs_TreatedAsLabels ()
     {
-        Assert.Equal (new [] { "a", "b", "c" }, LabelParser.Split (new [] { "a", "b", "c" }));
+        Assert.Equal (new[] { "a", "b", "c" }, LabelParser.Split (new[] { "a", "b", "c" }));
     }
 
     [Fact]
     public void Split_MixedCommasInArgs_FlattenedAndSplit ()
     {
-        Assert.Equal (new [] { "a", "b", "c" }, LabelParser.Split (new [] { "a,b", "c" }));
+        Assert.Equal (new[] { "a", "b", "c" }, LabelParser.Split (new[] { "a,b", "c" }));
     }
 
     [Fact]
     public void Split_TrailingCommaInArg_DropsEmpty ()
     {
-        Assert.Equal (new [] { "a", "b", "c" }, LabelParser.Split (new [] { "a,", "b,", "c" }));
+        Assert.Equal (new[] { "a", "b", "c" }, LabelParser.Split (new[] { "a,", "b,", "c" }));
     }
 
     [Fact]
     public void Split_SingleArgWithSpacesAfterCommas_Trimmed ()
     {
-        Assert.Equal (new [] { "a", "b", "c" }, LabelParser.Split (new [] { "a, b, c" }));
+        Assert.Equal (new[] { "a", "b", "c" }, LabelParser.Split (new[] { "a, b, c" }));
     }
 }

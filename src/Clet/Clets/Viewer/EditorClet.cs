@@ -17,7 +17,7 @@ internal sealed class EditorClet : IViewerClet
     public IReadOnlyList<string> Aliases => ["edit", "editor"];
     public string Description => "Edit text files with menus, undo/redo, find/replace, and glob support.";
     public CletKind Kind => CletKind.Viewer;
-    public Type ResultType => typeof(void);
+    public Type ResultType => typeof (void);
     public bool AcceptsPositionalArgs => true;
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
@@ -82,7 +82,7 @@ internal sealed class EditorClet : IViewerClet
             }
         }
 
-        string? filePath = files.Count > 0 ? files [0] : null;
+        string? filePath = files.Count > 0 ? files[0] : null;
         string? fileName = filePath is not null ? Path.GetFileName (filePath) : null;
         string? lastDirectory = filePath is not null ? Path.GetDirectoryName (filePath) : null;
         string? savedText = string.Empty;
@@ -118,7 +118,7 @@ internal sealed class EditorClet : IViewerClet
         // --- StatusBar shortcuts (declared early for capture) ---
 
         Shortcut cursorPositionShortcut = new ()
-            { Title = "Ln 1, Col 1", MouseHighlightStates = MouseState.None, Enabled = false };
+        { Title = "Ln 1, Col 1", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut modifiedShortcut = new () { Title = "", MouseHighlightStates = MouseState.None, Enabled = false };
 
         // --- Local state helpers ---
@@ -306,7 +306,7 @@ internal sealed class EditorClet : IViewerClet
 
             if (!od.Canceled && od.FilePaths.Count > 0)
             {
-                string selectedPath = od.FilePaths [0];
+                string selectedPath = od.FilePaths[0];
                 lastDirectory = Path.GetDirectoryName (Path.GetFullPath (selectedPath));
                 LoadFile (selectedPath);
             }
@@ -436,7 +436,7 @@ internal sealed class EditorClet : IViewerClet
             {
                 Source = new ListWrapper<string> (displayNamesOc),
                 ReadOnly = true,
-                Text = displayNames [0],
+                Text = displayNames[0],
                 Width = Dim.Auto (DimAutoStyle.Text, minimumContentDim: 20),
             };
 
@@ -466,7 +466,7 @@ internal sealed class EditorClet : IViewerClet
 
                     if (currentIndex >= 0)
                     {
-                        fileSelector.Text = displayNames [currentIndex];
+                        fileSelector.Text = displayNames[currentIndex];
                     }
 
                     switchingFile = false;
@@ -474,7 +474,7 @@ internal sealed class EditorClet : IViewerClet
                     return;
                 }
 
-                LoadFile (files [index]);
+                LoadFile (files[index]);
             };
 
             statusItems.Add (new Shortcut () { CommandView = fileSelector, HelpText = "File" });
@@ -482,14 +482,14 @@ internal sealed class EditorClet : IViewerClet
         else
         {
             Shortcut fileInfoShortcut = new ()
-                { Title = fileName ?? "Untitled", MouseHighlightStates = MouseState.None, Enabled = false };
+            { Title = fileName ?? "Untitled", MouseHighlightStates = MouseState.None, Enabled = false };
 
             // UpdateTitle needs to update this shortcut
             statusItems.Add (fileInfoShortcut);
         }
 
         StatusBar statusBar = new (statusItems)
-            { AlignmentModes = AlignmentModes.StartToEnd | AlignmentModes.IgnoreFirstOrLast };
+        { AlignmentModes = AlignmentModes.StartToEnd | AlignmentModes.IgnoreFirstOrLast };
 
         // --- Assemble window ---
 

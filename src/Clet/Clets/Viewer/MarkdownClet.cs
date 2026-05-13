@@ -63,7 +63,7 @@ internal sealed class MarkdownClet : IViewerClet
         }
 
         // Track current file directory for resolving relative links
-        string? currentFileDir = files.Count > 0 ? Path.GetDirectoryName (Path.GetFullPath (files [0])) : null;
+        string? currentFileDir = files.Count > 0 ? Path.GetDirectoryName (Path.GetFullPath (files[0])) : null;
 
         // File access policy for link navigation (reuse the same confinement as file loading)
         FileAccessPolicy linkPolicy = new (
@@ -73,7 +73,7 @@ internal sealed class MarkdownClet : IViewerClet
 
         // Browser mode
         bool browseMode = !options.NoBrowse;
-        string? currentFile = files.Count > 0 ? Path.GetFullPath (files [0]) : null;
+        string? currentFile = files.Count > 0 ? Path.GetFullPath (files[0]) : null;
         BrowseBar? browseBar = null;
 
         // Parse --theme option
@@ -231,7 +231,7 @@ internal sealed class MarkdownClet : IViewerClet
             {
                 Source = new ListWrapper<string> (displayNamesOc),
                 ReadOnly = true,
-                Text = displayNames [0] ?? string.Empty,
+                Text = displayNames[0] ?? string.Empty,
                 Width = 30,
             };
 
@@ -246,8 +246,8 @@ internal sealed class MarkdownClet : IViewerClet
                     return;
                 }
 
-                browseBar?.Push (files [index]);
-                LoadFile (files [index]);
+                browseBar?.Push (files[index]);
+                LoadFile (files[index]);
             };
 
             Shortcut fileSelectorShortcut = new () { CommandView = fileSelector, HelpText = "File" };
@@ -264,7 +264,7 @@ internal sealed class MarkdownClet : IViewerClet
         {
             if (files.Count > 0)
             {
-                LoadFile (files [0]);
+                LoadFile (files[0]);
             }
             else if (!string.IsNullOrEmpty (content))
             {
@@ -331,11 +331,11 @@ internal sealed class MarkdownClet : IViewerClet
 
         // Extract fragment (e.g. #section) before resolving the path
         int fragmentIndex = url.IndexOf ('#');
-        string pathPart = fragmentIndex >= 0 ? url [..fragmentIndex] : url;
+        string pathPart = fragmentIndex >= 0 ? url[..fragmentIndex] : url;
 
         if (fragmentIndex >= 0)
         {
-            fragment = url [(fragmentIndex + 1)..];
+            fragment = url[(fragmentIndex + 1)..];
         }
 
         if (string.IsNullOrWhiteSpace (pathPart))
@@ -400,6 +400,6 @@ internal sealed class MarkdownClet : IViewerClet
             size /= 1024;
         }
 
-        return $"{size:0.##} {sizes [order]}";
+        return $"{size:0.##} {sizes[order]}";
     }
 }

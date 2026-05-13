@@ -207,7 +207,7 @@ internal sealed class ConfigClet : IViewerClet
 
             if (pathIdx > 0)
             {
-                details = details [..pathIdx];
+                details = details[..pathIdx];
             }
 
             string message = $"{details}\n\nLine {errorRow + 1}, Column {errorCol + 1}";
@@ -336,7 +336,7 @@ internal sealed class ConfigClet : IViewerClet
 
             if (pathIdx > 0)
             {
-                details = details [..pathIdx];
+                details = details[..pathIdx];
             }
 
             return $"{details}\n\nLine {line}, Column {col}";

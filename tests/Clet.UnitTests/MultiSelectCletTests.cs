@@ -50,8 +50,8 @@ public class MultiSelectCletTests
         MultiSelectClet clet = new ();
 
         Assert.Single (clet.Options);
-        Assert.Equal ("options", clet.Options [0].Name);
-        Assert.True (clet.Options [0].Required);
+        Assert.Equal ("options", clet.Options[0].Name);
+        Assert.True (clet.Options[0].Required);
     }
 
     [Fact]

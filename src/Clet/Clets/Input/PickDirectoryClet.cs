@@ -78,6 +78,6 @@ internal sealed class PickDirectoryClet : IClet<string?>
             return new () { Status = CletRunStatus.Cancelled };
         }
 
-        return new () { Status = CletRunStatus.Ok, Value = paths [0] };
+        return new () { Status = CletRunStatus.Ok, Value = paths[0] };
     }
 }

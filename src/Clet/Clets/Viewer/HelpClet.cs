@@ -118,7 +118,7 @@ internal sealed class HelpClet : IViewerClet
                     }
 
                     string? linkAlias = url.Length > "clet:help:".Length
-                        ? url ["clet:help:".Length..]
+                        ? url["clet:help:".Length..]
                         : null;
 
                     string key = linkAlias ?? "(overview)";

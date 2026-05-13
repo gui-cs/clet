@@ -19,31 +19,31 @@ public class FileFilterParserTests
     [Fact]
     public void ParseExtensions_StarDotForm_StripsStar ()
     {
-        Assert.Equal (new [] { ".cs" }, FileFilterParser.ParseExtensions ("*.cs"));
+        Assert.Equal (new[] { ".cs" }, FileFilterParser.ParseExtensions ("*.cs"));
     }
 
     [Fact]
     public void ParseExtensions_DotForm_KeptAsIs ()
     {
-        Assert.Equal (new [] { ".cs" }, FileFilterParser.ParseExtensions (".cs"));
+        Assert.Equal (new[] { ".cs" }, FileFilterParser.ParseExtensions (".cs"));
     }
 
     [Fact]
     public void ParseExtensions_BareForm_GetsLeadingDot ()
     {
-        Assert.Equal (new [] { ".cs" }, FileFilterParser.ParseExtensions ("cs"));
+        Assert.Equal (new[] { ".cs" }, FileFilterParser.ParseExtensions ("cs"));
     }
 
     [Fact]
     public void ParseExtensions_CommaSeparated_AllNormalized ()
     {
-        Assert.Equal (new [] { ".cs", ".md", ".txt" }, FileFilterParser.ParseExtensions ("*.cs, .md, txt"));
+        Assert.Equal (new[] { ".cs", ".md", ".txt" }, FileFilterParser.ParseExtensions ("*.cs, .md, txt"));
     }
 
     [Fact]
     public void ParseExtensions_DuplicatesCollapsed_CaseInsensitive ()
     {
-        Assert.Equal (new [] { ".cs" }, FileFilterParser.ParseExtensions ("*.cs,.CS,cs"));
+        Assert.Equal (new[] { ".cs" }, FileFilterParser.ParseExtensions ("*.cs,.CS,cs"));
     }
 
     [Fact]

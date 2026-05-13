@@ -40,7 +40,7 @@ internal static class VersionInfo
         {
             int plus = informational.IndexOf ('+');
 
-            return plus >= 0 ? informational [..plus] : informational;
+            return plus >= 0 ? informational[..plus] : informational;
         }
 
         return assembly.GetName ().Version?.ToString (3) ?? fallback;

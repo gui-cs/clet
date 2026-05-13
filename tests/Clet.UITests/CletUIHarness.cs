@@ -179,7 +179,7 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
     ///     has any non-space glyphs. Used by the startup-stability detector and not part of
     ///     the public API.
     /// </summary>
-    private static (int Hash, bool NonEmpty) HashContents (Cell [,]? contents)
+    private static (int Hash, bool NonEmpty) HashContents (Cell[,]? contents)
     {
         if (contents is null)
         {
@@ -195,8 +195,8 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         {
             for (int c = 0; c < cols; c++)
             {
-                string g = contents [r, c].Grapheme;
-                hash = unchecked (hash * 31 + (string.IsNullOrEmpty (g) ? 0 : g.GetHashCode ()));
+                string g = contents[r, c].Grapheme;
+                hash = unchecked(hash * 31 + (string.IsNullOrEmpty (g) ? 0 : g.GetHashCode ()));
 
                 if (!string.IsNullOrEmpty (g) && g != " ")
                 {
@@ -286,7 +286,7 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
     /// </summary>
     public string SnapshotText ()
     {
-        Cell [,]? contents = _app.Driver?.Contents;
+        Cell[,]? contents = _app.Driver?.Contents;
 
         if (contents is null)
         {
@@ -302,13 +302,13 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
             int lineStart = sb.Length;
             for (int c = 0; c < cols; c++)
             {
-                string g = contents [r, c].Grapheme;
+                string g = contents[r, c].Grapheme;
                 sb.Append (string.IsNullOrEmpty (g) ? " " : g);
             }
 
             // Trim trailing whitespace from this row.
             int end = sb.Length;
-            while (end > lineStart && char.IsWhiteSpace (sb [end - 1]))
+            while (end > lineStart && char.IsWhiteSpace (sb[end - 1]))
             {
                 end--;
             }
@@ -320,12 +320,12 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
     }
 
     /// <summary>Snapshot the screen as raw <c>Cell[,]</c> for tests that need attribute/style assertions.</summary>
-    public Cell [,]? SnapshotCells () => _app.Driver?.Contents;
+    public Cell[,]? SnapshotCells () => _app.Driver?.Contents;
 
     /// <summary>Asserts the given text appears starting at <paramref name="row"/>, <paramref name="col"/>.</summary>
     public void AssertCellsAt (int row, int col, string expected)
     {
-        Cell [,]? contents = _app.Driver?.Contents
+        Cell[,]? contents = _app.Driver?.Contents
                              ?? throw new InvalidOperationException ("No driver contents available.");
 
         StringBuilder actual = new (expected.Length);
@@ -333,7 +333,7 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
 
         for (int i = 0; i < expected.Length && col + i < cols; i++)
         {
-            string g = contents [row, col + i].Grapheme;
+            string g = contents[row, col + i].Grapheme;
             actual.Append (string.IsNullOrEmpty (g) ? " " : g);
         }
 

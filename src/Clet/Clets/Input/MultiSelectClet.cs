@@ -12,7 +12,7 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
     public IReadOnlyList<string> Aliases => ["multi-select"];
     public string Description => "Presents a list of options with checkboxes and returns the selected texts.";
     public CletKind Kind => CletKind.Input;
-    public Type ResultType => typeof(JsonArray);
+    public Type ResultType => typeof (JsonArray);
 
     public IReadOnlyList<CletOptionDescriptor> Options =>
     [
@@ -21,7 +21,7 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
 
     public bool AcceptsPositionalArgs => true;
 
-    public async Task<CletRunResult<JsonArray?>> RunAsync(
+    public async Task<CletRunResult<JsonArray?>> RunAsync (
         IApplication app,
         string? initial,
         CletRunOptions options,
@@ -29,23 +29,23 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return new() { Status = CletRunStatus.Cancelled };
+            return new () { Status = CletRunStatus.Cancelled };
         }
 
         string[] labels = options.Arguments is { Count: > 0 }
-            ? LabelParser.Split(options.Arguments)
-            : options.CletOptions?.TryGetValue("options", out string? optionsValue) == true
-                ? LabelParser.Split(optionsValue)
+            ? LabelParser.Split (options.Arguments)
+            : options.CletOptions?.TryGetValue ("options", out string? optionsValue) == true
+                ? LabelParser.Split (optionsValue)
                 : [];
 
-        int[] values = new int [labels.Length];
+        int[] values = new int[labels.Length];
 
         for (int i = 0; i < labels.Length; i++)
         {
             values[i] = 1 << i;
         }
 
-        FlagSelector flagSelector = new()
+        FlagSelector flagSelector = new ()
         {
             Labels = labels,
             Values = values,
@@ -53,13 +53,13 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
 
         if (initial is not null)
         {
-            string[] initialLabels = initial.Split(',');
+            string[] initialLabels = initial.Split (',');
             int flags = 0;
 
             for (int i = 0; i < labels.Length; i++)
             {
-                if (Array.Exists(initialLabels,
-                        l => string.Equals(l.Trim(), labels[i], StringComparison.OrdinalIgnoreCase)))
+                if (Array.Exists (initialLabels,
+                        l => string.Equals (l.Trim (), labels[i], StringComparison.OrdinalIgnoreCase)))
                 {
                     flags |= 1 << i;
                 }
@@ -68,27 +68,27 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
             flagSelector.Value = flags;
         }
 
-        RunnableWrapper<FlagSelector, int?> wrapper = new(flagSelector)
+        RunnableWrapper<FlagSelector, int?> wrapper = new (flagSelector)
         {
             Title = options.Title ?? "Select one or more options (Enter to accept, Esc to cancel)",
-            Width = Dim.Fill(),
+            Width = Dim.Fill (),
             BorderStyle = LineStyle.Rounded,
             SchemeName = CletStyling.BaseSchemeName,
         };
-        wrapper.Border.Thickness = new Thickness(0, 1, 0, 0);
+        wrapper.Border.Thickness = new Thickness (0, 1, 0, 0);
 
         try
         {
-            await app.RunAsync(wrapper, cancellationToken);
+            await app.RunAsync (wrapper, cancellationToken);
         }
         catch (OperationCanceledException)
         {
-            return new() { Status = CletRunStatus.Cancelled };
+            return new () { Status = CletRunStatus.Cancelled };
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return new() { Status = CletRunStatus.Cancelled };
+            return new () { Status = CletRunStatus.Cancelled };
         }
 
         int? resultFlags = wrapper.Result;
@@ -100,11 +100,11 @@ internal sealed class MultiSelectClet : IClet<JsonArray?>
             {
                 if ((bits & (1 << i)) != 0)
                 {
-                    selected.Add((JsonNode)labels[i]);
+                    selected.Add ((JsonNode)labels[i]);
                 }
             }
         }
 
-        return new() { Status = CletRunStatus.Ok, Value = selected };
+        return new () { Status = CletRunStatus.Ok, Value = selected };
     }
 }

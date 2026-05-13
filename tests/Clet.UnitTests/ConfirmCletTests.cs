@@ -50,8 +50,8 @@ public class ConfirmCletTests
         ConfirmClet clet = new ();
 
         Assert.Single (clet.Options);
-        Assert.Equal ("prompt", clet.Options [0].Name);
-        Assert.False (clet.Options [0].Required);
+        Assert.Equal ("prompt", clet.Options[0].Name);
+        Assert.False (clet.Options[0].Required);
     }
 
     [Fact]
