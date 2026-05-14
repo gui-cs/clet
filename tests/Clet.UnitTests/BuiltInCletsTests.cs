@@ -71,6 +71,6 @@ public class BuiltInCletsTests
         CletRegistry registry = new ();
         BuiltInClets.RegisterAll (registry);
 
-        Assert.Equal (19, registry.All.Count);
+        Assert.Equal (18, registry.All.Count);
     }
 }

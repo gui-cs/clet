@@ -45,6 +45,22 @@ public class TextCletTests
     }
 
     [Fact]
+    public void Aliases_ContainsMultilineText ()
+    {
+        TextClet clet = new ();
+
+        Assert.Contains ("multiline-text", clet.Aliases);
+    }
+
+    [Fact]
+    public void Aliases_ContainsMt ()
+    {
+        TextClet clet = new ();
+
+        Assert.Contains ("mt", clet.Aliases);
+    }
+
+    [Fact]
     public void Options_IsEmpty ()
     {
         TextClet clet = new ();

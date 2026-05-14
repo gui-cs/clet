@@ -56,4 +56,38 @@ public class TextCletIntegrationTests
 
         Assert.Equal (CletRunStatus.Ok, result.Status);
     }
+
+    [Fact]
+    public async Task RunAsync_WithMultilineInitialValue_ReturnsOk ()
+    {
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+        app.StopAfterFirstIteration = true;
+
+        TextClet clet = new ();
+        CletRunOptions options = new ();
+
+        using CancellationTokenSource cts = new ();
+
+        CletRunResult<string?> result = await clet.RunAsync (app, "line1\nline2", options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Ok, result.Status);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithRows_ReturnsOk ()
+    {
+        using IApplication app = Application.Create ();
+        app.Init ("ansi");
+        app.StopAfterFirstIteration = true;
+
+        TextClet clet = new ();
+        CletRunOptions options = new () { Rows = 10 };
+
+        using CancellationTokenSource cts = new ();
+
+        CletRunResult<string?> result = await clet.RunAsync (app, null, options, cts.Token);
+
+        Assert.Equal (CletRunStatus.Ok, result.Status);
+    }
 }
