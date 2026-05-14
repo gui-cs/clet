@@ -7,6 +7,7 @@ using Terminal.Gui.Drawing;
 using Terminal.Gui.Editor;
 using Terminal.Gui.Highlighting;
 using Terminal.Gui.Input;
+using Terminal.Gui.Text.Indentation;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using TextMateSharp.Grammars;
@@ -135,7 +136,7 @@ internal sealed class EditorClet : IViewerClet
 
         if (settings.AutoIndent)
         {
-            editor.IndentationStrategy = new Terminal.Gui.Text.Indentation.DefaultIndentationStrategy ();
+            editor.IndentationStrategy = new DefaultIndentationStrategy ();
         }
 
         editor.HighlightingDefinition = filePath is not null

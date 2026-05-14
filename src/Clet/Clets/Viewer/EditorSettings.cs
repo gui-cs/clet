@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Terminal.Gui.App;
 
 namespace Clet;
 
@@ -51,9 +52,9 @@ internal sealed class EditorSettings
                 return settings ?? new ();
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // If the file is malformed, fall back to defaults.
+            Logging.Error ($"EditorSettings.Load: {ex.GetType ().Name}: {ex.Message}");
         }
 
         return new ();
@@ -82,9 +83,9 @@ internal sealed class EditorSettings
             string output = obj.ToJsonString (writeOptions);
             File.WriteAllText (path, output);
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort persistence — don't crash the editor if the config file is locked, etc.
+            Logging.Error ($"EditorSettings.Save: {ex.GetType ().Name}: {ex.Message}");
         }
     }
 }
