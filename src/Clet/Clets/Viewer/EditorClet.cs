@@ -99,6 +99,10 @@ internal sealed class EditorClet : IViewerClet
             BorderStyle = LineStyle.None,
         };
 
+        // --- Load persisted settings ---
+
+        EditorSettings settings = EditorSettings.Load ();
+
         Editor editor = new ()
         {
             X = 0,
@@ -106,10 +110,33 @@ internal sealed class EditorClet : IViewerClet
             Width = Dim.Fill (),
             Height = Dim.Fill (1),
             ReadOnly = readOnly,
-            GutterOptions = GutterOptions.LineNumbers | GutterOptions.Folding,
-            ConvertTabsToSpaces = true,
+            ConvertTabsToSpaces = settings.ConvertTabsToSpaces,
+            IndentationSize = settings.IndentSize,
+            WordWrap = settings.WordWrap,
+            ShowTabs = settings.ShowTabs,
+            UseThemeBackground = settings.UseThemeBackground,
             ViewportSettings = ViewportSettingsFlags.HasScrollBars,
         };
+
+        // Apply gutter options from settings
+        GutterOptions initGutter = GutterOptions.None;
+
+        if (settings.LineNumbers)
+        {
+            initGutter |= GutterOptions.LineNumbers;
+        }
+
+        if (settings.FoldIndicators)
+        {
+            initGutter |= GutterOptions.Folding;
+        }
+
+        editor.GutterOptions = initGutter;
+
+        if (settings.AutoIndent)
+        {
+            editor.IndentationStrategy = new Terminal.Gui.Text.Indentation.DefaultIndentationStrategy ();
+        }
 
         editor.HighlightingDefinition = filePath is not null
             ? HighlightingManager.Instance.GetDefinitionByExtension (Path.GetExtension (filePath))
@@ -149,7 +176,7 @@ internal sealed class EditorClet : IViewerClet
         // View-menu toggle items — declared early so preview toggle can reference them.
         MenuItem previewMarkdownItem = new () { Title = "  _Preview Markdown", Enabled = isMarkdownFile };
 
-        bool optUseThemeBg = false;
+        bool optUseThemeBg = settings.UseThemeBackground;
 
         void OnEditorViewportChanged (object? sender, DrawEventArgs e)
         {
@@ -684,6 +711,7 @@ internal sealed class EditorClet : IViewerClet
             if (dlg.WasAccepted)
             {
                 dlg.ApplyTo (editor);
+                SaveViewSettings ();
             }
 
             dlg.Dispose ();
@@ -691,10 +719,10 @@ internal sealed class EditorClet : IViewerClet
 
         // --- View menu toggle state ---
 
-        bool optLineNumbers = true;
-        bool optFoldIndicators = true;
-        bool optWordWrap = false;
-        bool optShowTabs = false;
+        bool optLineNumbers = settings.LineNumbers;
+        bool optFoldIndicators = settings.FoldIndicators;
+        bool optWordWrap = settings.WordWrap;
+        bool optShowTabs = settings.ShowTabs;
 
         void UpdateGutterOptions ()
         {
@@ -747,11 +775,25 @@ internal sealed class EditorClet : IViewerClet
         MenuItem viewShowTabsItem = new () { Title = ToggleTitle (optShowTabs, "Show _Tabs") };
         MenuItem viewUseThemeBgItem = new () { Title = ToggleTitle (optUseThemeBg, "Use _Theme Background") };
 
+        void SaveViewSettings ()
+        {
+            settings.LineNumbers = optLineNumbers;
+            settings.FoldIndicators = optFoldIndicators;
+            settings.WordWrap = optWordWrap;
+            settings.ShowTabs = optShowTabs;
+            settings.UseThemeBackground = optUseThemeBg;
+            settings.IndentSize = editor.IndentationSize;
+            settings.ConvertTabsToSpaces = editor.ConvertTabsToSpaces;
+            settings.AutoIndent = editor.IndentationStrategy is not null;
+            settings.Save ();
+        }
+
         viewLineNumbersItem.Action = () =>
         {
             optLineNumbers = !optLineNumbers;
             viewLineNumbersItem.Title = ToggleTitle (optLineNumbers, "_Line Numbers");
             UpdateGutterOptions ();
+            SaveViewSettings ();
         };
 
         viewFoldIndicatorsItem.Action = () =>
@@ -759,6 +801,7 @@ internal sealed class EditorClet : IViewerClet
             optFoldIndicators = !optFoldIndicators;
             viewFoldIndicatorsItem.Title = ToggleTitle (optFoldIndicators, "_Fold Indicators");
             UpdateGutterOptions ();
+            SaveViewSettings ();
         };
 
         viewWordWrapItem.Action = () =>
@@ -766,6 +809,7 @@ internal sealed class EditorClet : IViewerClet
             optWordWrap = !optWordWrap;
             viewWordWrapItem.Title = ToggleTitle (optWordWrap, "_Word Wrap");
             editor.WordWrap = optWordWrap;
+            SaveViewSettings ();
         };
 
         viewShowTabsItem.Action = () =>
@@ -773,6 +817,7 @@ internal sealed class EditorClet : IViewerClet
             optShowTabs = !optShowTabs;
             viewShowTabsItem.Title = ToggleTitle (optShowTabs, "Show _Tabs");
             editor.ShowTabs = optShowTabs;
+            SaveViewSettings ();
         };
 
         viewUseThemeBgItem.Action = () =>
@@ -785,6 +830,8 @@ internal sealed class EditorClet : IViewerClet
             {
                 markdownPreview.UseThemeBackground = optUseThemeBg;
             }
+
+            SaveViewSettings ();
         };
 
         previewMarkdownItem.Action = () =>
