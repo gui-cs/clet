@@ -1,12 +1,12 @@
 using System.Collections.ObjectModel;
 using Terminal.Gui.App;
+using Terminal.Gui.Configuration;
 using Terminal.Gui.Document;
 using Terminal.Gui.Document.Folding;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Editor;
 using Terminal.Gui.Highlighting;
 using Terminal.Gui.Input;
-using Terminal.Gui.Text.Indentation;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using TextMateSharp.Grammars;
@@ -108,6 +108,7 @@ internal sealed class EditorClet : IViewerClet
             ReadOnly = readOnly,
             GutterOptions = GutterOptions.LineNumbers | GutterOptions.Folding,
             ConvertTabsToSpaces = true,
+            ViewportSettings = ViewportSettingsFlags.HasScrollBars,
         };
 
         editor.HighlightingDefinition = filePath is not null
@@ -141,52 +142,186 @@ internal sealed class EditorClet : IViewerClet
         // --- Markdown preview ---
 
         Markdown? markdownPreview = null;
-        CheckBox? previewCheckBox = null;
+        bool syncingScroll = false;
         bool isMarkdownFile = filePath is not null
             && Path.GetExtension (filePath).Equals (".md", StringComparison.OrdinalIgnoreCase);
 
-        void UpdatePreviewVisibility ()
+        // View-menu toggle items — declared early so preview toggle can reference them.
+        MenuItem previewMarkdownItem = new () { Title = "  _Preview Markdown", Enabled = isMarkdownFile };
+
+        bool optUseThemeBg = false;
+
+        void OnEditorViewportChanged (object? sender, DrawEventArgs e)
         {
-            bool show = previewCheckBox?.Value == CheckState.Checked && isMarkdownFile;
-
-            if (show)
+            if (markdownPreview is null || syncingScroll)
             {
-                if (markdownPreview is null)
-                {
-                    markdownPreview = new Markdown ()
-                    {
-                        X = Pos.Percent (50),
-                        Y = 1,
-                        Width = Dim.Fill (),
-                        Height = Dim.Fill (1),
-                        SyntaxHighlighter = new TextMateSyntaxHighlighter (ThemeName.DarkPlus),
-                    };
+                return;
+            }
 
-                    markdownPreview.Text = editor.Document?.Text ?? "";
+            syncingScroll = true;
 
-                    editor.Document!.Changed += (_, _) =>
-                    {
-                        if (markdownPreview.Visible)
-                        {
-                            markdownPreview.Text = editor.Document?.Text ?? "";
-                        }
-                    };
+            try
+            {
+                int editorContentHeight = editor.GetContentSize ().Height;
+                int editorViewportHeight = editor.Viewport.Height;
+                int maxEditorY = Math.Max (0, editorContentHeight - editorViewportHeight);
+                int editorY = editor.Viewport.Y;
 
-                    window.Add (markdownPreview);
-                }
+                int previewContentHeight = markdownPreview.GetContentSize ().Height;
+                int previewViewportHeight = markdownPreview.Viewport.Height;
+                int maxPreviewY = Math.Max (0, previewContentHeight - previewViewportHeight);
 
-                editor.Width = Dim.Percent (50);
-                markdownPreview.Visible = true;
-                markdownPreview.Text = editor.Document?.Text ?? "";
+                int newY = maxEditorY > 0
+                    ? (int)((long)editorY * maxPreviewY / maxEditorY)
+                    : 0;
+
+                markdownPreview.Viewport = markdownPreview.Viewport with { Y = Math.Clamp (newY, 0, maxPreviewY) };
+            }
+            finally
+            {
+                syncingScroll = false;
+            }
+        }
+
+        void OnPreviewViewportChanged (object? sender, DrawEventArgs e)
+        {
+            if (markdownPreview is null || syncingScroll)
+            {
+                return;
+            }
+
+            syncingScroll = true;
+
+            try
+            {
+                int previewContentHeight = markdownPreview.GetContentSize ().Height;
+                int previewViewportHeight = markdownPreview.Viewport.Height;
+                int maxPreviewY = Math.Max (0, previewContentHeight - previewViewportHeight);
+                int previewY = markdownPreview.Viewport.Y;
+
+                int editorContentHeight = editor.GetContentSize ().Height;
+                int editorViewportHeight = editor.Viewport.Height;
+                int maxEditorY = Math.Max (0, editorContentHeight - editorViewportHeight);
+
+                int newY = maxPreviewY > 0
+                    ? (int)((long)previewY * maxEditorY / maxPreviewY)
+                    : 0;
+
+                editor.Viewport = editor.Viewport with { Y = Math.Clamp (newY, 0, maxEditorY) };
+            }
+            finally
+            {
+                syncingScroll = false;
+            }
+        }
+
+        void OnDocumentChangedForPreview (object? sender, EventArgs e)
+        {
+            if (markdownPreview is null)
+            {
+                return;
+            }
+
+            markdownPreview.Text = editor.Document?.Text ?? string.Empty;
+        }
+
+        void ShowMarkdownPreview ()
+        {
+            if (markdownPreview is not null)
+            {
+                return;
+            }
+
+            markdownPreview = new Markdown ()
+            {
+                X = Pos.Right (editor),
+                Y = editor.Y,
+                Width = Dim.Fill (),
+                Height = editor.Height,
+                Text = editor.Document?.Text ?? string.Empty,
+                ViewportSettings = ViewportSettingsFlags.HasScrollBars,
+                SyntaxHighlighter = new TextMateSyntaxHighlighter (ThemeName.DarkPlus),
+                UseThemeBackground = optUseThemeBg,
+            };
+
+            editor.Width = Dim.Percent (50);
+            window.Add (markdownPreview);
+
+            // Sync scrolling bidirectionally.
+            editor.ViewportChanged += OnEditorViewportChanged;
+            markdownPreview.ViewportChanged += OnPreviewViewportChanged;
+
+            // Update preview when document content changes.
+            if (editor.Document is not null)
+            {
+                editor.Document.Changed += OnDocumentChangedForPreview;
+            }
+        }
+
+        void HideMarkdownPreview ()
+        {
+            if (markdownPreview is null)
+            {
+                return;
+            }
+
+            editor.ViewportChanged -= OnEditorViewportChanged;
+            markdownPreview.ViewportChanged -= OnPreviewViewportChanged;
+
+            if (editor.Document is not null)
+            {
+                editor.Document.Changed -= OnDocumentChangedForPreview;
+            }
+
+            window.Remove (markdownPreview);
+            markdownPreview.Dispose ();
+            markdownPreview = null;
+
+            editor.Width = Dim.Fill ();
+        }
+
+        void RefreshPreviewDocument ()
+        {
+            if (markdownPreview is null)
+            {
+                return;
+            }
+
+            if (editor.Document is not null)
+            {
+                editor.Document.Changed -= OnDocumentChangedForPreview;
+                editor.Document.Changed += OnDocumentChangedForPreview;
+            }
+
+            markdownPreview.Text = editor.Document?.Text ?? string.Empty;
+        }
+
+        void ToggleMarkdownPreview ()
+        {
+            if (previewMarkdownItem.Title?.StartsWith ("✓") == true)
+            {
+                HideMarkdownPreview ();
+                previewMarkdownItem.Title = "  _Preview Markdown";
             }
             else
             {
-                editor.Width = Dim.Fill ();
+                ShowMarkdownPreview ();
+                previewMarkdownItem.Title = "✓ _Preview Markdown";
+            }
+        }
 
-                if (markdownPreview is not null)
-                {
-                    markdownPreview.Visible = false;
-                }
+        void UpdatePreviewEnabled ()
+        {
+            previewMarkdownItem.Enabled = isMarkdownFile;
+
+            if (!isMarkdownFile && markdownPreview is not null)
+            {
+                HideMarkdownPreview ();
+                previewMarkdownItem.Title = "  _Preview Markdown";
+            }
+            else if (isMarkdownFile && markdownPreview is not null)
+            {
+                RefreshPreviewDocument ();
             }
         }
 
@@ -194,15 +329,15 @@ internal sealed class EditorClet : IViewerClet
 
         Shortcut cursorPositionShortcut = new ()
         { Title = "Ln 1, Col 1", MouseHighlightStates = MouseState.None, Enabled = false };
-        Shortcut modifiedShortcut = new () { Title = "", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut languageShortcut = new ()
         { Title = "Plain Text", MouseHighlightStates = MouseState.None, Enabled = false };
 
-        // Filename shortcut for MenuBar
+        // Filename shortcut for MenuBar — full path, dialog scheme
         Shortcut filenameShortcut = new ()
         {
-            Title = fileName ?? "<untitled>",
+            Title = filePath ?? "<untitled>",
             MouseHighlightStates = MouseState.None,
+            SchemeName = SchemeManager.SchemesToSchemeName (Schemes.Dialog),
         };
 
         // --- Local state helpers ---
@@ -212,7 +347,6 @@ internal sealed class EditorClet : IViewerClet
         void UpdateModifiedIndicator ()
         {
             bool dirty = UnsavedChanges ();
-            modifiedShortcut.Title = dirty ? "Modified" : "";
             window.Title = dirty ? $"{fileName ?? "Untitled"}*" : fileName ?? "Untitled";
         }
 
@@ -265,15 +399,9 @@ internal sealed class EditorClet : IViewerClet
                 UpdateSyntaxLanguage (fullPath);
                 InstallFolding ();
                 UpdateModifiedIndicator ();
-                filenameShortcut.Title = fileName;
+                filenameShortcut.Title = fullPath;
                 isMarkdownFile = Path.GetExtension (fullPath).Equals (".md", StringComparison.OrdinalIgnoreCase);
-
-                if (previewCheckBox is not null)
-                {
-                    previewCheckBox.Visible = isMarkdownFile;
-                }
-
-                UpdatePreviewVisibility ();
+                UpdatePreviewEnabled ();
 
                 return;
             }
@@ -289,15 +417,9 @@ internal sealed class EditorClet : IViewerClet
             UpdateSyntaxLanguage (fullPath);
             InstallFolding ();
             UpdateModifiedIndicator ();
-            filenameShortcut.Title = fileName;
+            filenameShortcut.Title = fullPath;
             isMarkdownFile = Path.GetExtension (fullPath).Equals (".md", StringComparison.OrdinalIgnoreCase);
-
-            if (previewCheckBox is not null)
-            {
-                previewCheckBox.Visible = isMarkdownFile;
-            }
-
-            UpdatePreviewVisibility ();
+            UpdatePreviewEnabled ();
         }
 
         bool SaveFile ()
@@ -401,13 +523,7 @@ internal sealed class EditorClet : IViewerClet
             UpdateLanguageShortcut ();
             filenameShortcut.Title = "<untitled>";
             isMarkdownFile = false;
-
-            if (previewCheckBox is not null)
-            {
-                previewCheckBox.Visible = false;
-            }
-
-            UpdatePreviewVisibility ();
+            UpdatePreviewEnabled ();
         }
 
         void OpenFile ()
@@ -558,14 +674,27 @@ internal sealed class EditorClet : IViewerClet
             about.Dispose ();
         }
 
-        // --- Options menu state ---
+        // --- Settings dialog ---
+
+        void ShowSettings ()
+        {
+            EditorSettingsDialog dlg = new (editor);
+            app.Run (dlg);
+
+            if (dlg.WasAccepted)
+            {
+                dlg.ApplyTo (editor);
+            }
+
+            dlg.Dispose ();
+        }
+
+        // --- View menu toggle state ---
 
         bool optLineNumbers = true;
         bool optFoldIndicators = true;
-        bool optConvertTabs = true;
-        bool optAutoIndent = false;
-        bool optUseThemeBg = false;
         bool optWordWrap = false;
+        bool optShowTabs = false;
 
         void UpdateGutterOptions ()
         {
@@ -583,6 +712,8 @@ internal sealed class EditorClet : IViewerClet
 
             editor.GutterOptions = g;
         }
+
+        string ToggleTitle (bool on, string label) => on ? $"✓ {label}" : $"  {label}";
 
         // --- MenuBar ---
 
@@ -608,66 +739,79 @@ internal sealed class EditorClet : IViewerClet
             .. CreateEditMenuItems (),
         ]));
 
-        // Options menu items with toggle titles
-        MenuItem optLineNumbersItem = new () { Title = "✓ _Line Numbers" };
-        MenuItem optFoldIndicatorsItem = new () { Title = "✓ _Fold Indicators" };
-        MenuItem optConvertTabsItem = new () { Title = "✓ _Convert Tabs To Spaces" };
-        MenuItem optAutoIndentItem = new () { Title = "  _Auto Indent" };
-        MenuItem optUseThemeBgItem = new () { Title = "  Use _Theme Background" };
-        MenuItem optWordWrapItem = new () { Title = "  _Word Wrap" };
+        // --- View menu ---
 
-        string ToggleTitle (bool on, string label) => on ? $"✓ {label}" : $"  {label}";
+        MenuItem viewLineNumbersItem = new () { Title = ToggleTitle (optLineNumbers, "_Line Numbers") };
+        MenuItem viewFoldIndicatorsItem = new () { Title = ToggleTitle (optFoldIndicators, "_Fold Indicators") };
+        MenuItem viewWordWrapItem = new () { Title = ToggleTitle (optWordWrap, "_Word Wrap") };
+        MenuItem viewShowTabsItem = new () { Title = ToggleTitle (optShowTabs, "Show _Tabs") };
+        MenuItem viewUseThemeBgItem = new () { Title = ToggleTitle (optUseThemeBg, "Use _Theme Background") };
 
-        optLineNumbersItem.Action = () =>
+        viewLineNumbersItem.Action = () =>
         {
             optLineNumbers = !optLineNumbers;
-            optLineNumbersItem.Title = ToggleTitle (optLineNumbers, "_Line Numbers");
+            viewLineNumbersItem.Title = ToggleTitle (optLineNumbers, "_Line Numbers");
             UpdateGutterOptions ();
         };
 
-        optFoldIndicatorsItem.Action = () =>
+        viewFoldIndicatorsItem.Action = () =>
         {
             optFoldIndicators = !optFoldIndicators;
-            optFoldIndicatorsItem.Title = ToggleTitle (optFoldIndicators, "_Fold Indicators");
+            viewFoldIndicatorsItem.Title = ToggleTitle (optFoldIndicators, "_Fold Indicators");
             UpdateGutterOptions ();
         };
 
-        optConvertTabsItem.Action = () =>
-        {
-            optConvertTabs = !optConvertTabs;
-            optConvertTabsItem.Title = ToggleTitle (optConvertTabs, "_Convert Tabs To Spaces");
-            editor.ConvertTabsToSpaces = optConvertTabs;
-        };
-
-        optAutoIndentItem.Action = () =>
-        {
-            optAutoIndent = !optAutoIndent;
-            optAutoIndentItem.Title = ToggleTitle (optAutoIndent, "_Auto Indent");
-            editor.IndentationStrategy = optAutoIndent ? new DefaultIndentationStrategy () : null;
-        };
-
-        optUseThemeBgItem.Action = () =>
-        {
-            optUseThemeBg = !optUseThemeBg;
-            optUseThemeBgItem.Title = ToggleTitle (optUseThemeBg, "Use _Theme Background");
-            editor.UseThemeBackground = optUseThemeBg;
-        };
-
-        optWordWrapItem.Action = () =>
+        viewWordWrapItem.Action = () =>
         {
             optWordWrap = !optWordWrap;
-            optWordWrapItem.Title = ToggleTitle (optWordWrap, "_Word Wrap");
+            viewWordWrapItem.Title = ToggleTitle (optWordWrap, "_Word Wrap");
             editor.WordWrap = optWordWrap;
         };
 
+        viewShowTabsItem.Action = () =>
+        {
+            optShowTabs = !optShowTabs;
+            viewShowTabsItem.Title = ToggleTitle (optShowTabs, "Show _Tabs");
+            editor.ShowTabs = optShowTabs;
+        };
+
+        viewUseThemeBgItem.Action = () =>
+        {
+            optUseThemeBg = !optUseThemeBg;
+            viewUseThemeBgItem.Title = ToggleTitle (optUseThemeBg, "Use _Theme Background");
+            editor.UseThemeBackground = optUseThemeBg;
+
+            if (markdownPreview is not null)
+            {
+                markdownPreview.UseThemeBackground = optUseThemeBg;
+            }
+        };
+
+        previewMarkdownItem.Action = () =>
+        {
+            if (isMarkdownFile)
+            {
+                ToggleMarkdownPreview ();
+            }
+        };
+
+        menu.Add (new MenuBarItem ("_View",
+        [
+            viewLineNumbersItem,
+            viewFoldIndicatorsItem,
+            viewWordWrapItem,
+            viewShowTabsItem,
+            null!,
+            previewMarkdownItem,
+            null!,
+            viewUseThemeBgItem,
+        ]));
+
+        // --- Options menu ---
+
         menu.Add (new MenuBarItem ("_Options",
         [
-            optLineNumbersItem,
-            optFoldIndicatorsItem,
-            optConvertTabsItem,
-            optAutoIndentItem,
-            optUseThemeBgItem,
-            optWordWrapItem,
+            new MenuItem { Title = "_Settings...", Action = ShowSettings },
         ]));
 
         menu.Add (new MenuBarItem ("_Help",
@@ -709,27 +853,13 @@ internal sealed class EditorClet : IViewerClet
 
         // --- StatusBar ---
 
-        NumericUpDown<int> indentSpinner = new () { Value = editor.IndentationSize, Width = 5 };
-        indentSpinner.ValueChanged += (_, e) => editor.IndentationSize = e.NewValue;
-
-        CheckBox showTabsCheck = new () { Title = "↹", Value = CheckState.UnChecked };
-        showTabsCheck.ValueChanged += (_, e) =>
-            editor.ShowTabs = e.NewValue == CheckState.Checked;
-
-        previewCheckBox = new () { Title = "Preview", Value = CheckState.UnChecked, Visible = isMarkdownFile };
-        previewCheckBox.ValueChanged += (_, _) => UpdatePreviewVisibility ();
-
         List<Shortcut> statusItems =
         [
             new Shortcut (Application.GetDefaultKey (Command.Quit), "Quit", QuitEditor),
             new Shortcut (Key.F2, "Open", OpenFile),
             new Shortcut (Key.F3, "Save", () => SaveFile ()),
-            modifiedShortcut,
             cursorPositionShortcut,
             languageShortcut,
-            new () { CommandView = indentSpinner, HelpText = "Indent" },
-            new () { CommandView = showTabsCheck, HelpText = "" },
-            new () { CommandView = previewCheckBox, HelpText = "" },
         ];
 
         // File selector: dropdown when multiple files, plain label otherwise
