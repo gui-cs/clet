@@ -1,5 +1,5 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
 
@@ -10,7 +10,7 @@ namespace Clet;
 /// <see cref="ConfigurationManager"/> via <see cref="ConfigurationPropertyAttribute"/>
 /// and is loaded automatically from <c>~/.tui/clet.config.json</c>.
 /// </summary>
-internal static class EditorSettings
+internal static partial class EditorSettings
 {
     // --- View toggles ---
 
@@ -57,13 +57,15 @@ internal static class EditorSettings
 
     /// <summary>
     /// Saves current property values to <c>~/.tui/clet.config.json</c>,
-    /// preserving all other keys in the file.
+    /// preserving all JSONC content (comments, formatting, non-editor keys).
+    /// After writing, reloads <see cref="ConfigurationManager"/> so that in-memory
+    /// state matches the persisted file.
     /// </summary>
     internal static void Save () => Save (ConfigClet.GetConfigPath ());
 
     /// <summary>
     /// Saves current property values to the specified config file path,
-    /// preserving all other keys in the file.
+    /// preserving all JSONC content (comments, formatting, non-editor keys).
     /// </summary>
     internal static void Save (string path)
     {
@@ -71,30 +73,72 @@ internal static class EditorSettings
 
         try
         {
-            string existing = File.ReadAllText (path);
+            string text = File.ReadAllText (path);
 
-            JsonNode? root = JsonNode.Parse (
-                existing,
-                documentOptions: new ()
+            // Build key → JSON-value pairs for each managed setting.
+            Dictionary<string, string> entries = new ()
+            {
+                ["EditorSettings.LineNumbers"] = ToJson (LineNumbers),
+                ["EditorSettings.FoldIndicators"] = ToJson (FoldIndicators),
+                ["EditorSettings.WordWrap"] = ToJson (WordWrap),
+                ["EditorSettings.ShowTabs"] = ToJson (ShowTabs),
+                ["EditorSettings.UseThemeBackground"] = ToJson (UseThemeBackground),
+                ["EditorSettings.IndentSize"] = IndentSize.ToString (),
+                ["EditorSettings.ConvertTabsToSpaces"] = ToJson (ConvertTabsToSpaces),
+                ["EditorSettings.AutoIndent"] = ToJson (AutoIndent),
+            };
+
+            List<string> toInsert = [];
+
+            foreach (KeyValuePair<string, string> kvp in entries)
+            {
+                // Try to replace an existing key in-place (preserves surrounding JSONC).
+                // The regex matches: "key" : <value> on non-comment lines.
+                string pattern = $@"(""{Regex.Escape (kvp.Key)}""\s*:\s*)(?:true|false|\d+)";
+
+                if (Regex.IsMatch (text, pattern))
                 {
-                    CommentHandling = JsonCommentHandling.Skip,
-                    AllowTrailingCommas = true,
-                });
+                    text = Regex.Replace (text, pattern, $"${{1}}{kvp.Value}");
+                }
+                else
+                {
+                    toInsert.Add ($"  \"{kvp.Key}\": {kvp.Value}");
+                }
+            }
 
-            JsonObject obj = root as JsonObject ?? new ();
+            // Insert new keys (not previously in the file) before the last closing '}'.
+            if (toInsert.Count > 0)
+            {
+                int lastBrace = text.LastIndexOf ('}');
 
-            // Write each managed key into the config JSON
-            obj["EditorSettings.LineNumbers"] = LineNumbers;
-            obj["EditorSettings.FoldIndicators"] = FoldIndicators;
-            obj["EditorSettings.WordWrap"] = WordWrap;
-            obj["EditorSettings.ShowTabs"] = ShowTabs;
-            obj["EditorSettings.UseThemeBackground"] = UseThemeBackground;
-            obj["EditorSettings.IndentSize"] = IndentSize;
-            obj["EditorSettings.ConvertTabsToSpaces"] = ConvertTabsToSpaces;
-            obj["EditorSettings.AutoIndent"] = AutoIndent;
+                if (lastBrace >= 0)
+                {
+                    // Find the position of the last non-whitespace, non-comment character
+                    // before the closing brace so we can insert a comma after it.
+                    int insertCommaAfter = FindLastJsonTokenPosition (text, lastBrace);
 
-            JsonSerializerOptions writeOptions = new () { WriteIndented = true };
-            File.WriteAllText (path, obj.ToJsonString (writeOptions));
+                    if (insertCommaAfter >= 0 && text[insertCommaAfter] != ',' && text[insertCommaAfter] != '{')
+                    {
+                        // Insert comma after the last JSON value
+                        text = text.Insert (insertCommaAfter + 1, ",");
+
+                        // Adjust lastBrace since we inserted a character
+                        lastBrace = text.LastIndexOf ('}');
+                    }
+
+                    string insertion = $"\n\n{string.Join (",\n", toInsert)}\n";
+                    text = text.Insert (lastBrace, insertion);
+                }
+            }
+
+            File.WriteAllText (path, text);
+
+            // Sync ConfigurationManager so in-memory state matches the file.
+            if (ConfigurationManager.IsEnabled)
+            {
+                ConfigurationManager.Load (ConfigLocations.All);
+                ConfigurationManager.Apply ();
+            }
         }
         catch (Exception ex)
         {
@@ -106,4 +150,47 @@ internal static class EditorSettings
     /// Returns the keys managed by this class. Useful for testing.
     /// </summary>
     internal static IReadOnlyList<string> ManagedKeys => _keys;
+
+    /// <summary>Converts a boolean to its JSON literal.</summary>
+    private static string ToJson (bool value) => value ? "true" : "false";
+
+    /// <summary>
+    /// Finds the position of the last non-whitespace, non-comment character
+    /// before <paramref name="braceIndex"/>. This is where a trailing comma
+    /// should be inserted when appending new properties.
+    /// Returns -1 if only whitespace/comments precede the brace.
+    /// </summary>
+    private static int FindLastJsonTokenPosition (string text, int braceIndex)
+    {
+        int i = braceIndex - 1;
+
+        while (i >= 0)
+        {
+            char c = text[i];
+
+            if (char.IsWhiteSpace (c))
+            {
+                i--;
+
+                continue;
+            }
+
+            // Check if we're at the end of a line comment.
+            // Walk back to find if this line starts with "//".
+            int lineStart = text.LastIndexOf ('\n', i) + 1;
+            string line = text[lineStart..(i + 1)].TrimStart ();
+
+            if (line.StartsWith ("//", StringComparison.Ordinal))
+            {
+                // This entire line is a comment — skip to before it.
+                i = lineStart - 1;
+
+                continue;
+            }
+
+            return i;
+        }
+
+        return -1;
+    }
 }

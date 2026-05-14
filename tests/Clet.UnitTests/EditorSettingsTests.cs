@@ -98,15 +98,23 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.ConvertTabsToSpaces = false;
         EditorSettings.AutoIndent = true;
 
-        // Write a minimal config file so Save can merge into it
+        // Write a minimal config file so Save can insert into it
         File.WriteAllText (_configPath, "{}");
 
         // Act
         EditorSettings.Save (_configPath);
 
-        // Assert
+        // Assert — parse the written file and check values
         string json = File.ReadAllText (_configPath);
-        JsonNode? root = JsonNode.Parse (json);
+
+        JsonNode? root = JsonNode.Parse (
+            json,
+            documentOptions: new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true,
+            });
+
         Assert.NotNull (root);
         JsonObject obj = Assert.IsType<JsonObject> (root);
 
@@ -140,13 +148,109 @@ public class EditorSettingsTests : IDisposable
 
         // Assert
         string json = File.ReadAllText (_configPath);
-        JsonNode? root = JsonNode.Parse (json);
+
+        JsonNode? root = JsonNode.Parse (
+            json,
+            documentOptions: new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true,
+            });
+
         Assert.NotNull (root);
         JsonObject obj = Assert.IsType<JsonObject> (root);
 
         Assert.Equal ("https://example.com/schema.json", (string)obj["$schema"]!);
         Assert.Equal ("Dark", (string)obj["Theme"]!);
         Assert.True ((bool)obj["EditorSettings.LineNumbers"]!);
+    }
+
+    [Fact]
+    public void Save_PreservesJsoncComments ()
+    {
+        // Arrange — write a JSONC file with comments
+        string jsonc =
+            """
+            {
+              // This is a comment
+              "$schema": "https://example.com/schema.json",
+
+              // Theme configuration
+              // "Theme": "Anders",
+
+              "Key.Separator": "+"
+            }
+            """;
+        File.WriteAllText (_configPath, jsonc);
+
+        EditorSettings.LineNumbers = false;
+        EditorSettings.IndentSize = 2;
+
+        // Act
+        EditorSettings.Save (_configPath);
+
+        // Assert — JSONC comments and existing keys are preserved
+        string result = File.ReadAllText (_configPath);
+
+        Assert.Contains ("// This is a comment", result);
+        Assert.Contains ("// Theme configuration", result);
+        Assert.Contains ("// \"Theme\": \"Anders\",", result);
+        Assert.Contains ("\"Key.Separator\": \"+\"", result);
+        Assert.Contains ("\"$schema\": \"https://example.com/schema.json\"", result);
+        Assert.Contains ("\"EditorSettings.LineNumbers\": false", result);
+        Assert.Contains ("\"EditorSettings.IndentSize\": 2", result);
+    }
+
+    [Fact]
+    public void Save_PreservesDefaultConfigContent ()
+    {
+        // Arrange — use the full ConfigClet default JSONC template
+        File.WriteAllText (_configPath, ConfigClet.DefaultConfigContent);
+
+        EditorSettings.LineNumbers = false;
+
+        // Act
+        EditorSettings.Save (_configPath);
+
+        // Assert — the original JSONC structure is intact
+        string result = File.ReadAllText (_configPath);
+
+        Assert.Contains ("clet configuration", result);
+        Assert.Contains ("Terminal.Gui's ConfigurationManager", result);
+        Assert.Contains ("$schema", result);
+        Assert.Contains ("\"EditorSettings.LineNumbers\": false", result);
+    }
+
+    [Fact]
+    public void Save_UpdatesExistingEditorSettingsKeys ()
+    {
+        // Arrange — write a file that already has EditorSettings keys
+        File.WriteAllText (
+            _configPath,
+            """
+            {
+              // comments
+              "EditorSettings.LineNumbers": true,
+              "EditorSettings.IndentSize": 4
+            }
+            """);
+
+        EditorSettings.LineNumbers = false;
+        EditorSettings.IndentSize = 8;
+
+        // Act
+        EditorSettings.Save (_configPath);
+
+        // Assert — existing keys are updated in place
+        string result = File.ReadAllText (_configPath);
+
+        Assert.Contains ("// comments", result);
+        Assert.Contains ("\"EditorSettings.LineNumbers\": false", result);
+        Assert.Contains ("\"EditorSettings.IndentSize\": 8", result);
+
+        // Verify no duplicate keys
+        Assert.Equal (1, CountOccurrences (result, "EditorSettings.LineNumbers"));
+        Assert.Equal (1, CountOccurrences (result, "EditorSettings.IndentSize"));
     }
 
     [Fact]
@@ -223,13 +327,18 @@ public class EditorSettingsTests : IDisposable
         // Act
         EditorSettings.Save (_configPath);
 
-        // Assert — file was created (by EnsureConfigFile + overwritten by Save)
+        // Assert — file was created and contains the setting
         Assert.True (File.Exists (_configPath));
 
         string json = File.ReadAllText (_configPath);
 
-        // Save writes pure JSON (JSONC comments/trailing commas are stripped during round-trip)
-        JsonNode? root = JsonNode.Parse (json);
+        JsonNode? root = JsonNode.Parse (
+            json,
+            documentOptions: new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true,
+            });
 
         Assert.NotNull (root);
         Assert.Equal (6, (int)root!["EditorSettings.IndentSize"]!);
@@ -251,5 +360,20 @@ public class EditorSettingsTests : IDisposable
         Assert.Equal (4, EditorSettings.IndentSize);
         Assert.True (EditorSettings.ConvertTabsToSpaces);
         Assert.False (EditorSettings.AutoIndent);
+    }
+
+    /// <summary>Counts the number of occurrences of <paramref name="substring"/> in <paramref name="text"/>.</summary>
+    private static int CountOccurrences (string text, string substring)
+    {
+        int count = 0;
+        int index = 0;
+
+        while ((index = text.IndexOf (substring, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += substring.Length;
+        }
+
+        return count;
     }
 }
