@@ -597,13 +597,16 @@ internal sealed class EditorClet : IViewerClet
             new MenuItem { Title = "_Save", Key = Key.S.WithCtrl, Action = () => SaveFile () },
             new MenuItem { Title = "Save _As", Action = () => SaveAs () },
             null!,
-            new MenuItem { Title = "_Find...", Key = Key.F.WithCtrl, Action = () => ShowFindReplace () },
-            new MenuItem { Title = "_Replace...", Key = Key.H.WithCtrl, Action = () => ShowFindReplace (true) },
-            null!,
             new MenuItem { Title = "_Quit", Key = Key.Q.WithCtrl, Action = QuitEditor },
         ]));
 
-        menu.Add (new MenuBarItem ("_Edit", CreateEditMenuItems ()));
+        menu.Add (new MenuBarItem ("_Edit",
+        [
+            new MenuItem { Title = "_Find...", Key = Key.F.WithCtrl, Action = () => ShowFindReplace () },
+            new MenuItem { Title = "_Replace...", Key = Key.H.WithCtrl, Action = () => ShowFindReplace (true) },
+            null!,
+            .. CreateEditMenuItems (),
+        ]));
 
         // Options menu items with toggle titles
         MenuItem optLineNumbersItem = new () { Title = "✓ _Line Numbers" };
@@ -670,9 +673,15 @@ internal sealed class EditorClet : IViewerClet
         menu.Add (new MenuBarItem ("_Help",
         [
             new MenuItem { Title = "_About", Action = ShowAbout },
-        ]));
+        ]),
+        filenameShortcut);
 
         // --- Right-click context menu ---
+
+        PopoverMenu contextMenu = new (CreateEditMenuItems ())
+        {
+            Target = new WeakReference<View> (editor),
+        };
 
         editor.MouseEvent += (_, e) =>
         {
@@ -681,8 +690,8 @@ internal sealed class EditorClet : IViewerClet
                 return;
             }
 
-            PopoverMenu contextMenu = new (CreateEditMenuItems ());
-            contextMenu.Visible = true;
+            contextMenu.MakeVisible (e.ScreenPosition);
+            e.Handled = true;
         };
 
         // --- Wire find/replace events ---
@@ -721,7 +730,6 @@ internal sealed class EditorClet : IViewerClet
             new () { CommandView = indentSpinner, HelpText = "Indent" },
             new () { CommandView = showTabsCheck, HelpText = "" },
             new () { CommandView = previewCheckBox, HelpText = "" },
-            filenameShortcut,
         ];
 
         // File selector: dropdown when multiple files, plain label otherwise
