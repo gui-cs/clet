@@ -10,7 +10,7 @@ namespace Clet;
 /// <see cref="ConfigurationManager"/> via <see cref="ConfigurationPropertyAttribute"/>
 /// and is loaded automatically from <c>~/.tui/clet.config.json</c>.
 /// </summary>
-internal static partial class EditorSettings
+internal static class EditorSettings
 {
     // --- View toggles ---
 
@@ -92,9 +92,10 @@ internal static partial class EditorSettings
 
             foreach (KeyValuePair<string, string> kvp in entries)
             {
-                // Try to replace an existing key in-place (preserves surrounding JSONC).
-                // The regex matches: "key" : <value> on non-comment lines.
-                string pattern = $@"(""{Regex.Escape (kvp.Key)}""\s*:\s*)(?:true|false|\d+)";
+                // Replace an existing key in-place (preserves surrounding JSONC).
+                // The negative lookbehind skips keys inside JSONC line comments.
+                // Only matches bool and int values (all current EditorSettings types).
+                string pattern = $@"(?<!//[^\n]*)(""{Regex.Escape (kvp.Key)}""\s*:\s*)(?:true|false|\d+)";
 
                 if (Regex.IsMatch (text, pattern))
                 {

@@ -254,6 +254,33 @@ public class EditorSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Save_DoesNotModifyCommentedOutKeys ()
+    {
+        // Arrange — file has a commented-out EditorSettings key
+        File.WriteAllText (
+            _configPath,
+            """
+            {
+              // "EditorSettings.LineNumbers": true,
+              "EditorSettings.IndentSize": 4
+            }
+            """);
+
+        EditorSettings.LineNumbers = false;
+        EditorSettings.IndentSize = 2;
+
+        // Act
+        EditorSettings.Save (_configPath);
+
+        // Assert — commented-out key is untouched, active key is updated
+        string result = File.ReadAllText (_configPath);
+
+        Assert.Contains ("// \"EditorSettings.LineNumbers\": true,", result);
+        Assert.Contains ("\"EditorSettings.IndentSize\": 2", result);
+        Assert.Contains ("\"EditorSettings.LineNumbers\": false", result);
+    }
+
+    [Fact]
     public void RoundTrip_LoadApply_RestoresPersistedValues ()
     {
         // Arrange — write a config file with non-default values
