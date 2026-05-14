@@ -100,9 +100,7 @@ internal sealed class EditorClet : IViewerClet
             BorderStyle = LineStyle.None,
         };
 
-        // --- Load persisted settings ---
-
-        EditorSettings settings = EditorSettings.Load ();
+        // --- Settings are loaded by ConfigurationManager via [ConfigurationProperty] ---
 
         Editor editor = new ()
         {
@@ -111,30 +109,30 @@ internal sealed class EditorClet : IViewerClet
             Width = Dim.Fill (),
             Height = Dim.Fill (1),
             ReadOnly = readOnly,
-            ConvertTabsToSpaces = settings.ConvertTabsToSpaces,
-            IndentationSize = settings.IndentSize,
-            WordWrap = settings.WordWrap,
-            ShowTabs = settings.ShowTabs,
-            UseThemeBackground = settings.UseThemeBackground,
+            ConvertTabsToSpaces = EditorSettings.ConvertTabsToSpaces,
+            IndentationSize = EditorSettings.IndentSize,
+            WordWrap = EditorSettings.WordWrap,
+            ShowTabs = EditorSettings.ShowTabs,
+            UseThemeBackground = EditorSettings.UseThemeBackground,
             ViewportSettings = ViewportSettingsFlags.HasScrollBars,
         };
 
         // Apply gutter options from settings
         GutterOptions initGutter = GutterOptions.None;
 
-        if (settings.LineNumbers)
+        if (EditorSettings.LineNumbers)
         {
             initGutter |= GutterOptions.LineNumbers;
         }
 
-        if (settings.FoldIndicators)
+        if (EditorSettings.FoldIndicators)
         {
             initGutter |= GutterOptions.Folding;
         }
 
         editor.GutterOptions = initGutter;
 
-        if (settings.AutoIndent)
+        if (EditorSettings.AutoIndent)
         {
             editor.IndentationStrategy = new DefaultIndentationStrategy ();
         }
@@ -177,7 +175,7 @@ internal sealed class EditorClet : IViewerClet
         // View-menu toggle items — declared early so preview toggle can reference them.
         MenuItem previewMarkdownItem = new () { Title = "  _Preview Markdown", Enabled = isMarkdownFile };
 
-        bool optUseThemeBg = settings.UseThemeBackground;
+        bool optUseThemeBg = EditorSettings.UseThemeBackground;
 
         void OnEditorViewportChanged (object? sender, DrawEventArgs e)
         {
@@ -720,10 +718,10 @@ internal sealed class EditorClet : IViewerClet
 
         // --- View menu toggle state ---
 
-        bool optLineNumbers = settings.LineNumbers;
-        bool optFoldIndicators = settings.FoldIndicators;
-        bool optWordWrap = settings.WordWrap;
-        bool optShowTabs = settings.ShowTabs;
+        bool optLineNumbers = EditorSettings.LineNumbers;
+        bool optFoldIndicators = EditorSettings.FoldIndicators;
+        bool optWordWrap = EditorSettings.WordWrap;
+        bool optShowTabs = EditorSettings.ShowTabs;
 
         void UpdateGutterOptions ()
         {
@@ -778,15 +776,15 @@ internal sealed class EditorClet : IViewerClet
 
         void SaveViewSettings ()
         {
-            settings.LineNumbers = optLineNumbers;
-            settings.FoldIndicators = optFoldIndicators;
-            settings.WordWrap = optWordWrap;
-            settings.ShowTabs = optShowTabs;
-            settings.UseThemeBackground = optUseThemeBg;
-            settings.IndentSize = editor.IndentationSize;
-            settings.ConvertTabsToSpaces = editor.ConvertTabsToSpaces;
-            settings.AutoIndent = editor.IndentationStrategy is not null;
-            settings.Save ();
+            EditorSettings.LineNumbers = optLineNumbers;
+            EditorSettings.FoldIndicators = optFoldIndicators;
+            EditorSettings.WordWrap = optWordWrap;
+            EditorSettings.ShowTabs = optShowTabs;
+            EditorSettings.UseThemeBackground = optUseThemeBg;
+            EditorSettings.IndentSize = editor.IndentationSize;
+            EditorSettings.ConvertTabsToSpaces = editor.ConvertTabsToSpaces;
+            EditorSettings.AutoIndent = editor.IndentationStrategy is not null;
+            EditorSettings.Save ();
         }
 
         viewLineNumbersItem.Action = () =>
