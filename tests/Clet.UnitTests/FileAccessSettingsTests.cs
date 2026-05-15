@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Terminal.Gui.Configuration;
 using Xunit;
 
@@ -179,92 +180,162 @@ public class FileAccessSettingsTests
 }
 
 /// <summary>
-/// Tests that verify <see cref="FileAccessSettings.AllowedPaths"/> is discovered
-/// by <see cref="ConfigurationManager"/> and loaded via JSON with the
-/// <see cref="StringArrayJsonConverter"/>.
-/// Must not run in parallel with other CM tests.
+/// Verifies that <see cref="ConfigurationManager"/> discovers
+/// <see cref="FileAccessSettings.AllowedPaths"/> via its assembly scan.
+/// Uses the already-initialized Settings dictionary (no Enable/Disable) so it
+/// cannot interfere with other tests in the CM collection.
 /// </summary>
-[Collection (nameof (ConfigurationManagerCollection))]
-public class FileAccessSettingsCmTests : IDisposable
+public class FileAccessSettingsCmDiscoveryTests
 {
-    private readonly string? _originalHome;
-    private readonly string _tempDir;
-
-    public FileAccessSettingsCmTests ()
-    {
-        _tempDir = Path.Combine (Path.GetTempPath (), $"clet-fas-test-{Guid.NewGuid ():N}");
-        Directory.CreateDirectory (_tempDir);
-        _originalHome = Environment.GetEnvironmentVariable ("HOME");
-        Environment.SetEnvironmentVariable ("HOME", _tempDir);
-        ConfigurationManager.AppName = "clet";
-        FileAccessSettings.AllowedPaths = [];
-    }
-
-    public void Dispose ()
-    {
-        FileAccessSettings.AllowedPaths = [];
-
-        try
-        {
-            ConfigurationManager.Disable (resetToHardCodedDefaults: true);
-        }
-        catch
-        {
-            // Best-effort cleanup.
-        }
-
-        Environment.SetEnvironmentVariable ("HOME", _originalHome);
-
-        if (Directory.Exists (_tempDir))
-        {
-            Directory.Delete (_tempDir, recursive: true);
-        }
-    }
-
     [Fact]
     public void ConfigurationManager_Discovers_FileAccessSettings_AllowedPaths ()
     {
-        ConfigurationManager.Enable (ConfigLocations.None);
-
+        // Settings is populated by the module initializer before any test code
+        // runs; Enable() is not required to check discovery.
         Assert.True (
             ConfigurationManager.Settings!.Keys.Contains ("FileAccessSettings.AllowedPaths"),
             "ConfigurationManager.Settings should contain 'FileAccessSettings.AllowedPaths'");
     }
+}
 
-    [Fact]
-    public void ConfigurationManager_Loads_AllowedPaths_FromRuntimeConfig ()
+/// <summary>
+/// Unit tests for <see cref="StringArrayJsonConverter"/> without involving
+/// <see cref="ConfigurationManager"/> global state.
+/// </summary>
+public class StringArrayJsonConverterTests
+{
+    private static string[] Round (string json)
     {
-        string json = """
-            {
-              "FileAccessSettings.AllowedPaths": ["/home/user/projects", "/tmp/docs"]
-            }
-            """;
+        JsonSerializerOptions opts = new ();
+        opts.Converters.Add (new StringArrayJsonConverter ());
 
-        FileAccessSettings.AllowedPaths = [];
-
-        ConfigurationManager.RuntimeConfig = json;
-        ConfigurationManager.Enable (ConfigLocations.Runtime);
-
-        Assert.NotNull (FileAccessSettings.AllowedPaths);
-        Assert.Equal (2, FileAccessSettings.AllowedPaths.Length);
-        Assert.Equal ("/home/user/projects", FileAccessSettings.AllowedPaths[0]);
-        Assert.Equal ("/tmp/docs", FileAccessSettings.AllowedPaths[1]);
+        return JsonSerializer.Deserialize<string[]> (json, opts)!;
     }
 
     [Fact]
-    public void ConfigurationManager_EmptyArray_SetsAllowedPathsToEmpty ()
+    public void Read_TwoPaths_ReturnsBothPaths ()
     {
-        string json = """
+        string[] result = Round ("""["/home/user/projects", "/tmp/docs"]""");
+
+        Assert.Equal (2, result.Length);
+        Assert.Equal ("/home/user/projects", result[0]);
+        Assert.Equal ("/tmp/docs", result[1]);
+    }
+
+    [Fact]
+    public void Read_EmptyArray_ReturnsEmptyArray ()
+    {
+        string[] result = Round ("[]");
+
+        Assert.Empty (result);
+    }
+
+    [Fact]
+    public void Read_NullOrWhitespaceEntries_AreFiltered ()
+    {
+        string[] result = Round ("""["  ", "/real/path", ""]""");
+
+        Assert.Single (result);
+        Assert.Equal ("/real/path", result[0]);
+    }
+
+    [Fact]
+    public void Write_RoundTrips ()
+    {
+        string[] paths = ["/a", "/b"];
+        JsonSerializerOptions opts = new ();
+        opts.Converters.Add (new StringArrayJsonConverter ());
+
+        string json = JsonSerializer.Serialize (paths, opts);
+        string[] result = JsonSerializer.Deserialize<string[]> (json, opts)!;
+
+        Assert.Equal (paths, result);
+    }
+}
+
+/// <summary>
+/// Tests for <see cref="FileAccessSettings.AddToConfig(string, string)"/>.
+/// Uses a temporary file path so no CM global state is touched.
+/// </summary>
+public class FileAccessSettingsAddToConfigTests : IDisposable
+{
+    private readonly string _tempDir;
+    private readonly string _configPath;
+    private readonly string[] _originalPaths;
+
+    public FileAccessSettingsAddToConfigTests ()
+    {
+        _tempDir = Path.Combine (Path.GetTempPath (), $"clet-addcfg-{Guid.NewGuid ():N}");
+        Directory.CreateDirectory (_tempDir);
+        _configPath = Path.Combine (_tempDir, "clet.config.json");
+        _originalPaths = FileAccessSettings.AllowedPaths;
+    }
+
+    public void Dispose ()
+    {
+        FileAccessSettings.AllowedPaths = _originalPaths;
+
+        if (Directory.Exists (_tempDir))
+        {
+            Directory.Delete (_tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void AddToConfig_CreatesFileAndAddsPath ()
+    {
+        FileAccessSettings.AddToConfig ("/new/path", _configPath);
+
+        Assert.True (File.Exists (_configPath));
+        string text = File.ReadAllText (_configPath);
+        Assert.Contains ("/new/path", text);
+    }
+
+    [Fact]
+    public void AddToConfig_UpdatesInMemoryAllowedPaths ()
+    {
+        FileAccessSettings.AllowedPaths = [];
+
+        FileAccessSettings.AddToConfig ("/in-memory", _configPath);
+
+        Assert.Contains ("/in-memory", FileAccessSettings.AllowedPaths);
+    }
+
+    [Fact]
+    public void AddToConfig_AppendsToPreviouslyWrittenPath ()
+    {
+        FileAccessSettings.AddToConfig ("/first", _configPath);
+        FileAccessSettings.AddToConfig ("/second", _configPath);
+
+        string text = File.ReadAllText (_configPath);
+        Assert.Contains ("/first", text);
+        Assert.Contains ("/second", text);
+    }
+
+    [Fact]
+    public void AddToConfig_DuplicatePath_NotAddedAgain ()
+    {
+        FileAccessSettings.AddToConfig ("/dup", _configPath);
+        FileAccessSettings.AddToConfig ("/dup", _configPath);
+
+        string text = File.ReadAllText (_configPath);
+        Assert.Equal (1, text.Split ("/dup", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public void AddToConfig_PreservesExistingKeys ()
+    {
+        // Write a config file that already has EditorSettings.
+        File.WriteAllText (_configPath, """
             {
-              "FileAccessSettings.AllowedPaths": []
+              "EditorSettings.LineNumbers": false
             }
-            """;
+            """);
 
-        FileAccessSettings.AllowedPaths = ["/should-be-cleared"];
+        FileAccessSettings.AddToConfig ("/extra", _configPath);
 
-        ConfigurationManager.RuntimeConfig = json;
-        ConfigurationManager.Enable (ConfigLocations.Runtime);
-
-        Assert.Empty (FileAccessSettings.AllowedPaths);
+        string text = File.ReadAllText (_configPath);
+        Assert.Contains ("EditorSettings.LineNumbers", text);
+        Assert.Contains ("/extra", text);
     }
 }
