@@ -6,9 +6,26 @@ namespace Clet.UnitTests;
 /// <summary>
 /// Tests for <see cref="FileAccessSettings"/> and
 /// <see cref="FileAccessPolicy.MergeWithConfigPaths"/>.
+/// All three classes in this file touch <see cref="FileAccessSettings.AllowedPaths"/>,
+/// which is a CM-discovered static property. They must all run in the
+/// <see cref="ConfigurationManagerCollection"/> to avoid races with
+/// <see cref="EditorSettingsTests"/> and with each other.
 /// </summary>
-public class FileAccessSettingsTests
+[Collection (nameof (ConfigurationManagerCollection))]
+public class FileAccessSettingsTests : IDisposable
 {
+    private readonly List<string> _originalPaths;
+
+    public FileAccessSettingsTests ()
+    {
+        _originalPaths = [.. FileAccessSettings.AllowedPaths];
+    }
+
+    public void Dispose ()
+    {
+        FileAccessSettings.AllowedPaths = _originalPaths;
+    }
+
     // ── MergeWithConfigPaths ─────────────────────────────────────────────────
 
     [Fact]
@@ -37,18 +54,11 @@ public class FileAccessSettingsTests
     {
         FileAccessSettings.AllowedPaths = ["/tmp/config-dir"];
 
-        try
-        {
-            IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (null);
+        IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (null);
 
-            Assert.NotNull (result);
-            Assert.Single (result);
-            Assert.Equal ("/tmp/config-dir", result[0]);
-        }
-        finally
-        {
-            FileAccessSettings.AllowedPaths = [];
-        }
+        Assert.NotNull (result);
+        Assert.Single (result);
+        Assert.Equal ("/tmp/config-dir", result[0]);
     }
 
     [Fact]
@@ -57,19 +67,12 @@ public class FileAccessSettingsTests
         FileAccessSettings.AllowedPaths = ["/config/path"];
         List<string> cli = ["/cli/path"];
 
-        try
-        {
-            IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (cli);
+        IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (cli);
 
-            Assert.NotNull (result);
-            Assert.Equal (2, result.Count);
-            Assert.Equal ("/cli/path", result[0]);
-            Assert.Equal ("/config/path", result[1]);
-        }
-        finally
-        {
-            FileAccessSettings.AllowedPaths = [];
-        }
+        Assert.NotNull (result);
+        Assert.Equal (2, result.Count);
+        Assert.Equal ("/cli/path", result[0]);
+        Assert.Equal ("/config/path", result[1]);
     }
 
     // ── FileAccessPolicy integration with config paths ───────────────────────
@@ -100,7 +103,6 @@ public class FileAccessSettingsTests
         }
         finally
         {
-            FileAccessSettings.AllowedPaths = [];
             File.Delete (file);
             Directory.Delete (allowedDir, recursive: true);
             Directory.Delete (cwd, recursive: true);
@@ -133,7 +135,6 @@ public class FileAccessSettingsTests
         }
         finally
         {
-            FileAccessSettings.AllowedPaths = [];
             File.Delete (file);
             Directory.Delete (allowedDir, recursive: true);
             Directory.Delete (cwd, recursive: true);
@@ -169,7 +170,6 @@ public class FileAccessSettingsTests
         }
         finally
         {
-            FileAccessSettings.AllowedPaths = [];
             File.Delete (file);
             Directory.Delete (allowedDir, recursive: true);
             Directory.Delete (cwd, recursive: true);
@@ -181,9 +181,10 @@ public class FileAccessSettingsTests
 /// <summary>
 /// Verifies that <see cref="ConfigurationManager"/> discovers
 /// <see cref="FileAccessSettings.AllowedPaths"/> via its assembly scan.
-/// Uses the already-initialized Settings dictionary (no Enable/Disable) so it
-/// cannot interfere with other tests in the CM collection.
+/// In the <see cref="ConfigurationManagerCollection"/> so it runs serially
+/// with other CM-touching tests.
 /// </summary>
+[Collection (nameof (ConfigurationManagerCollection))]
 public class FileAccessSettingsCmDiscoveryTests
 {
     [Fact]
@@ -199,8 +200,10 @@ public class FileAccessSettingsCmDiscoveryTests
 
 /// <summary>
 /// Tests for <see cref="FileAccessSettings.AddToConfig(string, string)"/>.
-/// Uses a temporary file path so no CM global state is touched.
+/// In the <see cref="ConfigurationManagerCollection"/> because it mutates
+/// <see cref="FileAccessSettings.AllowedPaths"/>, a CM-discovered static property.
 /// </summary>
+[Collection (nameof (ConfigurationManagerCollection))]
 public class FileAccessSettingsAddToConfigTests : IDisposable
 {
     private readonly string _tempDir;
@@ -212,7 +215,7 @@ public class FileAccessSettingsAddToConfigTests : IDisposable
         _tempDir = Path.Combine (Path.GetTempPath (), $"clet-addcfg-{Guid.NewGuid ():N}");
         Directory.CreateDirectory (_tempDir);
         _configPath = Path.Combine (_tempDir, "clet.config.json");
-        _originalPaths = FileAccessSettings.AllowedPaths;
+        _originalPaths = [.. FileAccessSettings.AllowedPaths];
     }
 
     public void Dispose ()

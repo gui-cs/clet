@@ -405,7 +405,7 @@ public class EditorSettingsTests : IDisposable
         ConfigurationManager.Disable (resetToHardCodedDefaults: true);
 
         // Arrange — reset in-memory value to empty
-        List<string> savedPaths = FileAccessSettings.AllowedPaths;
+        List<string> savedPaths = [.. FileAccessSettings.AllowedPaths];
         FileAccessSettings.AllowedPaths = [];
 
         string json = """
