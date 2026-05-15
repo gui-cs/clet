@@ -22,6 +22,7 @@ public class EditorSettingsTests : IDisposable
     private readonly string _tempDir;
     private readonly string _configPath;
     private readonly string? _originalHome;
+    private readonly string? _originalUserProfile;
 
     public EditorSettingsTests ()
     {
@@ -30,11 +31,14 @@ public class EditorSettingsTests : IDisposable
         Directory.CreateDirectory (tuiDir);
         _configPath = Path.Combine (tuiDir, ConfigClet.ConfigFileName);
 
-        // Save original HOME so we can restore it on cleanup.
+        // Save original HOME/USERPROFILE so we can restore them on cleanup.
         _originalHome = Environment.GetEnvironmentVariable ("HOME");
+        _originalUserProfile = Environment.GetEnvironmentVariable ("USERPROFILE");
 
-        // Point HOME at our temp directory so CM picks up our test config file.
+        // Point HOME (Linux/macOS) and USERPROFILE (Windows) at our temp directory
+        // so CM's ~ resolution picks up our test config file on all platforms.
         Environment.SetEnvironmentVariable ("HOME", _tempDir);
+        Environment.SetEnvironmentVariable ("USERPROFILE", _tempDir);
 
         // Ensure CM uses the "clet" app name (matches the clet binary; in tests
         // the assembly name is different).
@@ -53,8 +57,9 @@ public class EditorSettingsTests : IDisposable
             // Best-effort cleanup.
         }
 
-        // Restore original HOME.
+        // Restore original HOME/USERPROFILE.
         Environment.SetEnvironmentVariable ("HOME", _originalHome);
+        Environment.SetEnvironmentVariable ("USERPROFILE", _originalUserProfile);
 
         if (Directory.Exists (_tempDir))
         {
@@ -305,16 +310,27 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.WordWrap = false;
         EditorSettings.AutoIndent = false;
 
-        // Act — enable CM and load + apply
-        ConfigurationManager.Enable (ConfigLocations.All);
-        ConfigurationManager.Load (ConfigLocations.All);
-        ConfigurationManager.Apply ();
+        // Act — enable CM and load + apply using the TUI_CONFIG env var
+        // (avoids ~ resolution issues on Windows where GetFolderPath
+        // doesn't respect USERPROFILE env var changes).
+        Environment.SetEnvironmentVariable ("TUI_CONFIG", _configPath);
 
-        // Assert
-        Assert.False (EditorSettings.LineNumbers);
-        Assert.Equal (8, EditorSettings.IndentSize);
-        Assert.True (EditorSettings.WordWrap);
-        Assert.True (EditorSettings.AutoIndent);
+        try
+        {
+            ConfigurationManager.Enable (ConfigLocations.All);
+            ConfigurationManager.Load (ConfigLocations.Env);
+            ConfigurationManager.Apply ();
+
+            // Assert
+            Assert.False (EditorSettings.LineNumbers);
+            Assert.Equal (8, EditorSettings.IndentSize);
+            Assert.True (EditorSettings.WordWrap);
+            Assert.True (EditorSettings.AutoIndent);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable ("TUI_CONFIG", null);
+        }
     }
 
     [Fact]
@@ -335,16 +351,26 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.IndentSize = 4;
         EditorSettings.ConvertTabsToSpaces = true;
 
-        // Act — load + apply via CM
-        ConfigurationManager.Enable (ConfigLocations.All);
-        ConfigurationManager.Load (ConfigLocations.All);
-        ConfigurationManager.Apply ();
+        // Act — load + apply via CM using the TUI_CONFIG env var
+        // (avoids ~ resolution issues on Windows).
+        Environment.SetEnvironmentVariable ("TUI_CONFIG", _configPath);
 
-        // Assert — values should match what we saved
-        Assert.False (EditorSettings.LineNumbers);
-        Assert.False (EditorSettings.FoldIndicators);
-        Assert.Equal (3, EditorSettings.IndentSize);
-        Assert.False (EditorSettings.ConvertTabsToSpaces);
+        try
+        {
+            ConfigurationManager.Enable (ConfigLocations.All);
+            ConfigurationManager.Load (ConfigLocations.Env);
+            ConfigurationManager.Apply ();
+
+            // Assert — values should match what we saved
+            Assert.False (EditorSettings.LineNumbers);
+            Assert.False (EditorSettings.FoldIndicators);
+            Assert.Equal (3, EditorSettings.IndentSize);
+            Assert.False (EditorSettings.ConvertTabsToSpaces);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable ("TUI_CONFIG", null);
+        }
     }
 
     [Fact]
