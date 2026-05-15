@@ -27,10 +27,12 @@ To permanently allow files in specific directories, add them to
 `FileAccessSettings.AllowedPaths` in `~/.tui/clet.config.json`:
 
 ```jsonc
-"FileAccessSettings.AllowedPaths": [
-  "/home/user/projects",
-  "/home/user/docs"
-]
+{
+  "FileAccessSettings.AllowedPaths": [
+    "/home/user/projects",
+    "/home/user/docs"
+  ]
+}
 ```
 
 Run `clet config` to open the config file.

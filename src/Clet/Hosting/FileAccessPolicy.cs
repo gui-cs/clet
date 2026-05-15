@@ -80,8 +80,10 @@ internal sealed class FileAccessPolicy
 
             if (!DefaultAllowedExtensions.Contains (ext))
             {
+                string allowed = string.Join (", ", DefaultAllowedExtensions);
+
                 return $"Refused: '{filePath}' has extension '{ext}' which is not in the allowlist " +
-                       $"({string.Join (", ", DefaultAllowedExtensions)}). Use --allow-file or add to " +
+                       $"({allowed}). Use --allow-file or add to " +
                        "\"FileAccessSettings.AllowedPaths\" in ~/.tui/clet.config.json to override.";
             }
         }

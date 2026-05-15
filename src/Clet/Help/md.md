@@ -24,10 +24,12 @@ To grant permanent access to specific directories, add them to
 `FileAccessSettings.AllowedPaths` in `~/.tui/clet.config.json`:
 
 ```jsonc
-"FileAccessSettings.AllowedPaths": [
-  "/home/user/projects",
-  "/home/user/docs"
-]
+{
+  "FileAccessSettings.AllowedPaths": [
+    "/home/user/projects",
+    "/home/user/docs"
+  ]
+}
 ```
 
 Files under those directories will be allowed by `clet md` and `clet edit`
