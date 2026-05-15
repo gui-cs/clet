@@ -12,7 +12,7 @@ public class FileAccessSettingsTests
     // ── MergeWithConfigPaths ─────────────────────────────────────────────────
 
     [Fact]
-    public void MergeWithConfigPaths_BothEmpty_ReturnsNull ()
+    public void MergeWithConfigPaths_ConfigEmptyAndCliNull_ReturnsNull ()
     {
         FileAccessSettings.AllowedPaths = [];
 

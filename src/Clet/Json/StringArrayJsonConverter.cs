@@ -37,7 +37,7 @@ internal sealed class StringArrayJsonConverter : JsonConverter<string[]>
             }
         }
 
-        return result.Count > 0 ? [..result] : [];
+        return result.Count > 0 ? result.ToArray () : [];
     }
 
     public override void Write (Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
