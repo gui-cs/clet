@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Terminal.Gui.Configuration;
 using Xunit;
 
 namespace Clet.UnitTests;
@@ -12,9 +12,9 @@ public class FileAccessSettingsTests
     // ── MergeWithConfigPaths ─────────────────────────────────────────────────
 
     [Fact]
-    public void MergeWithConfigPaths_BothNull_ReturnsNull ()
+    public void MergeWithConfigPaths_BothEmpty_ReturnsNull ()
     {
-        FileAccessSettings.AllowedPaths = null;
+        FileAccessSettings.AllowedPaths = [];
 
         IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (null);
 
@@ -37,13 +37,18 @@ public class FileAccessSettingsTests
     {
         FileAccessSettings.AllowedPaths = ["/tmp/config-dir"];
 
-        IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (null);
+        try
+        {
+            IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (null);
 
-        Assert.NotNull (result);
-        Assert.Single (result);
-        Assert.Equal ("/tmp/config-dir", result[0]);
-
-        FileAccessSettings.AllowedPaths = null;
+            Assert.NotNull (result);
+            Assert.Single (result);
+            Assert.Equal ("/tmp/config-dir", result[0]);
+        }
+        finally
+        {
+            FileAccessSettings.AllowedPaths = [];
+        }
     }
 
     [Fact]
@@ -52,182 +57,18 @@ public class FileAccessSettingsTests
         FileAccessSettings.AllowedPaths = ["/config/path"];
         List<string> cli = ["/cli/path"];
 
-        IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (cli);
-
-        Assert.NotNull (result);
-        Assert.Equal (2, result.Count);
-        Assert.Equal ("/cli/path", result[0]);
-        Assert.Equal ("/config/path", result[1]);
-
-        FileAccessSettings.AllowedPaths = null;
-    }
-
-    // ── LoadFromConfig ───────────────────────────────────────────────────────
-
-    [Fact]
-    public void LoadFromConfig_FileNotFound_LeavesAllowedPathsNull ()
-    {
-        FileAccessSettings.AllowedPaths = ["/existing"];
-
-        FileAccessSettings.LoadFromConfig ("/nonexistent/path/clet.config.json");
-
-        Assert.Null (FileAccessSettings.AllowedPaths);
-    }
-
-    [Fact]
-    public void LoadFromConfig_ValidArray_SetsAllowedPaths ()
-    {
-        string configPath = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ():N}.json");
-
         try
         {
-            File.WriteAllText (configPath, """
-                {
-                  "FileAccessSettings.AllowedPaths": ["/home/user/projects", "/tmp/docs"]
-                }
-                """);
+            IReadOnlyList<string>? result = FileAccessPolicy.MergeWithConfigPaths (cli);
 
-            FileAccessSettings.AllowedPaths = null;
-            FileAccessSettings.LoadFromConfig (configPath);
-
-            Assert.NotNull (FileAccessSettings.AllowedPaths);
-            Assert.Equal (2, FileAccessSettings.AllowedPaths.Length);
-            Assert.Equal ("/home/user/projects", FileAccessSettings.AllowedPaths[0]);
-            Assert.Equal ("/tmp/docs", FileAccessSettings.AllowedPaths[1]);
+            Assert.NotNull (result);
+            Assert.Equal (2, result.Count);
+            Assert.Equal ("/cli/path", result[0]);
+            Assert.Equal ("/config/path", result[1]);
         }
         finally
         {
-            FileAccessSettings.AllowedPaths = null;
-            File.Delete (configPath);
-        }
-    }
-
-    [Fact]
-    public void LoadFromConfig_ArrayWithComments_SetsAllowedPaths ()
-    {
-        string configPath = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ():N}.json");
-
-        try
-        {
-            File.WriteAllText (configPath, """
-                {
-                  // Allow list for clet edit and clet md
-                  "FileAccessSettings.AllowedPaths": [
-                    // My projects
-                    "/home/user/projects",
-                    "/tmp/docs"
-                  ]
-                }
-                """);
-
-            FileAccessSettings.AllowedPaths = null;
-            FileAccessSettings.LoadFromConfig (configPath);
-
-            Assert.NotNull (FileAccessSettings.AllowedPaths);
-            Assert.Equal (2, FileAccessSettings.AllowedPaths.Length);
-        }
-        finally
-        {
-            FileAccessSettings.AllowedPaths = null;
-            File.Delete (configPath);
-        }
-    }
-
-    [Fact]
-    public void LoadFromConfig_EmptyArray_LeavesAllowedPathsNull ()
-    {
-        string configPath = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ():N}.json");
-
-        try
-        {
-            File.WriteAllText (configPath, """
-                {
-                  "FileAccessSettings.AllowedPaths": []
-                }
-                """);
-
-            FileAccessSettings.AllowedPaths = ["/existing"];
-            FileAccessSettings.LoadFromConfig (configPath);
-
-            Assert.Null (FileAccessSettings.AllowedPaths);
-        }
-        finally
-        {
-            FileAccessSettings.AllowedPaths = null;
-            File.Delete (configPath);
-        }
-    }
-
-    [Fact]
-    public void LoadFromConfig_KeyAbsent_LeavesAllowedPathsNull ()
-    {
-        string configPath = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ():N}.json");
-
-        try
-        {
-            File.WriteAllText (configPath, """
-                {
-                  "EditorSettings.LineNumbers": true
-                }
-                """);
-
-            FileAccessSettings.AllowedPaths = ["/existing"];
-            FileAccessSettings.LoadFromConfig (configPath);
-
-            Assert.Null (FileAccessSettings.AllowedPaths);
-        }
-        finally
-        {
-            FileAccessSettings.AllowedPaths = null;
-            File.Delete (configPath);
-        }
-    }
-
-    [Fact]
-    public void LoadFromConfig_InvalidJson_LeavesAllowedPathsNull ()
-    {
-        string configPath = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ():N}.json");
-
-        try
-        {
-            File.WriteAllText (configPath, "not valid json {{{");
-
-            FileAccessSettings.AllowedPaths = ["/existing"];
-            FileAccessSettings.LoadFromConfig (configPath);
-
-            Assert.Null (FileAccessSettings.AllowedPaths);
-        }
-        finally
-        {
-            FileAccessSettings.AllowedPaths = null;
-            File.Delete (configPath);
-        }
-    }
-
-    [Fact]
-    public void LoadFromConfig_IgnoresBlankAndWhitespaceEntries ()
-    {
-        string configPath = Path.Combine (Path.GetTempPath (), $"clet-test-{Guid.NewGuid ():N}.json");
-
-        try
-        {
-            File.WriteAllText (configPath, """
-                {
-                  "FileAccessSettings.AllowedPaths": ["", "  ", "/valid/path", null]
-                }
-                """);
-
-            FileAccessSettings.AllowedPaths = null;
-            FileAccessSettings.LoadFromConfig (configPath);
-
-            Assert.NotNull (FileAccessSettings.AllowedPaths);
-            Assert.Single (FileAccessSettings.AllowedPaths);
-            Assert.Equal ("/valid/path", FileAccessSettings.AllowedPaths[0]);
-        }
-        finally
-        {
-            FileAccessSettings.AllowedPaths = null;
-            File.Delete (configPath);
+            FileAccessSettings.AllowedPaths = [];
         }
     }
 
@@ -259,7 +100,7 @@ public class FileAccessSettingsTests
         }
         finally
         {
-            FileAccessSettings.AllowedPaths = null;
+            FileAccessSettings.AllowedPaths = [];
             File.Delete (file);
             Directory.Delete (allowedDir, recursive: true);
             Directory.Delete (cwd, recursive: true);
@@ -292,7 +133,7 @@ public class FileAccessSettingsTests
         }
         finally
         {
-            FileAccessSettings.AllowedPaths = null;
+            FileAccessSettings.AllowedPaths = [];
             File.Delete (file);
             Directory.Delete (allowedDir, recursive: true);
             Directory.Delete (cwd, recursive: true);
@@ -328,11 +169,102 @@ public class FileAccessSettingsTests
         }
         finally
         {
-            FileAccessSettings.AllowedPaths = null;
+            FileAccessSettings.AllowedPaths = [];
             File.Delete (file);
             Directory.Delete (allowedDir, recursive: true);
             Directory.Delete (cwd, recursive: true);
             Directory.Delete (otherDir, recursive: true);
         }
+    }
+}
+
+/// <summary>
+/// Tests that verify <see cref="FileAccessSettings.AllowedPaths"/> is discovered
+/// by <see cref="ConfigurationManager"/> and loaded via JSON with the
+/// <see cref="StringArrayJsonConverter"/>.
+/// Must not run in parallel with other CM tests.
+/// </summary>
+[Collection (nameof (ConfigurationManagerCollection))]
+public class FileAccessSettingsCmTests : IDisposable
+{
+    private readonly string? _originalHome;
+    private readonly string _tempDir;
+
+    public FileAccessSettingsCmTests ()
+    {
+        _tempDir = Path.Combine (Path.GetTempPath (), $"clet-fas-test-{Guid.NewGuid ():N}");
+        Directory.CreateDirectory (_tempDir);
+        _originalHome = Environment.GetEnvironmentVariable ("HOME");
+        Environment.SetEnvironmentVariable ("HOME", _tempDir);
+        ConfigurationManager.AppName = "clet";
+        FileAccessSettings.AllowedPaths = [];
+    }
+
+    public void Dispose ()
+    {
+        FileAccessSettings.AllowedPaths = [];
+
+        try
+        {
+            ConfigurationManager.Disable (resetToHardCodedDefaults: true);
+        }
+        catch
+        {
+            // Best-effort cleanup.
+        }
+
+        Environment.SetEnvironmentVariable ("HOME", _originalHome);
+
+        if (Directory.Exists (_tempDir))
+        {
+            Directory.Delete (_tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConfigurationManager_Discovers_FileAccessSettings_AllowedPaths ()
+    {
+        ConfigurationManager.Enable (ConfigLocations.None);
+
+        Assert.True (
+            ConfigurationManager.Settings!.Keys.Contains ("FileAccessSettings.AllowedPaths"),
+            "ConfigurationManager.Settings should contain 'FileAccessSettings.AllowedPaths'");
+    }
+
+    [Fact]
+    public void ConfigurationManager_Loads_AllowedPaths_FromRuntimeConfig ()
+    {
+        string json = """
+            {
+              "FileAccessSettings.AllowedPaths": ["/home/user/projects", "/tmp/docs"]
+            }
+            """;
+
+        FileAccessSettings.AllowedPaths = [];
+
+        ConfigurationManager.RuntimeConfig = json;
+        ConfigurationManager.Enable (ConfigLocations.Runtime);
+
+        Assert.NotNull (FileAccessSettings.AllowedPaths);
+        Assert.Equal (2, FileAccessSettings.AllowedPaths.Length);
+        Assert.Equal ("/home/user/projects", FileAccessSettings.AllowedPaths[0]);
+        Assert.Equal ("/tmp/docs", FileAccessSettings.AllowedPaths[1]);
+    }
+
+    [Fact]
+    public void ConfigurationManager_EmptyArray_SetsAllowedPathsToEmpty ()
+    {
+        string json = """
+            {
+              "FileAccessSettings.AllowedPaths": []
+            }
+            """;
+
+        FileAccessSettings.AllowedPaths = ["/should-be-cleared"];
+
+        ConfigurationManager.RuntimeConfig = json;
+        ConfigurationManager.Enable (ConfigLocations.Runtime);
+
+        Assert.Empty (FileAccessSettings.AllowedPaths);
     }
 }

@@ -47,9 +47,6 @@ internal sealed class AliasDispatcher
                 return helpClet.RenderCat (options, stdout, stderr);
             }
 
-            // Load config-based allowed paths before resolving file content.
-            FileAccessSettings.LoadFromConfig ();
-
             string? markdown = ResolveViewerContent (initial, options, stderr);
 
             if (markdown is not null)
@@ -78,9 +75,6 @@ internal sealed class AliasDispatcher
                 ConfigurationManager.Enable (ConfigLocations.None);
                 Logging.Information ("AliasDispatcher: fell back to hard-coded defaults");
             }
-
-            // Load string-array settings not handled by ConfigurationManager's Apply() directly.
-            FileAccessSettings.LoadFromConfig ();
 
             bool useFullscreen = options.Fullscreen || clet.Kind == CletKind.Viewer;
             Application.AppModel = useFullscreen ? AppModel.FullScreen : AppModel.Inline;
