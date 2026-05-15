@@ -6,7 +6,6 @@ internal static class BuiltInClets
     {
         registry.Register (new SelectClet ());
         registry.Register (new TextClet ());
-        registry.Register (new MultilineTextClet ());
         registry.Register (new IntClet ());
         registry.Register (new DecimalClet ());
         registry.Register (new ConfirmClet ());
