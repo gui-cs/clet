@@ -22,7 +22,6 @@ public class EditorSettingsTests : IDisposable
     private readonly string _tempDir;
     private readonly string _configPath;
     private readonly string? _originalHome;
-    private readonly string? _originalUserProfile;
 
     public EditorSettingsTests ()
     {
@@ -31,14 +30,11 @@ public class EditorSettingsTests : IDisposable
         Directory.CreateDirectory (tuiDir);
         _configPath = Path.Combine (tuiDir, ConfigClet.ConfigFileName);
 
-        // Save original HOME/USERPROFILE so we can restore them on cleanup.
+        // Save original HOME so we can restore it on cleanup.
         _originalHome = Environment.GetEnvironmentVariable ("HOME");
-        _originalUserProfile = Environment.GetEnvironmentVariable ("USERPROFILE");
 
-        // Point HOME (Linux/macOS) and USERPROFILE (Windows) at our temp directory
-        // so CM's ~ resolution picks up our test config file on all platforms.
+        // Point HOME at our temp directory (used by Save's CM reload on Linux).
         Environment.SetEnvironmentVariable ("HOME", _tempDir);
-        Environment.SetEnvironmentVariable ("USERPROFILE", _tempDir);
 
         // Ensure CM uses the "clet" app name (matches the clet binary; in tests
         // the assembly name is different).
@@ -57,9 +53,8 @@ public class EditorSettingsTests : IDisposable
             // Best-effort cleanup.
         }
 
-        // Restore original HOME/USERPROFILE.
+        // Restore original HOME.
         Environment.SetEnvironmentVariable ("HOME", _originalHome);
-        Environment.SetEnvironmentVariable ("USERPROFILE", _originalUserProfile);
 
         if (Directory.Exists (_tempDir))
         {
@@ -292,17 +287,15 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void RoundTrip_LoadApply_RestoresPersistedValues ()
     {
-        // Arrange — write a config file with non-default values
-        File.WriteAllText (
-            _configPath,
-            """
+        // Arrange — JSON with non-default values
+        string json = """
             {
               "EditorSettings.LineNumbers": false,
               "EditorSettings.IndentSize": 8,
               "EditorSettings.WordWrap": true,
               "EditorSettings.AutoIndent": true
             }
-            """);
+            """;
 
         // Reset to defaults first
         EditorSettings.LineNumbers = true;
@@ -310,27 +303,16 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.WordWrap = false;
         EditorSettings.AutoIndent = false;
 
-        // Act — enable CM and load + apply using the TUI_CONFIG env var
-        // (avoids ~ resolution issues on Windows where GetFolderPath
-        // doesn't respect USERPROFILE env var changes).
-        Environment.SetEnvironmentVariable ("TUI_CONFIG", _configPath);
+        // Act — load via RuntimeConfig (cross-platform; avoids ~ resolution
+        // issues on Windows where GetFolderPath ignores env var changes).
+        ConfigurationManager.RuntimeConfig = json;
+        ConfigurationManager.Enable (ConfigLocations.Runtime);
 
-        try
-        {
-            ConfigurationManager.Enable (ConfigLocations.All);
-            ConfigurationManager.Load (ConfigLocations.Env);
-            ConfigurationManager.Apply ();
-
-            // Assert
-            Assert.False (EditorSettings.LineNumbers);
-            Assert.Equal (8, EditorSettings.IndentSize);
-            Assert.True (EditorSettings.WordWrap);
-            Assert.True (EditorSettings.AutoIndent);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable ("TUI_CONFIG", null);
-        }
+        // Assert
+        Assert.False (EditorSettings.LineNumbers);
+        Assert.Equal (8, EditorSettings.IndentSize);
+        Assert.True (EditorSettings.WordWrap);
+        Assert.True (EditorSettings.AutoIndent);
     }
 
     [Fact]
@@ -351,26 +333,16 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.IndentSize = 4;
         EditorSettings.ConvertTabsToSpaces = true;
 
-        // Act — load + apply via CM using the TUI_CONFIG env var
-        // (avoids ~ resolution issues on Windows).
-        Environment.SetEnvironmentVariable ("TUI_CONFIG", _configPath);
+        // Act — load saved file via RuntimeConfig (cross-platform).
+        string savedJson = File.ReadAllText (_configPath);
+        ConfigurationManager.RuntimeConfig = savedJson;
+        ConfigurationManager.Enable (ConfigLocations.Runtime);
 
-        try
-        {
-            ConfigurationManager.Enable (ConfigLocations.All);
-            ConfigurationManager.Load (ConfigLocations.Env);
-            ConfigurationManager.Apply ();
-
-            // Assert — values should match what we saved
-            Assert.False (EditorSettings.LineNumbers);
-            Assert.False (EditorSettings.FoldIndicators);
-            Assert.Equal (3, EditorSettings.IndentSize);
-            Assert.False (EditorSettings.ConvertTabsToSpaces);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable ("TUI_CONFIG", null);
-        }
+        // Assert — values should match what we saved
+        Assert.False (EditorSettings.LineNumbers);
+        Assert.False (EditorSettings.FoldIndicators);
+        Assert.Equal (3, EditorSettings.IndentSize);
+        Assert.False (EditorSettings.ConvertTabsToSpaces);
     }
 
     [Fact]
