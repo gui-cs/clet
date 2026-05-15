@@ -75,18 +75,20 @@ internal static class FileAccessSettings
 
             // Append to existing array or create a new one.
             // Implicit string → JsonNode cast avoids reflection (IL2026/IL3050).
+            JsonNode dirPathNode = (JsonNode) dirPath;
+
             if (obj ["FileAccessSettings.AllowedPaths"] is JsonArray existing)
             {
                 bool found = existing.Any (n => n?.GetValue<string> () == dirPath);
 
                 if (!found)
                 {
-                    existing.Add ((JsonNode) dirPath);
+                    existing.Add (dirPathNode);
                 }
             }
             else
             {
-                obj ["FileAccessSettings.AllowedPaths"] = new JsonArray ((JsonNode) dirPath);
+                obj ["FileAccessSettings.AllowedPaths"] = new JsonArray (dirPathNode);
             }
 
             File.WriteAllText (configPath, obj.ToJsonString (new JsonSerializerOptions { WriteIndented = true }));

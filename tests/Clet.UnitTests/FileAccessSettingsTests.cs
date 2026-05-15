@@ -204,7 +204,7 @@ public class FileAccessSettingsCmDiscoveryTests
 /// </summary>
 public class StringArrayJsonConverterTests
 {
-    private static string[] Round (string json)
+    private static string[] DeserializeWithConverter (string json)
     {
         JsonSerializerOptions opts = new ();
         opts.Converters.Add (new StringArrayJsonConverter ());
@@ -215,7 +215,7 @@ public class StringArrayJsonConverterTests
     [Fact]
     public void Read_TwoPaths_ReturnsBothPaths ()
     {
-        string[] result = Round ("""["/home/user/projects", "/tmp/docs"]""");
+        string[] result = DeserializeWithConverter ("""["/home/user/projects", "/tmp/docs"]""");
 
         Assert.Equal (2, result.Length);
         Assert.Equal ("/home/user/projects", result[0]);
@@ -225,7 +225,7 @@ public class StringArrayJsonConverterTests
     [Fact]
     public void Read_EmptyArray_ReturnsEmptyArray ()
     {
-        string[] result = Round ("[]");
+        string[] result = DeserializeWithConverter ("[]");
 
         Assert.Empty (result);
     }
@@ -233,7 +233,7 @@ public class StringArrayJsonConverterTests
     [Fact]
     public void Read_NullOrWhitespaceEntries_AreFiltered ()
     {
-        string[] result = Round ("""["  ", "/real/path", ""]""");
+        string[] result = DeserializeWithConverter ("""["  ", "/real/path", ""]""");
 
         Assert.Single (result);
         Assert.Equal ("/real/path", result[0]);
@@ -247,7 +247,7 @@ public class StringArrayJsonConverterTests
         opts.Converters.Add (new StringArrayJsonConverter ());
 
         string json = JsonSerializer.Serialize (paths, opts);
-        string[] result = JsonSerializer.Deserialize<string[]> (json, opts)!;
+        string[] result = DeserializeWithConverter (json);
 
         Assert.Equal (paths, result);
     }
@@ -319,7 +319,8 @@ public class FileAccessSettingsAddToConfigTests : IDisposable
         FileAccessSettings.AddToConfig ("/dup", _configPath);
 
         string text = File.ReadAllText (_configPath);
-        Assert.Equal (1, text.Split ("/dup", StringSplitOptions.None).Length - 1);
+        int occurrences = text.Split (["/dup"], StringSplitOptions.None).Length - 1;
+        Assert.Equal (1, occurrences);
     }
 
     [Fact]

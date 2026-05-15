@@ -1047,7 +1047,6 @@ internal sealed class EditorClet : IViewerClet
                     default: // Cancel
                         accessDialogCancelled = true;
                         window.RequestStop ();
-                        editor.SetFocus ();
 
                         return;
                 }
