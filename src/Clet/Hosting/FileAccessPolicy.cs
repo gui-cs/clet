@@ -3,7 +3,8 @@ namespace Clet;
 /// <summary>
 /// Enforces file-access confinement for <c>clet md</c> to mitigate agent-context exfiltration.
 /// Files must pass extension allowlist + working-directory confinement unless explicitly opted in
-/// via <c>--allow-file</c>. Binary content and oversized files/aggregates are also rejected.
+/// via <c>--allow-file</c> or via <see cref="FileAccessSettings.AllowedPaths"/> in
+/// <c>~/.tui/clet.config.json</c>. Binary content and oversized files/aggregates are also rejected.
 /// Pass <c>allowAllExtensions: true</c> to skip the extension check (used by <c>clet edit</c>).
 /// </summary>
 internal sealed class FileAccessPolicy
@@ -80,7 +81,8 @@ internal sealed class FileAccessPolicy
             if (!DefaultAllowedExtensions.Contains (ext))
             {
                 return $"Refused: '{filePath}' has extension '{ext}' which is not in the allowlist " +
-                       $"({string.Join (", ", DefaultAllowedExtensions)}). Use --allow-file to override.";
+                       $"({string.Join (", ", DefaultAllowedExtensions)}). Use --allow-file or add to " +
+                       "\"FileAccessSettings.AllowedPaths\" in ~/.tui/clet.config.json to override.";
             }
         }
 
@@ -88,7 +90,8 @@ internal sealed class FileAccessPolicy
         if (!IsUnderDirectory (fullPath, _workingDirectory))
         {
             return $"Refused: '{filePath}' is outside the working directory '{_workingDirectory}'. " +
-                   "Use --allow-file to override.";
+                   "Use --allow-file or add to \"FileAccessSettings.AllowedPaths\" in " +
+                   "~/.tui/clet.config.json to override.";
         }
 
         return CheckSizeAndBinary (fullPath);
@@ -166,6 +169,28 @@ internal sealed class FileAccessPolicy
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Merges <paramref name="cliAllowedPaths"/> (from <c>--allow-file</c> flags) with
+    /// the config-based <see cref="FileAccessSettings.AllowedPaths"/> list into a single
+    /// collection. Returns <see langword="null"/> when both sources are empty.
+    /// </summary>
+    internal static IReadOnlyList<string>? MergeWithConfigPaths (IReadOnlyList<string>? cliAllowedPaths)
+    {
+        string[]? configPaths = FileAccessSettings.AllowedPaths;
+
+        if (configPaths is null || configPaths.Length == 0)
+        {
+            return cliAllowedPaths;
+        }
+
+        if (cliAllowedPaths is null || cliAllowedPaths.Count == 0)
+        {
+            return configPaths;
+        }
+
+        return [..cliAllowedPaths, ..configPaths];
     }
 
     private static bool IsUnderDirectory (string filePath, string directory)

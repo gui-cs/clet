@@ -15,7 +15,25 @@ clet edit --readonly foo.cs
 
 # With a custom title:
 clet edit --title "Config Editor" settings.json
+
+# Edit a file outside the working directory (ephemeral override):
+clet edit --allow-file /path/to/dir /path/to/dir/file.cs
 ```
+
+## File access
+
+By default, `clet edit` is restricted to files in the current working directory.
+To permanently allow files in specific directories, add them to
+`FileAccessSettings.AllowedPaths` in `~/.tui/clet.config.json`:
+
+```jsonc
+"FileAccessSettings.AllowedPaths": [
+  "/home/user/projects",
+  "/home/user/docs"
+]
+```
+
+Run `clet config` to open the config file.
 
 ## Default keyboard shortcuts
 

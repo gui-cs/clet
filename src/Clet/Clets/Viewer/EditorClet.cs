@@ -50,7 +50,7 @@ internal sealed class EditorClet : IViewerClet
         {
             FileAccessPolicy policy = new (
                 Directory.GetCurrentDirectory (),
-                options.AllowedFiles,
+                FileAccessPolicy.MergeWithConfigPaths (options.AllowedFiles),
                 options.AllowBinary,
                 allowAllExtensions: true);
 
