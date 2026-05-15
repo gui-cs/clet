@@ -30,8 +30,7 @@ internal static class FileAccessSettings
     /// confinement checks (size and binary checks still apply).
     /// </remarks>
     [ConfigurationProperty (Scope = typeof (SettingsScope))]
-    [System.Text.Json.Serialization.JsonConverter (typeof (StringArrayJsonConverter))]
-    public static string[] AllowedPaths { get; set; } = [];
+    public static List<string> AllowedPaths { get; set; } = [];
 
     /// <summary>
     /// Adds <paramref name="dirPath"/> to <see cref="AllowedPaths"/> both in memory

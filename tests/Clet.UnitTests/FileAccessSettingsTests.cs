@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Terminal.Gui.Configuration;
 using Xunit;
 
@@ -199,61 +198,6 @@ public class FileAccessSettingsCmDiscoveryTests
 }
 
 /// <summary>
-/// Unit tests for <see cref="StringArrayJsonConverter"/> without involving
-/// <see cref="ConfigurationManager"/> global state.
-/// </summary>
-public class StringArrayJsonConverterTests
-{
-    private static string[] DeserializeWithConverter (string json)
-    {
-        JsonSerializerOptions opts = new ();
-        opts.Converters.Add (new StringArrayJsonConverter ());
-
-        return JsonSerializer.Deserialize<string[]> (json, opts)!;
-    }
-
-    [Fact]
-    public void Read_TwoPaths_ReturnsBothPaths ()
-    {
-        string[] result = DeserializeWithConverter ("""["/home/user/projects", "/tmp/docs"]""");
-
-        Assert.Equal (2, result.Length);
-        Assert.Equal ("/home/user/projects", result[0]);
-        Assert.Equal ("/tmp/docs", result[1]);
-    }
-
-    [Fact]
-    public void Read_EmptyArray_ReturnsEmptyArray ()
-    {
-        string[] result = DeserializeWithConverter ("[]");
-
-        Assert.Empty (result);
-    }
-
-    [Fact]
-    public void Read_NullOrWhitespaceEntries_AreFiltered ()
-    {
-        string[] result = DeserializeWithConverter ("""["  ", "/real/path", ""]""");
-
-        Assert.Single (result);
-        Assert.Equal ("/real/path", result[0]);
-    }
-
-    [Fact]
-    public void Write_RoundTrips ()
-    {
-        string[] paths = ["/a", "/b"];
-        JsonSerializerOptions opts = new ();
-        opts.Converters.Add (new StringArrayJsonConverter ());
-
-        string json = JsonSerializer.Serialize (paths, opts);
-        string[] result = DeserializeWithConverter (json);
-
-        Assert.Equal (paths, result);
-    }
-}
-
-/// <summary>
 /// Tests for <see cref="FileAccessSettings.AddToConfig(string, string)"/>.
 /// Uses a temporary file path so no CM global state is touched.
 /// </summary>
@@ -261,7 +205,7 @@ public class FileAccessSettingsAddToConfigTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly string _configPath;
-    private readonly string[] _originalPaths;
+    private readonly List<string> _originalPaths;
 
     public FileAccessSettingsAddToConfigTests ()
     {

@@ -382,7 +382,7 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void Defaults_AreCorrect ()
     {
-        // Reset CM so properties are at hard-coded defaults
+        // Ensure CM starts disabled so Enable() is not a no-op on any platform.
         ConfigurationManager.Disable (resetToHardCodedDefaults: true);
         ConfigurationManager.Enable (ConfigLocations.None);
         ConfigurationManager.Load (ConfigLocations.HardCoded);
@@ -405,7 +405,7 @@ public class EditorSettingsTests : IDisposable
         ConfigurationManager.Disable (resetToHardCodedDefaults: true);
 
         // Arrange — reset in-memory value to empty
-        string[] savedPaths = FileAccessSettings.AllowedPaths;
+        List<string> savedPaths = FileAccessSettings.AllowedPaths;
         FileAccessSettings.AllowedPaths = [];
 
         string json = """

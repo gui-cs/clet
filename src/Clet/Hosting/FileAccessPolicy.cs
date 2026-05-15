@@ -180,9 +180,9 @@ internal sealed class FileAccessPolicy
     /// </summary>
     internal static IReadOnlyList<string>? MergeWithConfigPaths (IReadOnlyList<string>? cliAllowedPaths)
     {
-        string[] configPaths = FileAccessSettings.AllowedPaths;
+        List<string> configPaths = FileAccessSettings.AllowedPaths;
 
-        if (configPaths.Length == 0)
+        if (configPaths.Count == 0)
         {
             return cliAllowedPaths;
         }
