@@ -95,7 +95,7 @@ internal static class EditorSettings
                 // Replace an existing key in-place (preserves surrounding JSONC).
                 // The negative lookbehind skips keys inside JSONC line comments.
                 // Only matches bool and int values (all current EditorSettings types).
-                string pattern = $@"(?<!//[^\n]*)(""{Regex.Escape (kvp.Key)}""\s*:\s*)(?:true|false|\d+)";
+                string pattern = $@"(?<!//[^\n]*)(""{Regex.Escape (kvp.Key)}""\s*:\s*)(?:true|false|-?\d+)";
 
                 if (Regex.IsMatch (text, pattern))
                 {

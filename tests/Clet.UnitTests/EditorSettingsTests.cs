@@ -21,6 +21,7 @@ public class EditorSettingsTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly string _configPath;
+    private readonly string? _originalHome;
 
     public EditorSettingsTests ()
     {
@@ -28,6 +29,9 @@ public class EditorSettingsTests : IDisposable
         string tuiDir = Path.Combine (_tempDir, ".tui");
         Directory.CreateDirectory (tuiDir);
         _configPath = Path.Combine (tuiDir, ConfigClet.ConfigFileName);
+
+        // Save original HOME so we can restore it on cleanup.
+        _originalHome = Environment.GetEnvironmentVariable ("HOME");
 
         // Point HOME at our temp directory so CM picks up our test config file.
         Environment.SetEnvironmentVariable ("HOME", _tempDir);
@@ -49,8 +53,8 @@ public class EditorSettingsTests : IDisposable
             // Best-effort cleanup.
         }
 
-        // Restore HOME.
-        Environment.SetEnvironmentVariable ("HOME", null);
+        // Restore original HOME.
+        Environment.SetEnvironmentVariable ("HOME", _originalHome);
 
         if (Directory.Exists (_tempDir))
         {
