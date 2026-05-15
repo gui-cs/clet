@@ -35,8 +35,10 @@ internal static class FileAccessSettings
 
     /// <summary>
     /// Adds <paramref name="dirPath"/> to <see cref="AllowedPaths"/> both in memory
-    /// and persistently in <c>~/.tui/clet.config.json</c>, then reloads
-    /// <see cref="ConfigurationManager"/> so the change takes effect immediately.
+    /// and persistently in <c>~/.tui/clet.config.json</c>.
+    /// The change takes effect immediately in the current session via the in-memory
+    /// property; <see cref="ConfigurationManager"/> picks up the persisted value on
+    /// the next full Enable/Load cycle.
     /// </summary>
     /// <param name="dirPath">The directory (or file) path to trust.</param>
     internal static void AddToConfig (string dirPath) => AddToConfig (dirPath, ConfigClet.GetConfigPath ());
@@ -75,9 +77,9 @@ internal static class FileAccessSettings
 
             // Append to existing array or create a new one.
             // Implicit string → JsonNode cast avoids reflection (IL2026/IL3050).
-            JsonNode dirPathNode = (JsonNode) dirPath;
+            JsonNode dirPathNode = (JsonNode)dirPath;
 
-            if (obj ["FileAccessSettings.AllowedPaths"] is JsonArray existing)
+            if (obj["FileAccessSettings.AllowedPaths"] is JsonArray existing)
             {
                 bool found = existing.Any (n => n?.GetValue<string> () == dirPath);
 
@@ -88,20 +90,15 @@ internal static class FileAccessSettings
             }
             else
             {
-                obj ["FileAccessSettings.AllowedPaths"] = new JsonArray (dirPathNode);
+                obj["FileAccessSettings.AllowedPaths"] = new JsonArray (dirPathNode);
             }
 
             File.WriteAllText (configPath, obj.ToJsonString (new JsonSerializerOptions { WriteIndented = true }));
 
-            // Sync ConfigurationManager so subsequent Enable/Apply also see the change.
-            if (ConfigurationManager.IsEnabled)
-            {
-                ConfigurationManager.Load (ConfigLocations.All);
-                ConfigurationManager.Apply ();
-            }
-
-            // Ensure the in-memory property contains dirPath regardless of whether
-            // CM reset it (e.g. when configPath differs from CM's active config).
+            // Update the in-memory property directly so it takes effect immediately
+            // in the current session, without triggering a full CM reload that could
+            // race with other tests or components that have CM enabled.
+            // CM will pick up the persisted file on the next full Enable/Load cycle.
             if (!AllowedPaths.Contains (dirPath))
             {
                 AllowedPaths = [.. AllowedPaths, dirPath];

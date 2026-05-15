@@ -1014,35 +1014,35 @@ internal sealed class EditorClet : IViewerClet
                 switch (choice)
                 {
                     case 0: // Allow once — add dir to the session policy only
-                    {
-                        files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy ([dir]), out _);
-
-                        if (files.Count > 0)
                         {
-                            filePath = files[0];
-                            fileName = Path.GetFileName (filePath);
-                            lastDirectory = Path.GetDirectoryName (filePath);
-                            window.Title = fileName;
-                        }
+                            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy ([dir]), out _);
 
-                        break;
-                    }
+                            if (files.Count > 0)
+                            {
+                                filePath = files[0];
+                                fileName = Path.GetFileName (filePath);
+                                lastDirectory = Path.GetDirectoryName (filePath);
+                                window.Title = fileName;
+                            }
+
+                            break;
+                        }
 
                     case 1: // Add to config — persist the directory and allow now
-                    {
-                        FileAccessSettings.AddToConfig (dir);
-                        files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy (), out _);
-
-                        if (files.Count > 0)
                         {
-                            filePath = files[0];
-                            fileName = Path.GetFileName (filePath);
-                            lastDirectory = Path.GetDirectoryName (filePath);
-                            window.Title = fileName;
-                        }
+                            FileAccessSettings.AddToConfig (dir);
+                            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy (), out _);
 
-                        break;
-                    }
+                            if (files.Count > 0)
+                            {
+                                filePath = files[0];
+                                fileName = Path.GetFileName (filePath);
+                                lastDirectory = Path.GetDirectoryName (filePath);
+                                window.Title = fileName;
+                            }
+
+                            break;
+                        }
 
                     default: // Cancel
                         accessDialogCancelled = true;
