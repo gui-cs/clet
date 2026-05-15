@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Terminal.Gui.Editor;
 using Xunit;
 
 namespace Clet.UnitTests;
@@ -97,6 +98,27 @@ public class ConfigCletTests
         finally
         {
             Directory.Delete (tempDir, true);
+        }
+    }
+
+    [Theory]
+    [InlineData (true)]
+    [InlineData (false)]
+    public void CreateEditor_UsesEditorSettingsThemeBackground (bool useThemeBackground)
+    {
+        bool originalUseThemeBackground = EditorSettings.UseThemeBackground;
+
+        try
+        {
+            EditorSettings.UseThemeBackground = useThemeBackground;
+
+            Editor editor = ConfigClet.CreateEditor ("{}");
+
+            Assert.Equal (useThemeBackground, editor.UseThemeBackground);
+        }
+        finally
+        {
+            EditorSettings.UseThemeBackground = originalUseThemeBackground;
         }
     }
 }

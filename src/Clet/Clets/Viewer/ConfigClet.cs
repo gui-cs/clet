@@ -55,18 +55,7 @@ internal sealed class ConfigClet : IViewerClet
             Height = Dim.Fill (),
         };
 
-        Editor editor = new ()
-        {
-            Width = Dim.Fill (),
-            Height = Dim.Fill (1), // leave room for StatusBar
-            ConvertTabsToSpaces = true,
-            IndentationSize = 2,
-            GutterOptions = GutterOptions.LineNumbers,
-        };
-
-        editor.HighlightingDefinition = HighlightingManager.Instance.GetDefinitionByExtension (".json");
-
-        editor.Document = new TextDocument (configText);
+        Editor editor = CreateEditor (configText);
 
         editor.CaretChanged += (_, _) =>
         {
@@ -79,11 +68,16 @@ internal sealed class ConfigClet : IViewerClet
             }
         };
 
-        editor.Document.TextChanged += (_, _) =>
+        TextDocument? editorDocument = editor.Document;
+
+        if (editorDocument is not null)
         {
-            isDirty = true;
-            UpdateTitle ();
-        };
+            editorDocument.TextChanged += (_, _) =>
+            {
+                isDirty = true;
+                UpdateTitle ();
+            };
+        }
 
         // --- StatusBar ---
 
@@ -275,6 +269,24 @@ internal sealed class ConfigClet : IViewerClet
                 window.RequestStop ();
             }
         }
+    }
+
+    internal static Editor CreateEditor (string configText)
+    {
+        Editor editor = new ()
+        {
+            Width = Dim.Fill (),
+            Height = Dim.Fill (1), // leave room for StatusBar
+            ConvertTabsToSpaces = true,
+            IndentationSize = 2,
+            GutterOptions = GutterOptions.LineNumbers,
+            UseThemeBackground = EditorSettings.UseThemeBackground,
+        };
+
+        editor.HighlightingDefinition = HighlightingManager.Instance.GetDefinitionByExtension (".json");
+        editor.Document = new TextDocument (configText);
+
+        return editor;
     }
 
     /// <summary>Returns the path to <c>~/.tui/clet.config.json</c>.</summary>
