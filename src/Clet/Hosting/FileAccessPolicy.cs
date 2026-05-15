@@ -192,7 +192,7 @@ internal sealed class FileAccessPolicy
             return configPaths;
         }
 
-        return [..cliAllowedPaths, ..configPaths];
+        return [.. cliAllowedPaths, .. configPaths];
     }
 
     private static bool IsUnderDirectory (string filePath, string directory)
