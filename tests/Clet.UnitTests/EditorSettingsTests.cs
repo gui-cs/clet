@@ -287,6 +287,9 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void RoundTrip_LoadApply_RestoresPersistedValues ()
     {
+        // Ensure CM starts disabled so Enable(Runtime) is not a no-op on any platform.
+        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
+
         // Arrange — JSON with non-default values
         string json = """
             {
@@ -318,6 +321,9 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void RoundTrip_SaveThenLoad_RestoresValues ()
     {
+        // Ensure CM starts disabled so Enable(Runtime) is not a no-op on any platform.
+        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
+
         // Arrange — write initial config, set non-default values, save
         File.WriteAllText (_configPath, "{}");
 
@@ -376,7 +382,8 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void Defaults_AreCorrect ()
     {
-        // Reset CM so properties are at hard-coded defaults
+        // Ensure CM starts disabled so Enable() is not a no-op on any platform.
+        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
         ConfigurationManager.Enable (ConfigLocations.None);
         ConfigurationManager.Load (ConfigLocations.HardCoded);
         ConfigurationManager.Apply ();
@@ -389,6 +396,39 @@ public class EditorSettingsTests : IDisposable
         Assert.Equal (4, EditorSettings.IndentSize);
         Assert.True (EditorSettings.ConvertTabsToSpaces);
         Assert.False (EditorSettings.AutoIndent);
+    }
+
+    [Fact]
+    public void AllowedPaths_RoundTrip_CM_LoadsArrayFromRuntimeConfig ()
+    {
+        // Ensure CM starts disabled so Enable(Runtime) is not a no-op on any platform.
+        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
+
+        // Arrange — reset in-memory value to empty
+        List<string> savedPaths = [.. FileAccessSettings.AllowedPaths];
+        FileAccessSettings.AllowedPaths = [];
+
+        string json = """
+            {
+              "FileAccessSettings.AllowedPaths": ["/allowed/path1", "/allowed/path2"]
+            }
+            """;
+
+        try
+        {
+            // Act — load via RuntimeConfig
+            ConfigurationManager.RuntimeConfig = json;
+            ConfigurationManager.Enable (ConfigLocations.Runtime);
+
+            // Assert — CM must have applied the array
+            Assert.NotEmpty (FileAccessSettings.AllowedPaths);
+            Assert.Contains ("/allowed/path1", FileAccessSettings.AllowedPaths);
+            Assert.Contains ("/allowed/path2", FileAccessSettings.AllowedPaths);
+        }
+        finally
+        {
+            FileAccessSettings.AllowedPaths = savedPaths;
+        }
     }
 
     /// <summary>Counts the number of occurrences of <paramref name="substring"/> in <paramref name="text"/>.</summary>

@@ -45,47 +45,65 @@ internal sealed class EditorClet : IViewerClet
         // --- Expand positional args (glob patterns + explicit paths) ---
 
         List<string> files = [];
+        string cwd = Directory.GetCurrentDirectory ();
+        IReadOnlyList<string> args = options.Arguments ?? [];
+        string? pendingDeniedPath = null;   // set when access is denied; drives dialog
 
-        if (options.Arguments is { Count: > 0 } args)
+        FileAccessPolicy BuildPolicy (IReadOnlyList<string>? extraAllowed = null)
         {
-            FileAccessPolicy policy = new (
-                Directory.GetCurrentDirectory (),
-                options.AllowedFiles,
-                options.AllowBinary,
-                allowAllExtensions: true);
+            IReadOnlyList<string>? merged = FileAccessPolicy.MergeWithConfigPaths (options.AllowedFiles);
 
-            files = MarkdownContentResolver.ExpandFiles (args, policy, out string? policyError);
+            if (extraAllowed is { Count: > 0 })
+            {
+                merged = merged is { Count: > 0 }
+                    ? [.. merged, .. extraAllowed]
+                    : [.. extraAllowed];
+            }
+
+            return new (cwd, merged, options.AllowBinary, allowAllExtensions: true);
+        }
+
+        if (args.Count > 0)
+        {
+            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy (), out string? policyError);
 
             if (policyError is not null)
             {
-                return new ()
-                {
-                    Status = CletRunStatus.Error,
-                    ErrorCode = "file-access-denied",
-                    ErrorMessage = policyError,
-                };
+                // Identify the first non-glob argument that was denied so the
+                // dialog can show it and offer to allow it.
+                pendingDeniedPath = args
+                    .FirstOrDefault (a => !a.Contains ('*') && !a.Contains ('?')) is { } first
+                    ? Path.GetFullPath (first)
+                    : null;
+
+                // Don't return an error yet — show the interactive dialog in
+                // window.Initialized (inside the running event loop).
             }
-
-            foreach (string arg in args)
+            else
             {
-                if (arg.Contains ('*') || arg.Contains ('?'))
+                foreach (string arg in args)
                 {
-                    continue;
-                }
+                    if (arg.Contains ('*') || arg.Contains ('?'))
+                    {
+                        continue;
+                    }
 
-                string fullPath = Path.GetFullPath (arg);
+                    string fullPath = Path.GetFullPath (arg);
 
-                if (!files.Contains (fullPath))
-                {
-                    files.Add (fullPath);
+                    if (!files.Contains (fullPath))
+                    {
+                        files.Add (fullPath);
+                    }
                 }
             }
         }
 
         string? filePath = files.Count > 0 ? files[0] : null;
-        string? fileName = filePath is not null ? Path.GetFileName (filePath) : null;
+        // When access was denied, use the intended path for the window title.
+        string? fileName = (filePath ?? pendingDeniedPath) is { } fp ? Path.GetFileName (fp) : null;
         string? lastDirectory = filePath is not null ? Path.GetDirectoryName (filePath) : null;
         string? savedText = string.Empty;
+        bool accessDialogCancelled = false;
 
         bool readOnly = options.CletOptions?.TryGetValue ("readonly", out string? roVal) == true
                         && roVal is "true" or "1";
@@ -915,9 +933,9 @@ internal sealed class EditorClet : IViewerClet
         {
             List<string> basenames = [.. files.Select (f => Path.GetFileName (f) ?? f)];
             bool hasCollisions = basenames.Count != basenames.Distinct (StringComparer.OrdinalIgnoreCase).Count ();
-            string cwd = Directory.GetCurrentDirectory ();
+            string currentDir = Directory.GetCurrentDirectory ();
             List<string> displayNames = hasCollisions
-                ? [.. files.Select (f => Path.GetRelativePath (cwd, f))]
+                ? [.. files.Select (f => Path.GetRelativePath (currentDir, f))]
                 : basenames;
 
             ObservableCollection<string> displayNamesOc = new (displayNames);
@@ -978,6 +996,63 @@ internal sealed class EditorClet : IViewerClet
 
         window.Initialized += (_, _) =>
         {
+            // ── File-access dialog ───────────────────────────────────────────
+            if (pendingDeniedPath is not null)
+            {
+                string dir = Path.GetDirectoryName (pendingDeniedPath) is { Length: > 0 } d
+                    ? d
+                    : pendingDeniedPath;
+
+                int? choice = MessageBox.Query (
+                    app,
+                    "File Access Required",
+                    $"'{Path.GetFileName (pendingDeniedPath)}' is outside the allowed\n"
+                    + $"directories.\n\n{pendingDeniedPath}\n\n"
+                    + "How would you like to proceed?",
+                    "Allow once", "Add to config", "Cancel");
+
+                switch (choice)
+                {
+                    case 0: // Allow once — add dir to the session policy only
+                        {
+                            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy ([dir]), out _);
+
+                            if (files.Count > 0)
+                            {
+                                filePath = files[0];
+                                fileName = Path.GetFileName (filePath);
+                                lastDirectory = Path.GetDirectoryName (filePath);
+                                window.Title = fileName;
+                            }
+
+                            break;
+                        }
+
+                    case 1: // Add to config — persist the directory and allow now
+                        {
+                            FileAccessSettings.AddToConfig (dir);
+                            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy (), out _);
+
+                            if (files.Count > 0)
+                            {
+                                filePath = files[0];
+                                fileName = Path.GetFileName (filePath);
+                                lastDirectory = Path.GetDirectoryName (filePath);
+                                window.Title = fileName;
+                            }
+
+                            break;
+                        }
+
+                    default: // Cancel
+                        accessDialogCancelled = true;
+                        window.RequestStop ();
+
+                        return;
+                }
+            }
+
+            // ── Normal (or post-allow) content load ──────────────────────────
             if (filePath is not null && File.Exists (filePath))
             {
                 LoadFile (filePath);
@@ -1012,7 +1087,7 @@ internal sealed class EditorClet : IViewerClet
             return new () { Status = CletRunStatus.Cancelled };
         }
 
-        if (cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested || accessDialogCancelled)
         {
             return new () { Status = CletRunStatus.Cancelled };
         }
