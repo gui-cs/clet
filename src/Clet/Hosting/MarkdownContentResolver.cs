@@ -45,7 +45,7 @@ internal static class MarkdownContentResolver
         {
             FileAccessPolicy policy = new (
                 Directory.GetCurrentDirectory (),
-                options.AllowedFiles,
+                FileAccessPolicy.MergeWithConfigPaths (options.AllowedFiles),
                 options.AllowBinary);
 
             List<string> files = ExpandFiles (args, policy, out string? policyError);

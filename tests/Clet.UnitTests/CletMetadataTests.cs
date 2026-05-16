@@ -32,7 +32,6 @@ public class CletMetadataTests
         yield return [new DateClet (), "date", CletKind.Input, typeof (string), false];
         yield return [new TimeClet (), "time", CletKind.Input, typeof (string), false];
         yield return [new DurationClet (), "duration", CletKind.Input, typeof (string), false];
-        yield return [new MultilineTextClet (), "multiline-text", CletKind.Input, typeof (string), false];
         yield return [new MultiSelectClet (), "multi-select", CletKind.Input, typeof (System.Text.Json.Nodes.JsonArray), true];
         yield return [new LinearRangeClet (), "linear-range", CletKind.Input, typeof (System.Text.Json.Nodes.JsonObject), true];
         yield return [new PickFileClet (), "pick-file", CletKind.Input, typeof (System.Text.Json.Nodes.JsonNode), false];

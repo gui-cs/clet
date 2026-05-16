@@ -218,8 +218,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias.
 
 | Alias                         | `value` shape                                                |
 |-------------------------------|--------------------------------------------------------------|
-| `text`                        | string                                                       |
-| `multiline-text`              | string (newlines preserved as `\n`)                          |
+| `text`                        | string (newlines preserved as `\n`)                          |
 | `int`                         | integer                                                      |
 | `decimal`                     | number (JSON number; consumer decides float vs decimal)      |
 | `confirm`                     | boolean                                                      |
@@ -237,7 +236,7 @@ For schema-lock at v0.5, the shape of `value` is fixed per alias.
 
 ### 4.4 Registration
 
-`BuiltInClets.RegisterAll(ICletRegistry)` hand-registers all 15 clets. Auto-discovery via a source generator was explored and dropped — there is no `[Clet]` attribute in shipped code, and no source-generator project in the repo.
+`BuiltInClets.RegisterAll(ICletRegistry)` hand-registers all 18 clets. Auto-discovery via a source generator was explored and dropped — there is no `[Clet]` attribute in shipped code, and no source-generator project in the repo.
 
 ### 4.5 Built-in clet implementation pattern
 

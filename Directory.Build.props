@@ -13,7 +13,7 @@
     <Copyright>Copyright (c) gui-cs and contributors</Copyright>
 
     <!-- Pinned Terminal.Gui version. CI / release workflows can override via -p:TerminalGuiVersion=<x>. -->
-    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.1.0-rc.*</TerminalGuiVersion>
+    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.1.1-develop.*</TerminalGuiVersion>
     <!-- Pinned Terminal.Gui.Editor version. CI / release workflows can override via -p:TerminalGuiEditorVersion=<x>. -->
     <TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.1.1-develop.*</TerminalGuiEditorVersion>
   </PropertyGroup>

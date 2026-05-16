@@ -503,6 +503,23 @@ internal sealed class ConfigClet : IViewerClet
           // Useful values: "Lifecycle", "Drawing", "Layout", "Mouse", "Keyboard"
           //
           // "Trace.EnabledCategories": "Lifecycle"
+
+          // ─── File-Access Allow List ───────────────────────────────────────────
+          //
+          // Directories (or individual files) that clet edit and clet md are
+          // always allowed to open, regardless of the current working directory.
+          // Equivalent to VS Code's trusted-folders list.
+          //
+          // Paths are matched as prefixes, so adding a directory allows all
+          // files under it. Size and binary checks still apply.
+          //
+          // This is the persistent alternative to passing --allow-file each time.
+          //
+          // Example — allow your projects tree and a shared docs directory:
+          // "FileAccessSettings.AllowedPaths": [
+          //   "/home/user/projects",
+          //   "/home/user/docs"
+          // ]
         }
         """;
 }

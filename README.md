@@ -11,8 +11,7 @@ Works for humans and AI agents alike.
 | Alias | Description | Options |
 | --- | --- | --- |
 | `select` | Presents a list of options and returns the text of the selected item. | `--options`, `args...` |
-| `text` | Prompts for free-form text input and returns the entered string. | |
-| `multiline-text`, `mt` | Prompts for multi-line text input and returns the entered string. | |
+| `text`, `multiline-text`, `mt` | Prompts for multi-line text input using an editor and returns the entered string. | |
 | `int` | Prompts for an integer value using a numeric spinner. | `--step` |
 | `decimal` | Prompts for a decimal value using a numeric spinner. | `--step` |
 | `confirm` | Prompts for a yes/no confirmation and returns a boolean. | `--prompt` |

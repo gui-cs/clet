@@ -1,12 +1,16 @@
 using System.Collections.ObjectModel;
 using Terminal.Gui.App;
-using Terminal.Gui.Drawing;
-using Terminal.Gui.Input;
+using Terminal.Gui.Configuration;
 using Terminal.Gui.Document;
+using Terminal.Gui.Document.Folding;
+using Terminal.Gui.Drawing;
 using Terminal.Gui.Editor;
 using Terminal.Gui.Highlighting;
+using Terminal.Gui.Input;
+using Terminal.Gui.Text.Indentation;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using TextMateSharp.Grammars;
 using Command = Terminal.Gui.Input.Command;
 
 namespace Clet;
@@ -41,51 +45,65 @@ internal sealed class EditorClet : IViewerClet
         // --- Expand positional args (glob patterns + explicit paths) ---
 
         List<string> files = [];
+        string cwd = Directory.GetCurrentDirectory ();
+        IReadOnlyList<string> args = options.Arguments ?? [];
+        string? pendingDeniedPath = null;   // set when access is denied; drives dialog
 
-        if (options.Arguments is { Count: > 0 } args)
+        FileAccessPolicy BuildPolicy (IReadOnlyList<string>? extraAllowed = null)
         {
-            FileAccessPolicy policy = new (
-                Directory.GetCurrentDirectory (),
-                options.AllowedFiles,
-                options.AllowBinary,
-                allowAllExtensions: true);
+            IReadOnlyList<string>? merged = FileAccessPolicy.MergeWithConfigPaths (options.AllowedFiles);
 
-            files = MarkdownContentResolver.ExpandFiles (args, policy, out string? policyError);
+            if (extraAllowed is { Count: > 0 })
+            {
+                merged = merged is { Count: > 0 }
+                    ? [.. merged, .. extraAllowed]
+                    : [.. extraAllowed];
+            }
+
+            return new (cwd, merged, options.AllowBinary, allowAllExtensions: true);
+        }
+
+        if (args.Count > 0)
+        {
+            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy (), out string? policyError);
 
             if (policyError is not null)
             {
-                return new ()
-                {
-                    Status = CletRunStatus.Error,
-                    ErrorCode = "file-access-denied",
-                    ErrorMessage = policyError,
-                };
+                // Identify the first non-glob argument that was denied so the
+                // dialog can show it and offer to allow it.
+                pendingDeniedPath = args
+                    .FirstOrDefault (a => !a.Contains ('*') && !a.Contains ('?')) is { } first
+                    ? Path.GetFullPath (first)
+                    : null;
+
+                // Don't return an error yet — show the interactive dialog in
+                // window.Initialized (inside the running event loop).
             }
-
-            // Preserve explicit (non-glob) paths for files that don't exist yet.
-            // ExpandFiles skips missing files with a warning; for edit we want to
-            // open a new empty buffer bound to the given path.
-            foreach (string arg in args)
+            else
             {
-                // Skip glob patterns (only * and ? are wildcards — matching ExpandFiles / Directory.GetFiles semantics).
-                if (arg.Contains ('*') || arg.Contains ('?'))
+                foreach (string arg in args)
                 {
-                    continue;
-                }
+                    if (arg.Contains ('*') || arg.Contains ('?'))
+                    {
+                        continue;
+                    }
 
-                string fullPath = Path.GetFullPath (arg);
+                    string fullPath = Path.GetFullPath (arg);
 
-                if (!files.Contains (fullPath))
-                {
-                    files.Add (fullPath);
+                    if (!files.Contains (fullPath))
+                    {
+                        files.Add (fullPath);
+                    }
                 }
             }
         }
 
         string? filePath = files.Count > 0 ? files[0] : null;
-        string? fileName = filePath is not null ? Path.GetFileName (filePath) : null;
+        // When access was denied, use the intended path for the window title.
+        string? fileName = (filePath ?? pendingDeniedPath) is { } fp ? Path.GetFileName (fp) : null;
         string? lastDirectory = filePath is not null ? Path.GetDirectoryName (filePath) : null;
         string? savedText = string.Empty;
+        bool accessDialogCancelled = false;
 
         bool readOnly = options.CletOptions?.TryGetValue ("readonly", out string? roVal) == true
                         && roVal is "true" or "1";
@@ -100,26 +118,271 @@ internal sealed class EditorClet : IViewerClet
             BorderStyle = LineStyle.None,
         };
 
+        // --- Settings are loaded by ConfigurationManager via [ConfigurationProperty] ---
+
         Editor editor = new ()
         {
             X = 0,
-            Y = 1, // below MenuBar
+            Y = 1,
             Width = Dim.Fill (),
-            Height = Dim.Fill (1), // above StatusBar
+            Height = Dim.Fill (1),
             ReadOnly = readOnly,
-            GutterOptions = GutterOptions.LineNumbers,
-            ConvertTabsToSpaces = true,
+            ConvertTabsToSpaces = EditorSettings.ConvertTabsToSpaces,
+            IndentationSize = EditorSettings.IndentSize,
+            WordWrap = EditorSettings.WordWrap,
+            ShowTabs = EditorSettings.ShowTabs,
+            UseThemeBackground = EditorSettings.UseThemeBackground,
+            ViewportSettings = ViewportSettingsFlags.HasScrollBars,
         };
+
+        // Apply gutter options from settings
+        GutterOptions initGutter = GutterOptions.None;
+
+        if (EditorSettings.LineNumbers)
+        {
+            initGutter |= GutterOptions.LineNumbers;
+        }
+
+        if (EditorSettings.FoldIndicators)
+        {
+            initGutter |= GutterOptions.Folding;
+        }
+
+        editor.GutterOptions = initGutter;
+
+        if (EditorSettings.AutoIndent)
+        {
+            editor.IndentationStrategy = new DefaultIndentationStrategy ();
+        }
 
         editor.HighlightingDefinition = filePath is not null
             ? HighlightingManager.Instance.GetDefinitionByExtension (Path.GetExtension (filePath))
             : null;
 
+        // --- Folding support ---
+
+        BraceFoldingStrategy braceFoldingStrategy = new ();
+
+        void InstallFolding ()
+        {
+            if (editor.Document is null)
+            {
+                return;
+            }
+
+            FoldingManager fm = new (editor.Document);
+            braceFoldingStrategy.UpdateFoldings (fm, editor.Document);
+            editor.FoldingManager = fm;
+
+            editor.Document.Changed += (_, _) =>
+            {
+                if (editor.FoldingManager is not null && editor.Document is not null)
+                {
+                    braceFoldingStrategy.UpdateFoldings (editor.FoldingManager, editor.Document);
+                }
+            };
+        }
+
+        // --- Markdown preview ---
+
+        Markdown? markdownPreview = null;
+        bool syncingScroll = false;
+        bool isMarkdownFile = filePath is not null
+            && Path.GetExtension (filePath).Equals (".md", StringComparison.OrdinalIgnoreCase);
+
+        // View-menu toggle items — declared early so preview toggle can reference them.
+        MenuItem previewMarkdownItem = new () { Title = "  _Preview Markdown", Enabled = isMarkdownFile };
+
+        bool optUseThemeBg = EditorSettings.UseThemeBackground;
+
+        void OnEditorViewportChanged (object? sender, DrawEventArgs e)
+        {
+            if (markdownPreview is null || syncingScroll)
+            {
+                return;
+            }
+
+            syncingScroll = true;
+
+            try
+            {
+                int editorContentHeight = editor.GetContentSize ().Height;
+                int editorViewportHeight = editor.Viewport.Height;
+                int maxEditorY = Math.Max (0, editorContentHeight - editorViewportHeight);
+                int editorY = editor.Viewport.Y;
+
+                int previewContentHeight = markdownPreview.GetContentSize ().Height;
+                int previewViewportHeight = markdownPreview.Viewport.Height;
+                int maxPreviewY = Math.Max (0, previewContentHeight - previewViewportHeight);
+
+                int newY = maxEditorY > 0
+                    ? (int)((long)editorY * maxPreviewY / maxEditorY)
+                    : 0;
+
+                markdownPreview.Viewport = markdownPreview.Viewport with { Y = Math.Clamp (newY, 0, maxPreviewY) };
+            }
+            finally
+            {
+                syncingScroll = false;
+            }
+        }
+
+        void OnPreviewViewportChanged (object? sender, DrawEventArgs e)
+        {
+            if (markdownPreview is null || syncingScroll)
+            {
+                return;
+            }
+
+            syncingScroll = true;
+
+            try
+            {
+                int previewContentHeight = markdownPreview.GetContentSize ().Height;
+                int previewViewportHeight = markdownPreview.Viewport.Height;
+                int maxPreviewY = Math.Max (0, previewContentHeight - previewViewportHeight);
+                int previewY = markdownPreview.Viewport.Y;
+
+                int editorContentHeight = editor.GetContentSize ().Height;
+                int editorViewportHeight = editor.Viewport.Height;
+                int maxEditorY = Math.Max (0, editorContentHeight - editorViewportHeight);
+
+                int newY = maxPreviewY > 0
+                    ? (int)((long)previewY * maxEditorY / maxPreviewY)
+                    : 0;
+
+                editor.Viewport = editor.Viewport with { Y = Math.Clamp (newY, 0, maxEditorY) };
+            }
+            finally
+            {
+                syncingScroll = false;
+            }
+        }
+
+        void OnDocumentChangedForPreview (object? sender, EventArgs e)
+        {
+            if (markdownPreview is null)
+            {
+                return;
+            }
+
+            markdownPreview.Text = editor.Document?.Text ?? string.Empty;
+        }
+
+        void ShowMarkdownPreview ()
+        {
+            if (markdownPreview is not null)
+            {
+                return;
+            }
+
+            markdownPreview = new Markdown ()
+            {
+                X = Pos.Right (editor),
+                Y = editor.Y,
+                Width = Dim.Fill (),
+                Height = editor.Height,
+                Text = editor.Document?.Text ?? string.Empty,
+                ViewportSettings = ViewportSettingsFlags.HasScrollBars,
+                SyntaxHighlighter = new TextMateSyntaxHighlighter (ThemeName.DarkPlus),
+                UseThemeBackground = optUseThemeBg,
+            };
+
+            editor.Width = Dim.Percent (50);
+            window.Add (markdownPreview);
+
+            // Sync scrolling bidirectionally.
+            editor.ViewportChanged += OnEditorViewportChanged;
+            markdownPreview.ViewportChanged += OnPreviewViewportChanged;
+
+            // Update preview when document content changes.
+            if (editor.Document is not null)
+            {
+                editor.Document.Changed += OnDocumentChangedForPreview;
+            }
+        }
+
+        void HideMarkdownPreview ()
+        {
+            if (markdownPreview is null)
+            {
+                return;
+            }
+
+            editor.ViewportChanged -= OnEditorViewportChanged;
+            markdownPreview.ViewportChanged -= OnPreviewViewportChanged;
+
+            if (editor.Document is not null)
+            {
+                editor.Document.Changed -= OnDocumentChangedForPreview;
+            }
+
+            window.Remove (markdownPreview);
+            markdownPreview.Dispose ();
+            markdownPreview = null;
+
+            editor.Width = Dim.Fill ();
+        }
+
+        void RefreshPreviewDocument ()
+        {
+            if (markdownPreview is null)
+            {
+                return;
+            }
+
+            if (editor.Document is not null)
+            {
+                editor.Document.Changed -= OnDocumentChangedForPreview;
+                editor.Document.Changed += OnDocumentChangedForPreview;
+            }
+
+            markdownPreview.Text = editor.Document?.Text ?? string.Empty;
+        }
+
+        void ToggleMarkdownPreview ()
+        {
+            if (previewMarkdownItem.Title?.StartsWith ("✓") == true)
+            {
+                HideMarkdownPreview ();
+                previewMarkdownItem.Title = "  _Preview Markdown";
+            }
+            else
+            {
+                ShowMarkdownPreview ();
+                previewMarkdownItem.Title = "✓ _Preview Markdown";
+            }
+        }
+
+        void UpdatePreviewEnabled ()
+        {
+            previewMarkdownItem.Enabled = isMarkdownFile;
+
+            if (!isMarkdownFile && markdownPreview is not null)
+            {
+                HideMarkdownPreview ();
+                previewMarkdownItem.Title = "  _Preview Markdown";
+            }
+            else if (isMarkdownFile && markdownPreview is not null)
+            {
+                RefreshPreviewDocument ();
+            }
+        }
+
         // --- StatusBar shortcuts (declared early for capture) ---
 
         Shortcut cursorPositionShortcut = new ()
         { Title = "Ln 1, Col 1", MouseHighlightStates = MouseState.None, Enabled = false };
-        Shortcut modifiedShortcut = new () { Title = "", MouseHighlightStates = MouseState.None, Enabled = false };
+        Shortcut languageShortcut = new ()
+        { Title = "Plain Text", MouseHighlightStates = MouseState.None, Enabled = false };
+
+        // Filename shortcut for MenuBar — full path, dialog scheme
+        Shortcut filenameShortcut = new ()
+        {
+            Title = filePath ?? "<untitled>",
+            MouseHighlightStates = MouseState.None,
+            SchemeName = SchemeManager.SchemesToSchemeName (Schemes.Dialog),
+        };
 
         // --- Local state helpers ---
 
@@ -128,13 +391,18 @@ internal sealed class EditorClet : IViewerClet
         void UpdateModifiedIndicator ()
         {
             bool dirty = UnsavedChanges ();
-            modifiedShortcut.Title = dirty ? "Modified" : "";
             window.Title = dirty ? $"{fileName ?? "Untitled"}*" : fileName ?? "Untitled";
+        }
+
+        void UpdateLanguageShortcut ()
+        {
+            languageShortcut.Title = editor.HighlightingDefinition?.Name ?? "Plain Text";
         }
 
         void UpdateSyntaxLanguage (string path)
         {
             editor.HighlightingDefinition = HighlightingManager.Instance.GetDefinitionByExtension (Path.GetExtension (path));
+            UpdateLanguageShortcut ();
         }
 
         void UpdateLocShortcut ()
@@ -144,12 +412,19 @@ internal sealed class EditorClet : IViewerClet
             if (document is null)
             {
                 cursorPositionShortcut.Title = "Ln 1, Col 1";
+
+                return;
             }
-            else
+
+            DocumentLine line = document.GetLineByOffset (editor.CaretOffset);
+            string loc = $"Ln {line.LineNumber}, Col {editor.CaretOffset - line.Offset + 1}";
+
+            if (editor.HasMultipleCarets)
             {
-                DocumentLine line = document.GetLineByOffset (editor.CaretOffset);
-                cursorPositionShortcut.Title = $"Ln {line.LineNumber}, Col {editor.CaretOffset - line.Offset + 1}";
+                loc += $" ({editor.AdditionalCaretOffsets.Count + 1} carets)";
             }
+
+            cursorPositionShortcut.Title = loc;
         }
 
         // --- File operations ---
@@ -166,7 +441,11 @@ internal sealed class EditorClet : IViewerClet
                 savedText = string.Empty;
                 editor.Document = new TextDocument ();
                 UpdateSyntaxLanguage (fullPath);
+                InstallFolding ();
                 UpdateModifiedIndicator ();
+                filenameShortcut.Title = fullPath;
+                isMarkdownFile = Path.GetExtension (fullPath).Equals (".md", StringComparison.OrdinalIgnoreCase);
+                UpdatePreviewEnabled ();
 
                 return;
             }
@@ -180,7 +459,11 @@ internal sealed class EditorClet : IViewerClet
             editor.Document = new TextDocument (text);
             editor.CaretOffset = 0;
             UpdateSyntaxLanguage (fullPath);
+            InstallFolding ();
             UpdateModifiedIndicator ();
+            filenameShortcut.Title = fullPath;
+            isMarkdownFile = Path.GetExtension (fullPath).Equals (".md", StringComparison.OrdinalIgnoreCase);
+            UpdatePreviewEnabled ();
         }
 
         bool SaveFile ()
@@ -254,15 +537,15 @@ internal sealed class EditorClet : IViewerClet
 
             if (result is null or 0)
             {
-                return false; // Cancel
+                return false;
             }
 
             if (result == 2)
             {
-                return SaveFile (); // Yes
+                return SaveFile ();
             }
 
-            return true; // No — discard
+            return true;
         }
 
         void NewFile ()
@@ -278,7 +561,13 @@ internal sealed class EditorClet : IViewerClet
             editor.ClearSelection ();
             editor.Document = new TextDocument ();
             editor.CaretOffset = 0;
+            editor.HighlightingDefinition = null;
+            InstallFolding ();
             UpdateModifiedIndicator ();
+            UpdateLanguageShortcut ();
+            filenameShortcut.Title = "<untitled>";
+            isMarkdownFile = false;
+            UpdatePreviewEnabled ();
         }
 
         void OpenFile ()
@@ -324,7 +613,7 @@ internal sealed class EditorClet : IViewerClet
             window.RequestStop ();
         }
 
-        // --- Clipboard helpers (Editor doesn't have built-in clipboard commands) ---
+        // --- Clipboard helpers ---
 
         void Paste ()
         {
@@ -371,9 +660,111 @@ internal sealed class EditorClet : IViewerClet
             editor.ReplaceSelection (string.Empty);
         }
 
+        // --- Find/Replace ---
+
+        void ShowFindReplace (bool showReplace = false)
+        {
+            FindReplaceDialog dlg = new (editor, showReplace);
+            app.Run (dlg);
+            dlg.Dispose ();
+        }
+
+        // --- Edit menu items (reusable for context menu) ---
+
+        MenuItem[] CreateEditMenuItems () =>
+        [
+            new () { Title = "_Undo", Key = Key.Z.WithCtrl, Action = () => editor.Document?.UndoStack.Undo () },
+            new () { Title = "_Redo", Key = Key.Y.WithCtrl, Action = () => editor.Document?.UndoStack.Redo () },
+            null!,
+            new () { Title = "Cu_t", Key = Key.X.WithCtrl, Action = Cut },
+            new () { Title = "_Copy", Key = Key.C.WithCtrl, Action = Copy },
+            new () { Title = "_Paste", Key = Key.V.WithCtrl, Action = Paste },
+            null!,
+            new () { Title = "Select _All", Key = Key.A.WithCtrl, Action = () => editor.SelectAll () },
+        ];
+
+        // --- About dialog ---
+
+        void ShowAbout ()
+        {
+            string editorVersion = VersionInfo.GetAssemblyVersion (
+                typeof (Editor).Assembly, "unknown");
+
+            Dialog about = new ()
+            {
+                Title = "About clet edit",
+                Width = Dim.Percent (50),
+                Height = 12,
+            };
+
+            Label info = new ()
+            {
+                X = 1,
+                Y = 0,
+                Width = Dim.Fill (1),
+                Text = $"""
+                         clet {VersionInfo.GetCletVersion ()}
+                         Terminal.Gui {VersionInfo.GetTerminalGuiVersion ()}
+                         Terminal.Gui.Editor {editorVersion}
+
+                         https://github.com/gui-cs/clet
+                         """,
+            };
+
+            Button ok = new () { Text = "OK", X = Pos.Center (), Y = Pos.Bottom (info) + 1, IsDefault = true };
+            ok.Accepting += (_, _) => about.RequestStop ();
+            about.Add (info, ok);
+            app.Run (about);
+            about.Dispose ();
+        }
+
+        // --- Settings dialog ---
+
+        void ShowSettings ()
+        {
+            EditorSettingsDialog dlg = new (editor);
+            app.Run (dlg);
+
+            if (dlg.WasAccepted)
+            {
+                dlg.ApplyTo (editor);
+                SaveViewSettings ();
+            }
+
+            dlg.Dispose ();
+        }
+
+        // --- View menu toggle state ---
+
+        bool optLineNumbers = EditorSettings.LineNumbers;
+        bool optFoldIndicators = EditorSettings.FoldIndicators;
+        bool optWordWrap = EditorSettings.WordWrap;
+        bool optShowTabs = EditorSettings.ShowTabs;
+
+        void UpdateGutterOptions ()
+        {
+            GutterOptions g = GutterOptions.None;
+
+            if (optLineNumbers)
+            {
+                g |= GutterOptions.LineNumbers;
+            }
+
+            if (optFoldIndicators)
+            {
+                g |= GutterOptions.Folding;
+            }
+
+            editor.GutterOptions = g;
+        }
+
+        string ToggleTitle (bool on, string label) => on ? $"✓ {label}" : $"  {label}";
+
         // --- MenuBar ---
 
-        MenuBar menu = new ();
+        MenuBar menu = new () { AlignmentModes = AlignmentModes.IgnoreFirstOrLast };
+
+        filenameShortcut.Accepting += (_, _) => OpenFile ();
 
         menu.Add (new MenuBarItem ("_File",
         [
@@ -381,21 +772,140 @@ internal sealed class EditorClet : IViewerClet
             new MenuItem { Title = "_Open", Key = Key.O.WithCtrl, Action = OpenFile },
             new MenuItem { Title = "_Save", Key = Key.S.WithCtrl, Action = () => SaveFile () },
             new MenuItem { Title = "Save _As", Action = () => SaveAs () },
-            null!, // separator
+            null!,
             new MenuItem { Title = "_Quit", Key = Key.Q.WithCtrl, Action = QuitEditor },
         ]));
 
         menu.Add (new MenuBarItem ("_Edit",
         [
-            new MenuItem { Title = "_Undo", Key = Key.Z.WithCtrl, Action = () => editor.Document?.UndoStack.Undo () },
-            new MenuItem { Title = "_Redo", Key = Key.Y.WithCtrl, Action = () => editor.Document?.UndoStack.Redo () },
-            null!, // separator
-            new MenuItem { Title = "Cu_t", Key = Key.X.WithCtrl, Action = Cut },
-            new MenuItem { Title = "_Copy", Key = Key.C.WithCtrl, Action = Copy },
-            new MenuItem { Title = "_Paste", Key = Key.V.WithCtrl, Action = Paste },
-            null!, // separator
-            new MenuItem { Title = "Select _All", Key = Key.A.WithCtrl, Action = () => editor.SelectAll () },
+            new MenuItem { Title = "_Find...", Key = Key.F.WithCtrl, Action = () => ShowFindReplace () },
+            new MenuItem { Title = "_Replace...", Key = Key.H.WithCtrl, Action = () => ShowFindReplace (true) },
+            null!,
+            .. CreateEditMenuItems (),
         ]));
+
+        // --- View menu ---
+
+        MenuItem viewLineNumbersItem = new () { Title = ToggleTitle (optLineNumbers, "_Line Numbers") };
+        MenuItem viewFoldIndicatorsItem = new () { Title = ToggleTitle (optFoldIndicators, "_Fold Indicators") };
+        MenuItem viewWordWrapItem = new () { Title = ToggleTitle (optWordWrap, "_Word Wrap") };
+        MenuItem viewShowTabsItem = new () { Title = ToggleTitle (optShowTabs, "Show _Tabs") };
+        MenuItem viewUseThemeBgItem = new () { Title = ToggleTitle (optUseThemeBg, "Use _Theme Background") };
+
+        void SaveViewSettings ()
+        {
+            EditorSettings.LineNumbers = optLineNumbers;
+            EditorSettings.FoldIndicators = optFoldIndicators;
+            EditorSettings.WordWrap = optWordWrap;
+            EditorSettings.ShowTabs = optShowTabs;
+            EditorSettings.UseThemeBackground = optUseThemeBg;
+            EditorSettings.IndentSize = editor.IndentationSize;
+            EditorSettings.ConvertTabsToSpaces = editor.ConvertTabsToSpaces;
+            EditorSettings.AutoIndent = editor.IndentationStrategy is not null;
+            EditorSettings.Save ();
+        }
+
+        viewLineNumbersItem.Action = () =>
+        {
+            optLineNumbers = !optLineNumbers;
+            viewLineNumbersItem.Title = ToggleTitle (optLineNumbers, "_Line Numbers");
+            UpdateGutterOptions ();
+            SaveViewSettings ();
+        };
+
+        viewFoldIndicatorsItem.Action = () =>
+        {
+            optFoldIndicators = !optFoldIndicators;
+            viewFoldIndicatorsItem.Title = ToggleTitle (optFoldIndicators, "_Fold Indicators");
+            UpdateGutterOptions ();
+            SaveViewSettings ();
+        };
+
+        viewWordWrapItem.Action = () =>
+        {
+            optWordWrap = !optWordWrap;
+            viewWordWrapItem.Title = ToggleTitle (optWordWrap, "_Word Wrap");
+            editor.WordWrap = optWordWrap;
+            SaveViewSettings ();
+        };
+
+        viewShowTabsItem.Action = () =>
+        {
+            optShowTabs = !optShowTabs;
+            viewShowTabsItem.Title = ToggleTitle (optShowTabs, "Show _Tabs");
+            editor.ShowTabs = optShowTabs;
+            SaveViewSettings ();
+        };
+
+        viewUseThemeBgItem.Action = () =>
+        {
+            optUseThemeBg = !optUseThemeBg;
+            viewUseThemeBgItem.Title = ToggleTitle (optUseThemeBg, "Use _Theme Background");
+            editor.UseThemeBackground = optUseThemeBg;
+
+            if (markdownPreview is not null)
+            {
+                markdownPreview.UseThemeBackground = optUseThemeBg;
+            }
+
+            SaveViewSettings ();
+        };
+
+        previewMarkdownItem.Action = () =>
+        {
+            if (isMarkdownFile)
+            {
+                ToggleMarkdownPreview ();
+            }
+        };
+
+        menu.Add (new MenuBarItem ("_View",
+        [
+            viewLineNumbersItem,
+            viewFoldIndicatorsItem,
+            viewWordWrapItem,
+            viewShowTabsItem,
+            null!,
+            previewMarkdownItem,
+            null!,
+            viewUseThemeBgItem,
+        ]));
+
+        // --- Options menu ---
+
+        menu.Add (new MenuBarItem ("_Options",
+        [
+            new MenuItem { Title = "_Settings...", Action = ShowSettings },
+        ]));
+
+        menu.Add (new MenuBarItem ("_Help",
+        [
+            new MenuItem { Title = "_About", Action = ShowAbout },
+        ]),
+        filenameShortcut);
+
+        // --- Right-click context menu ---
+
+        PopoverMenu contextMenu = new (CreateEditMenuItems ())
+        {
+            Target = new WeakReference<View> (editor),
+        };
+
+        editor.MouseEvent += (_, e) =>
+        {
+            if (!e.Flags.HasFlag (MouseFlags.RightButtonClicked))
+            {
+                return;
+            }
+
+            contextMenu.MakeVisible (e.ScreenPosition);
+            e.Handled = true;
+        };
+
+        // --- Wire find/replace events ---
+
+        editor.FindRequested += (_, _) => ShowFindReplace ();
+        editor.ReplaceRequested += (_, _) => ShowFindReplace (true);
 
         // --- Wire events ---
 
@@ -412,8 +922,8 @@ internal sealed class EditorClet : IViewerClet
             new Shortcut (Application.GetDefaultKey (Command.Quit), "Quit", QuitEditor),
             new Shortcut (Key.F2, "Open", OpenFile),
             new Shortcut (Key.F3, "Save", () => SaveFile ()),
-            modifiedShortcut,
             cursorPositionShortcut,
+            languageShortcut,
         ];
 
         // File selector: dropdown when multiple files, plain label otherwise
@@ -421,13 +931,11 @@ internal sealed class EditorClet : IViewerClet
 
         if (files.Count > 1)
         {
-            // Use basenames when they are all distinct; fall back to relative paths
-            // so that files like a/readme.md and b/readme.md get unique labels.
             List<string> basenames = [.. files.Select (f => Path.GetFileName (f) ?? f)];
             bool hasCollisions = basenames.Count != basenames.Distinct (StringComparer.OrdinalIgnoreCase).Count ();
-            string cwd = Directory.GetCurrentDirectory ();
+            string currentDir = Directory.GetCurrentDirectory ();
             List<string> displayNames = hasCollisions
-                ? [.. files.Select (f => Path.GetRelativePath (cwd, f))]
+                ? [.. files.Select (f => Path.GetRelativePath (currentDir, f))]
                 : basenames;
 
             ObservableCollection<string> displayNamesOc = new (displayNames);
@@ -449,8 +957,6 @@ internal sealed class EditorClet : IViewerClet
                     return;
                 }
 
-                // Use the unique display name list — since labels are guaranteed distinct,
-                // IndexOf is unambiguous even when files share the same basename.
                 int index = displayNames.IndexOf (fileSelector.Text);
 
                 if (index < 0 || index >= files.Count)
@@ -460,7 +966,6 @@ internal sealed class EditorClet : IViewerClet
 
                 if (!PromptSaveIfDirty ())
                 {
-                    // Revert dropdown to current file
                     switchingFile = true;
                     int currentIndex = filePath is not null ? files.IndexOf (filePath) : -1;
 
@@ -479,14 +984,6 @@ internal sealed class EditorClet : IViewerClet
 
             statusItems.Add (new Shortcut () { CommandView = fileSelector, HelpText = "File" });
         }
-        else
-        {
-            Shortcut fileInfoShortcut = new ()
-            { Title = fileName ?? "Untitled", MouseHighlightStates = MouseState.None, Enabled = false };
-
-            // UpdateTitle needs to update this shortcut
-            statusItems.Add (fileInfoShortcut);
-        }
 
         StatusBar statusBar = new (statusItems)
         { AlignmentModes = AlignmentModes.StartToEnd | AlignmentModes.IgnoreFirstOrLast };
@@ -499,25 +996,83 @@ internal sealed class EditorClet : IViewerClet
 
         window.Initialized += (_, _) =>
         {
+            // ── File-access dialog ───────────────────────────────────────────
+            if (pendingDeniedPath is not null)
+            {
+                string dir = Path.GetDirectoryName (pendingDeniedPath) is { Length: > 0 } d
+                    ? d
+                    : pendingDeniedPath;
+
+                int? choice = MessageBox.Query (
+                    app,
+                    "File Access Required",
+                    $"'{Path.GetFileName (pendingDeniedPath)}' is outside the allowed\n"
+                    + $"directories.\n\n{pendingDeniedPath}\n\n"
+                    + "How would you like to proceed?",
+                    "Allow once", "Add to config", "Cancel");
+
+                switch (choice)
+                {
+                    case 0: // Allow once — add dir to the session policy only
+                        {
+                            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy ([dir]), out _);
+
+                            if (files.Count > 0)
+                            {
+                                filePath = files[0];
+                                fileName = Path.GetFileName (filePath);
+                                lastDirectory = Path.GetDirectoryName (filePath);
+                                window.Title = fileName;
+                            }
+
+                            break;
+                        }
+
+                    case 1: // Add to config — persist the directory and allow now
+                        {
+                            FileAccessSettings.AddToConfig (dir);
+                            files = MarkdownContentResolver.ExpandFiles (args, BuildPolicy (), out _);
+
+                            if (files.Count > 0)
+                            {
+                                filePath = files[0];
+                                fileName = Path.GetFileName (filePath);
+                                lastDirectory = Path.GetDirectoryName (filePath);
+                                window.Title = fileName;
+                            }
+
+                            break;
+                        }
+
+                    default: // Cancel
+                        accessDialogCancelled = true;
+                        window.RequestStop ();
+
+                        return;
+                }
+            }
+
+            // ── Normal (or post-allow) content load ──────────────────────────
             if (filePath is not null && File.Exists (filePath))
             {
                 LoadFile (filePath);
             }
             else if (filePath is not null)
             {
-                // File doesn't exist yet — treat as new file at that path
                 savedText = string.Empty;
                 editor.Document = new TextDocument ();
+                InstallFolding ();
                 UpdateModifiedIndicator ();
             }
             else if (content is not null)
             {
-                // Piped content via --initial
                 editor.Document = new TextDocument (content);
-                savedText = string.Empty; // Mark as unsaved
+                savedText = string.Empty;
+                InstallFolding ();
                 UpdateModifiedIndicator ();
             }
 
+            UpdateLanguageShortcut ();
             editor.SetFocus ();
         };
 
@@ -532,7 +1087,7 @@ internal sealed class EditorClet : IViewerClet
             return new () { Status = CletRunStatus.Cancelled };
         }
 
-        if (cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested || accessDialogCancelled)
         {
             return new () { Status = CletRunStatus.Cancelled };
         }
