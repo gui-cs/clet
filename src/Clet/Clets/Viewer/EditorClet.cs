@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
@@ -273,6 +274,10 @@ internal sealed class EditorClet : IViewerClet
                 return;
             }
 
+            // Pick a TextMate syntax theme that matches the terminal background.
+            Terminal.Gui.Drawing.Attribute baseAttr = editor.GetScheme ().Normal;
+            ThemeName autoTheme = TextMateSyntaxHighlighter.GetThemeForBackground (baseAttr.Background);
+
             markdownPreview = new Markdown ()
             {
                 X = Pos.Right (editor),
@@ -281,7 +286,7 @@ internal sealed class EditorClet : IViewerClet
                 Height = editor.Height,
                 Text = editor.Document?.Text ?? string.Empty,
                 ViewportSettings = ViewportSettingsFlags.HasScrollBars,
-                SyntaxHighlighter = new TextMateSyntaxHighlighter (ThemeName.DarkPlus),
+                SyntaxHighlighter = new TextMateSyntaxHighlighter (autoTheme),
             };
 
             editor.Width = Dim.Percent (50);
@@ -892,6 +897,29 @@ internal sealed class EditorClet : IViewerClet
             UpdateLocShortcut ();
         };
 
+        // --- Theme selector ---
+
+        ImmutableList<string> themeNames = ThemeManager.GetThemeNames ();
+        ObservableCollection<string> themeCollection = new (themeNames);
+
+        DropDownList themeDropDown = new ()
+        {
+            Source = new ListWrapper<string> (themeCollection),
+            ReadOnly = true,
+            Text = ThemeManager.Theme,
+            Width = Dim.Auto (DimAutoStyle.Text, minimumContentDim: 10),
+        };
+
+        themeDropDown.ValueChanged += (_, _) =>
+        {
+            string selected = themeDropDown.Text;
+
+            if (!string.IsNullOrEmpty (selected) && selected != ThemeManager.Theme)
+            {
+                ThemeManager.Theme = selected;
+            }
+        };
+
         // --- StatusBar ---
 
         List<Shortcut> statusItems =
@@ -901,6 +929,7 @@ internal sealed class EditorClet : IViewerClet
             new Shortcut (Key.F3, "Save", () => SaveFile ()),
             cursorPositionShortcut,
             languageShortcut,
+            new Shortcut { Title = "Theme", CommandView = themeDropDown },
         ];
 
         // File selector: dropdown when multiple files, plain label otherwise
