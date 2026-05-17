@@ -131,7 +131,6 @@ internal sealed class EditorClet : IViewerClet
             IndentationSize = EditorSettings.IndentSize,
             WordWrap = EditorSettings.WordWrap,
             ShowTabs = EditorSettings.ShowTabs,
-            UseThemeBackground = EditorSettings.UseThemeBackground,
             ViewportSettings = ViewportSettingsFlags.HasScrollBars,
         };
 
@@ -192,8 +191,6 @@ internal sealed class EditorClet : IViewerClet
 
         // View-menu toggle items — declared early so preview toggle can reference them.
         MenuItem previewMarkdownItem = new () { Title = "  _Preview Markdown", Enabled = isMarkdownFile };
-
-        bool optUseThemeBg = EditorSettings.UseThemeBackground;
 
         void OnEditorViewportChanged (object? sender, DrawEventArgs e)
         {
@@ -285,7 +282,6 @@ internal sealed class EditorClet : IViewerClet
                 Text = editor.Document?.Text ?? string.Empty,
                 ViewportSettings = ViewportSettingsFlags.HasScrollBars,
                 SyntaxHighlighter = new TextMateSyntaxHighlighter (ThemeName.DarkPlus),
-                UseThemeBackground = optUseThemeBg,
             };
 
             editor.Width = Dim.Percent (50);
@@ -790,15 +786,12 @@ internal sealed class EditorClet : IViewerClet
         MenuItem viewFoldIndicatorsItem = new () { Title = ToggleTitle (optFoldIndicators, "_Fold Indicators") };
         MenuItem viewWordWrapItem = new () { Title = ToggleTitle (optWordWrap, "_Word Wrap") };
         MenuItem viewShowTabsItem = new () { Title = ToggleTitle (optShowTabs, "Show _Tabs") };
-        MenuItem viewUseThemeBgItem = new () { Title = ToggleTitle (optUseThemeBg, "Use _Theme Background") };
-
         void SaveViewSettings ()
         {
             EditorSettings.LineNumbers = optLineNumbers;
             EditorSettings.FoldIndicators = optFoldIndicators;
             EditorSettings.WordWrap = optWordWrap;
             EditorSettings.ShowTabs = optShowTabs;
-            EditorSettings.UseThemeBackground = optUseThemeBg;
             EditorSettings.IndentSize = editor.IndentationSize;
             EditorSettings.ConvertTabsToSpaces = editor.ConvertTabsToSpaces;
             EditorSettings.AutoIndent = editor.IndentationStrategy is not null;
@@ -837,20 +830,6 @@ internal sealed class EditorClet : IViewerClet
             SaveViewSettings ();
         };
 
-        viewUseThemeBgItem.Action = () =>
-        {
-            optUseThemeBg = !optUseThemeBg;
-            viewUseThemeBgItem.Title = ToggleTitle (optUseThemeBg, "Use _Theme Background");
-            editor.UseThemeBackground = optUseThemeBg;
-
-            if (markdownPreview is not null)
-            {
-                markdownPreview.UseThemeBackground = optUseThemeBg;
-            }
-
-            SaveViewSettings ();
-        };
-
         previewMarkdownItem.Action = () =>
         {
             if (isMarkdownFile)
@@ -867,8 +846,6 @@ internal sealed class EditorClet : IViewerClet
             viewShowTabsItem,
             null!,
             previewMarkdownItem,
-            null!,
-            viewUseThemeBgItem,
         ]));
 
         // --- Options menu ---
