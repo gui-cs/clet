@@ -274,10 +274,6 @@ internal sealed class EditorClet : IViewerClet
                 return;
             }
 
-            // Pick a TextMate syntax theme that matches the terminal background.
-            Terminal.Gui.Drawing.Attribute baseAttr = editor.GetScheme ().Normal;
-            ThemeName autoTheme = TextMateSyntaxHighlighter.GetThemeForBackground (baseAttr.Background);
-
             markdownPreview = new Markdown ()
             {
                 X = Pos.Right (editor),
@@ -286,7 +282,7 @@ internal sealed class EditorClet : IViewerClet
                 Height = editor.Height,
                 Text = editor.Document?.Text ?? string.Empty,
                 ViewportSettings = ViewportSettingsFlags.HasScrollBars,
-                SyntaxHighlighter = new TextMateSyntaxHighlighter (autoTheme),
+                SyntaxHighlighter = new TextMateSyntaxHighlighter (ThemeName.DarkPlus),
             };
 
             editor.Width = Dim.Percent (50);

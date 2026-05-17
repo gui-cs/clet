@@ -185,19 +185,6 @@ internal sealed class MarkdownClet : IViewerClet
 
         statusItems.Add (new Shortcut { Title = "Theme", CommandView = themeDropDown });
 
-        // Auto-select light or dark syntax theme based on terminal background
-        app.Driver!.DefaultAttributeChanged += (_, e) =>
-        {
-            if (e.NewValue is not { } attr)
-            {
-                return;
-            }
-
-            ThemeName autoTheme = TextMateSyntaxHighlighter.GetThemeForBackground (attr.Background);
-            markdownView.SyntaxHighlighter = new TextMateSyntaxHighlighter (autoTheme);
-            themeDropDown.Value = autoTheme;
-        };
-
         // Theme background toggle
         CheckBox themeBgCheckBox = new ()
         {
