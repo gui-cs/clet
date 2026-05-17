@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using System.Text.Json;
 using Terminal.Gui.App;
 using Terminal.Gui.Configuration;
@@ -53,6 +55,7 @@ internal sealed class ConfigClet : IViewerClet
             Title = options.Title ?? $"clet config — {configPath}",
             Width = Dim.Fill (),
             Height = Dim.Fill (),
+            BorderStyle = LineStyle.None,
         };
 
         Editor editor = new ()
@@ -62,6 +65,7 @@ internal sealed class ConfigClet : IViewerClet
             ConvertTabsToSpaces = true,
             IndentationSize = 2,
             GutterOptions = GutterOptions.LineNumbers,
+            ViewportSettings = ViewportSettingsFlags.HasScrollBars,
         };
 
         editor.HighlightingDefinition = HighlightingManager.Instance.GetDefinitionByExtension (".json");
@@ -85,12 +89,35 @@ internal sealed class ConfigClet : IViewerClet
             UpdateTitle ();
         };
 
+        // --- Theme selector ---
+
+        ImmutableList<string> themeNames = ThemeManager.GetThemeNames ();
+        ObservableCollection<string> themeCollection = new (themeNames);
+
+        DropDownList themeDropDown = new ()
+        {
+            Source = new ListWrapper<string> (themeCollection),
+            ReadOnly = true,
+            Text = ThemeManager.Theme,
+            Width = Dim.Auto (DimAutoStyle.Text, minimumContentDim: 10),
+        };
+
+        themeDropDown.ValueChanged += (_, _) =>
+        {
+            string selected = themeDropDown.Text;
+
+            if (!string.IsNullOrEmpty (selected) && selected != ThemeManager.Theme)
+            {
+                ThemeManager.Theme = selected;
+            }
+        };
+
         // --- StatusBar ---
 
         Shortcut saveShortcut = new (Key.S.WithCtrl, "Save", () => Save ());
         Shortcut quitShortcut = new (Application.GetDefaultKey (Command.Quit), "Quit", () => TryQuit ());
 
-        StatusBar statusBar = new ([quitShortcut, saveShortcut, statusMessage, cursorPosition])
+        StatusBar statusBar = new ([quitShortcut, saveShortcut, statusMessage, cursorPosition, new Shortcut { Title = "Theme", CommandView = themeDropDown }])
         {
             AlignmentModes = AlignmentModes.IgnoreFirstOrLast,
         };

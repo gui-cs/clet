@@ -26,9 +26,6 @@ internal static class EditorSettings
     [ConfigurationProperty (Scope = typeof (SettingsScope))]
     public static bool ShowTabs { get; set; }
 
-    [ConfigurationProperty (Scope = typeof (SettingsScope))]
-    public static bool UseThemeBackground { get; set; }
-
     // --- Tab settings ---
 
     [ConfigurationProperty (Scope = typeof (SettingsScope))]
@@ -49,7 +46,6 @@ internal static class EditorSettings
         "EditorSettings.FoldIndicators",
         "EditorSettings.WordWrap",
         "EditorSettings.ShowTabs",
-        "EditorSettings.UseThemeBackground",
         "EditorSettings.IndentSize",
         "EditorSettings.ConvertTabsToSpaces",
         "EditorSettings.AutoIndent",
@@ -82,7 +78,6 @@ internal static class EditorSettings
                 ["EditorSettings.FoldIndicators"] = ToJson (FoldIndicators),
                 ["EditorSettings.WordWrap"] = ToJson (WordWrap),
                 ["EditorSettings.ShowTabs"] = ToJson (ShowTabs),
-                ["EditorSettings.UseThemeBackground"] = ToJson (UseThemeBackground),
                 ["EditorSettings.IndentSize"] = IndentSize.ToString (),
                 ["EditorSettings.ConvertTabsToSpaces"] = ToJson (ConvertTabsToSpaces),
                 ["EditorSettings.AutoIndent"] = ToJson (AutoIndent),

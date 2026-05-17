@@ -69,11 +69,10 @@ public class EditorSettingsTests : IDisposable
         Assert.Contains ("EditorSettings.FoldIndicators", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.WordWrap", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.ShowTabs", EditorSettings.ManagedKeys);
-        Assert.Contains ("EditorSettings.UseThemeBackground", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.IndentSize", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.ConvertTabsToSpaces", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.AutoIndent", EditorSettings.ManagedKeys);
-        Assert.Equal (8, EditorSettings.ManagedKeys.Count);
+        Assert.Equal (7, EditorSettings.ManagedKeys.Count);
     }
 
     [Fact]
@@ -97,7 +96,6 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.FoldIndicators = false;
         EditorSettings.WordWrap = true;
         EditorSettings.ShowTabs = true;
-        EditorSettings.UseThemeBackground = true;
         EditorSettings.IndentSize = 2;
         EditorSettings.ConvertTabsToSpaces = false;
         EditorSettings.AutoIndent = true;
@@ -126,7 +124,6 @@ public class EditorSettingsTests : IDisposable
         Assert.False ((bool)obj["EditorSettings.FoldIndicators"]!);
         Assert.True ((bool)obj["EditorSettings.WordWrap"]!);
         Assert.True ((bool)obj["EditorSettings.ShowTabs"]!);
-        Assert.True ((bool)obj["EditorSettings.UseThemeBackground"]!);
         Assert.Equal (2, (int)obj["EditorSettings.IndentSize"]!);
         Assert.False ((bool)obj["EditorSettings.ConvertTabsToSpaces"]!);
         Assert.True ((bool)obj["EditorSettings.AutoIndent"]!);
@@ -392,7 +389,6 @@ public class EditorSettingsTests : IDisposable
         Assert.True (EditorSettings.FoldIndicators);
         Assert.False (EditorSettings.WordWrap);
         Assert.False (EditorSettings.ShowTabs);
-        Assert.False (EditorSettings.UseThemeBackground);
         Assert.Equal (4, EditorSettings.IndentSize);
         Assert.True (EditorSettings.ConvertTabsToSpaces);
         Assert.False (EditorSettings.AutoIndent);
