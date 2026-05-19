@@ -97,15 +97,54 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         string? ansiSnapshot = null;
         string? textSnapshot = null;
         int iterations = 0;
+        int previousHash = 0;
+        bool sawNonEmpty = false;
+        int stableCount = 0;
+        const int stableThreshold = 2;
+        const int maxIterations = 50;
         TextWriter originalOut = Console.Out;
         StringWriter capturedOut = new ();
         EventHandler<EventArgs<IApplication?>> handler = (_, _) =>
         {
+            iterations++;
+
+            // Capture latest snapshot every iteration so we always have the most recent.
             ansiSnapshot = CanonicalizeAnsi (app.Driver?.ToAnsi ());
             textSnapshot = BuildTextSnapshot (app.Driver?.Contents);
 
-            iterations++;
-            if (iterations >= 3)
+            // Wait until contents are *stable* across consecutive iterations before stopping.
+            // "Stable" = same hash for two iterations in a row, after at least one non-empty
+            // frame. Views that do async filesystem population or post additional layout work
+            // (file picker, Markdown/editor viewers) need more than a fixed count of iterations.
+            (int hash, bool nonEmpty) = HashContents (app.Driver?.Contents);
+
+            if (!sawNonEmpty)
+            {
+                if (nonEmpty)
+                {
+                    sawNonEmpty = true;
+                    previousHash = hash;
+                    stableCount = 1;
+                }
+                return;
+            }
+
+            if (hash == previousHash)
+            {
+                stableCount++;
+                if (stableCount >= stableThreshold)
+                {
+                    app.RequestStop ();
+                }
+            }
+            else
+            {
+                previousHash = hash;
+                stableCount = 1;
+            }
+
+            // Hard cap to prevent infinite loops if content never stabilizes (e.g. cursor blink).
+            if (iterations >= maxIterations)
             {
                 app.RequestStop ();
             }
@@ -184,6 +223,39 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         }
 
         return sb.ToString ();
+    }
+
+    /// <summary>
+    ///     Returns a content-hash for the cell grid plus a flag indicating whether the grid
+    ///     has any non-space glyphs. Used by the startup-stability detector.
+    /// </summary>
+    private static (int Hash, bool NonEmpty) HashContents (Cell[,]? contents)
+    {
+        if (contents is null)
+        {
+            return (0, false);
+        }
+
+        int rows = contents.GetLength (0);
+        int cols = contents.GetLength (1);
+        int hash = 17;
+        bool nonEmpty = false;
+
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                string g = contents[r, c].Grapheme;
+                hash = unchecked(hash * 31 + (string.IsNullOrEmpty (g) ? 0 : g.GetHashCode ()));
+
+                if (!string.IsNullOrEmpty (g) && g != " ")
+                {
+                    nonEmpty = true;
+                }
+            }
+        }
+
+        return (hash, nonEmpty);
     }
 
     /// <summary>Snapshot the screen as ANSI, including styling.</summary>
