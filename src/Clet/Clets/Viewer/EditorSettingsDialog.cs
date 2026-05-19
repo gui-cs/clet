@@ -13,6 +13,7 @@ namespace Clet;
 internal sealed class EditorSettingsDialog : Dialog
 {
     private readonly CheckBox _autoCompleteCheck;
+    private readonly CheckBox _scrollbarsCheck;
     private readonly NumericUpDown<int> _indentSize;
     private readonly CheckBox _convertTabsCheck;
     private readonly CheckBox _autoIndentCheck;
@@ -78,6 +79,16 @@ internal sealed class EditorSettingsDialog : Dialog
             Value = editor.CompletionProvider is not null ? CheckState.Checked : CheckState.UnChecked,
         };
 
+        _scrollbarsCheck = new ()
+        {
+            X = 1,
+            Y = 3,
+            Title = "_Scrollbars",
+            Value = editor.ViewportSettings.HasFlag (ViewportSettingsFlags.HasScrollBars)
+                ? CheckState.Checked
+                : CheckState.UnChecked,
+        };
+
         // --- Config tab ---
         View configTab = new ()
         {
@@ -86,7 +97,7 @@ internal sealed class EditorSettingsDialog : Dialog
             Height = Dim.Fill (),
         };
 
-        configTab.Add (_autoCompleteCheck);
+        configTab.Add (_autoCompleteCheck, _scrollbarsCheck);
 
         // --- Tabs ---
         Tabs tabs = new ()
@@ -139,5 +150,8 @@ internal sealed class EditorSettingsDialog : Dialog
         editor.CompletionProvider = _autoCompleteCheck.Value == CheckState.Checked
             ? new WordCompletionProvider ()
             : null;
+        editor.ViewportSettings = _scrollbarsCheck.Value == CheckState.Checked
+            ? editor.ViewportSettings | ViewportSettingsFlags.HasScrollBars
+            : editor.ViewportSettings & ~ViewportSettingsFlags.HasScrollBars;
     }
 }

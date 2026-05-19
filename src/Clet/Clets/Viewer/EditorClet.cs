@@ -1024,6 +1024,7 @@ internal sealed class EditorClet : IViewerClet
             if (dlg.WasAccepted)
             {
                 dlg.ApplyTo (editor);
+                SyncViewMenuStateFromEditor ();
                 SaveViewSettings ();
             }
 
@@ -1088,6 +1089,13 @@ internal sealed class EditorClet : IViewerClet
         MenuItem viewWordWrapItem = new () { Title = ToggleTitle (optWordWrap, "_Word Wrap") };
         MenuItem viewShowTabsItem = new () { Title = ToggleTitle (optShowTabs, "Show _Tabs") };
         MenuItem viewScrollbarsItem = new () { Title = ToggleTitle (optScrollbars, "_Scrollbars") };
+
+        void SyncViewMenuStateFromEditor ()
+        {
+            optScrollbars = editor.ViewportSettings.HasFlag (ViewportSettingsFlags.HasScrollBars);
+            viewScrollbarsItem.Title = ToggleTitle (optScrollbars, "_Scrollbars");
+        }
+
         void SaveViewSettings ()
         {
             EditorSettings.LineNumbers = optLineNumbers;
