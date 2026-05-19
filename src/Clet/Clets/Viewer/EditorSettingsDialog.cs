@@ -12,6 +12,7 @@ namespace Clet;
 /// </summary>
 internal sealed class EditorSettingsDialog : Dialog
 {
+    private readonly CheckBox _autoCompleteCheck;
     private readonly NumericUpDown<int> _indentSize;
     private readonly CheckBox _convertTabsCheck;
     private readonly CheckBox _autoIndentCheck;
@@ -39,6 +40,13 @@ internal sealed class EditorSettingsDialog : Dialog
             Value = editor.IndentationSize,
             Width = 8,
         };
+        _indentSize.ValueChanging += (_, e) =>
+        {
+            if (e.NewValue is < 1)
+            {
+                e.Handled = true;
+            }
+        };
 
         _convertTabsCheck = new ()
         {
@@ -62,7 +70,15 @@ internal sealed class EditorSettingsDialog : Dialog
             _convertTabsCheck,
             _autoIndentCheck);
 
-        // --- Config tab (empty for now) ---
+        _autoCompleteCheck = new ()
+        {
+            X = 1,
+            Y = 1,
+            Title = "Auto _Complete (Ctrl+Space)",
+            Value = editor.CompletionProvider is not null ? CheckState.Checked : CheckState.UnChecked,
+        };
+
+        // --- Config tab ---
         View configTab = new ()
         {
             Title = "_Config",
@@ -70,7 +86,7 @@ internal sealed class EditorSettingsDialog : Dialog
             Height = Dim.Fill (),
         };
 
-        configTab.Add (new Label () { X = 1, Y = 1, Text = "No settings yet." });
+        configTab.Add (_autoCompleteCheck);
 
         // --- Tabs ---
         Tabs tabs = new ()
@@ -115,10 +131,13 @@ internal sealed class EditorSettingsDialog : Dialog
     /// </summary>
     internal void ApplyTo (Editor editor)
     {
-        editor.IndentationSize = _indentSize.Value;
+        editor.IndentationSize = Math.Max (1, _indentSize.Value);
         editor.ConvertTabsToSpaces = _convertTabsCheck.Value == CheckState.Checked;
         editor.IndentationStrategy = _autoIndentCheck.Value == CheckState.Checked
             ? new DefaultIndentationStrategy ()
+            : null;
+        editor.CompletionProvider = _autoCompleteCheck.Value == CheckState.Checked
+            ? new WordCompletionProvider ()
             : null;
     }
 }
