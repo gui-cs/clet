@@ -58,6 +58,20 @@ The legitimate worry that in-process injection drifts from AOT behavior is addre
 
 **Patterns:** xUnit v3, `[Fact]` and `[Theory]`. No `Application.Init`. No threading.
 
+### 2.1b Configuration tests (`Clet.ConfigTests`)
+
+**What this catches:** Races and ordering bugs in `ConfigurationManager` (CM) state — a process-global singleton with one-time `[ConfigurationProperty]` discovery. CM tests that run in a parallel assembly can observe different discovery outcomes depending on which collection enables CM first.
+
+**Why a separate project:** `DisableParallelization = true` on a collection only stops intra-/cross-collection concurrency *within* one assembly — it doesn't prevent a *different* parallel collection in the same assembly from enabling CM before the configuration tests run. The only robust isolation (used by Terminal.Gui itself and the sibling `gui-cs/Editor` repo) is a separate assembly with `parallelizeAssembly: false` and `parallelizeTestCollections: false` in `xunit.runner.json`.
+
+**Cases:**
+- `EditorSettings`: ManagedKeys completeness, CM discovery, Save round-trips (JSONC comments, existing keys, default template, key updates), CM Load/Apply restores values.
+- `FileAccessSettings`: AllowedPaths CM discovery, MergeWithConfigPaths logic, AddToConfig persistence, FileAccessPolicy integration.
+
+**Canonical CM test pattern:** Each test defensively resets CM (`if (IsEnabled) Disable(true)`), sets `ThrowOnJsonErrors = true`, uses `RuntimeConfig` for in-memory config injection (never file-based `AppHome`), and resets via `Disable(resetToHardCodedDefaults: true)` in `finally`/`Dispose`.
+
+**Patterns:** xUnit v3, `[Fact]` and `[Theory]`. No `Application.Init`. No threading. Full assembly serialization via `xunit.runner.json`.
+
 ### 2.2 Integration tests (`Clet.IntegrationTests`)
 
 **What this catches:** TG hosting bugs (init/teardown, cancellation propagation, lifecycle) that unit tests can't see because they don't run an `IApplication`. **Pure-state assertions** — these tests assert on `CletRunResult`, exit codes, and lifecycle events, not on rendered output. Rendered-output assertions live in §2.3.

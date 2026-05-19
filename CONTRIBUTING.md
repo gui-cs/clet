@@ -70,6 +70,7 @@ Or, without `make`:
 dotnet restore
 dotnet build
 dotnet run --project tests/Clet.UnitTests
+dotnet run --project tests/Clet.ConfigTests
 dotnet run --project tests/Clet.IntegrationTests
 dotnet run --project tests/Clet.SmokeTests
 ```
@@ -82,7 +83,8 @@ All green? Ship it.
 2. **Branch from `develop`**, not `main`. PRs target `develop`. Merging to `main` is a release.
 3. **Keep PRs small.** One thing per PR. If your PR touches the spec, the decisions log, *and* the code — good, that's the doc-update gate doing its job.
 4. **Tests are not optional.** New clet? Unit + integration tests. New CLI flag? CommandLineRoot tests. Bug fix? Regression test.
-5. **Read `CLAUDE.md`** before your first PR. It has the build commands, the doc-update gate checklist, and pointers to the spec and decisions log.
+5. **ConfigurationManager tests live only in `Clet.ConfigTests`.** Never call `ConfigurationManager.Enable/Load/Apply/Disable` or set `ConfigurationManager.AppName`/`RuntimeConfig` in the parallel test projects (`Clet.UnitTests`, `Clet.IntegrationTests`, `Clet.SmokeTests`, `Clet.UITests`). CM is process-global; `Clet.ConfigTests` disables all parallelization at the assembly level to guarantee deterministic discovery order.
+6. **Read `CLAUDE.md`** before your first PR. It has the build commands, the doc-update gate checklist, and pointers to the spec and decisions log.
 
 ## What we're looking for
 

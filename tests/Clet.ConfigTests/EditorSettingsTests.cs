@@ -3,20 +3,12 @@ using System.Text.Json.Nodes;
 using Terminal.Gui.Configuration;
 using Xunit;
 
-namespace Clet.UnitTests;
-
-/// <summary>
-/// Defines a non-parallel collection for tests that interact with
-/// <see cref="ConfigurationManager"/>, which uses global static state.
-/// </summary>
-[CollectionDefinition (nameof (ConfigurationManagerCollection), DisableParallelization = true)]
-public class ConfigurationManagerCollection;
+namespace Clet.ConfigTests;
 
 /// <summary>
 /// Tests for <see cref="EditorSettings"/> round-tripping through
 /// <see cref="ConfigurationManager"/>.
 /// </summary>
-[Collection (nameof (ConfigurationManagerCollection))]
 public class EditorSettingsTests : IDisposable
 {
     private readonly string _tempDir;
@@ -35,6 +27,14 @@ public class EditorSettingsTests : IDisposable
 
         // Point HOME at our temp directory (used by Save's CM reload on Linux).
         Environment.SetEnvironmentVariable ("HOME", _tempDir);
+
+        // Defensive clean baseline per canonical CM test pattern.
+        if (ConfigurationManager.IsEnabled)
+        {
+            ConfigurationManager.Disable (resetToHardCodedDefaults: true);
+        }
+
+        ConfigurationManager.ThrowOnJsonErrors = true;
 
         // Ensure CM uses the "clet" app name (matches the clet binary; in tests
         // the assembly name is different).
@@ -290,9 +290,6 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void RoundTrip_LoadApply_RestoresPersistedValues ()
     {
-        // Ensure CM starts disabled so Enable(Runtime) is not a no-op on any platform.
-        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
-
         // Arrange — JSON with non-default values
         string json = """
             {
@@ -330,9 +327,6 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void RoundTrip_SaveThenLoad_RestoresValues ()
     {
-        // Ensure CM starts disabled so Enable(Runtime) is not a no-op on any platform.
-        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
-
         // Arrange — write initial config, set non-default values, save
         File.WriteAllText (_configPath, "{}");
 
@@ -391,8 +385,6 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void Defaults_AreCorrect ()
     {
-        // Ensure CM starts disabled so Enable() is not a no-op on any platform.
-        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
         ConfigurationManager.Enable (ConfigLocations.None);
         ConfigurationManager.Load (ConfigLocations.HardCoded);
         ConfigurationManager.Apply ();
@@ -411,9 +403,6 @@ public class EditorSettingsTests : IDisposable
     [Fact]
     public void AllowedPaths_RoundTrip_CM_LoadsArrayFromRuntimeConfig ()
     {
-        // Ensure CM starts disabled so Enable(Runtime) is not a no-op on any platform.
-        ConfigurationManager.Disable (resetToHardCodedDefaults: true);
-
         // Arrange — reset in-memory value to empty
         List<string> savedPaths = [.. FileAccessSettings.AllowedPaths];
         FileAccessSettings.AllowedPaths = [];

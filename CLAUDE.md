@@ -16,6 +16,7 @@ dotnet build --no-restore
 
 # Tests use xunit.v3 via dotnet run (not dotnet test)
 dotnet run --project tests/Clet.UnitTests --no-build
+dotnet run --project tests/Clet.ConfigTests --no-build
 dotnet run --project tests/Clet.IntegrationTests --no-build
 dotnet run --project tests/Clet.SmokeTests --no-build
 ```
@@ -61,6 +62,7 @@ Projects in this repo:
 
 - **`src/Clet/`** — The CLI executable (net10.0). Depends on `Terminal.Gui` v2 (preview NuGet, currently `2.0.2-develop.24` — pin tracked in `src/Clet/Clet.csproj`, must be replaced with a release tag before v0.5 schema-lock per spec §8 risks). All abstractions are `internal` (not published until v2 plugin system). `BuiltInClets.RegisterAll` registers the shipped clets by hand; auto-discovery via a source generator was explored and dropped.
 - **`tests/Clet.UnitTests/`** — Registry, JSON schema, host pipeline (CommandLineRoot, OutputFormatter, ExitCodes, BuiltInClets) tests.
+- **`tests/Clet.ConfigTests/`** — Non-parallel assembly for all `ConfigurationManager`-touching tests (EditorSettings, FileAccessSettings CM round-trips). `xunit.runner.json` disables both assembly and collection parallelization. **Never enable CM in the other parallel test projects.**
 - **`tests/Clet.IntegrationTests/`** — In-process tests that init Terminal.Gui (`Application.Create()`, `app.Init("ansi")`).
 - **`tests/Clet.SmokeTests/`** — Process-level smoke tests (`Process.Start` against the built `Clet.dll`). The keystroke-driven cases land at v0.3 with TUIcast — see `specs/decisions.md` D-007.
 
