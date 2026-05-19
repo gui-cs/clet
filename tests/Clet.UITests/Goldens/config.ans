@@ -1,0 +1,20 @@
+[39m[49m  1 [38;2;212;212;212m[49m{[39m[49m                                                                                              ▲
+  2 [38;2;212;212;212m[49m  // ═══════════════════════════════════════════════════════════════════════[39m[49m                   [39m[49m[4m█
+[39m[49m[24m  3 [38;2;212;212;212m[49m  //  clet configuration — ~/.tui/clet.config.json[39m[49m                                             [39m[49m[4m█
+[39m[49m[24m  4 [38;2;212;212;212m[49m  //[39m[49m                                                                                           ░
+  5 [38;2;212;212;212m[49m  //  This file configures Terminal.Gui settings for the `clet` tool.[39m[49m                          ░
+  6 [38;2;212;212;212m[49m  //  Terminal.Gui[38;2;156;220;254m[49m's ConfigurationManager loads this automatically.[39m[49m                            ░
+  7 [38;2;212;212;212m[49m  //[39m[49m                                                                                           ░
+  8 [38;2;212;212;212m[49m  //  Edit and save (Ctrl+S) to apply changes live.[39m[49m                                            ░
+  9 [38;2;212;212;212m[49m  //  See: ]8;;https://gui-cs.github.io/Terminal.Gui/docs/config.html\https://gui-cs.github.io/Terminal.Gui/docs/config.html]8;;\[39m[49m                              ░
+ 10 [38;2;212;212;212m[49m  //  Schema: ]8;;https://gui-cs.github.io/Terminal.Gui/schemas/tui-config-schema.json\https://gui-cs.github.io/Terminal.Gui/schemas/tui-config-schema.json]8;;\[39m[49m             ░
+ 11 [38;2;212;212;212m[49m  // ═══════════════════════════════════════════════════════════════════════[39m[49m                   ░
+ 12                                                                                                ░
+ 13 [38;2;212;212;212m[49m  [38;2;156;220;254m[49m"$schema"[38;2;212;212;212m[49m: [38;2;206;145;120m[49m"]8;;https://gui-cs.github.io/Terminal.Gui/schemas/tui-config-schema.json\https://gui-cs.github.io/Terminal.Gui/schemas/tui-config-schema.json]8;;\"[38;2;212;212;212m[49m,[39m[49m           ░
+ 14                                                                                                ░
+ 15 [38;2;212;212;212m[49m  // ─── General Settings ─────────────────────────────────────────────────[39m[49m                    ░
+ 16                                                                                                ░
+ 17 [38;2;212;212;212m[49m  // Separator character for key bindings displayed in the UI (e.g. [38;2;156;220;254m[49m"Ctrl+S"[38;2;212;212;212m[49m)[39m[49m                  ░
+ 18 [38;2;212;212;212m[49m  // [38;2;156;220;254m[49m"Key.Separator"[38;2;212;212;212m[49m: [38;2;206;145;120m[49m"+"[38;2;212;212;212m[49m,[39m[49m                                                                     ░
+ 19                                                                                                ▼
+[38;2;54;69;79m[48;2;173;216;230m[1m [38;2;54;69;79m[48;2;173;216;230m[4mEsc[38;2;54;69;79m[48;2;173;216;230m[24m  Quit │ [38;2;54;69;79m[48;2;173;216;230m[4mCtrl+S[38;2;54;69;79m[48;2;173;216;230m[24m  Save │[38;2;74;95;109m[48;2;173;216;230m Config has errors [38;2;54;69;79m[48;2;173;216;230m│[38;2;74;95;109m[48;2;173;216;230m Ln 1, Col 1 [38;2;54;69;79m[48;2;173;216;230m│                           Default   ▼ 
