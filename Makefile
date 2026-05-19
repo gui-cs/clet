@@ -66,6 +66,7 @@ build-release: restore
 
 test:
 	dotnet run --project tests/Clet.UnitTests --no-build
+	dotnet run --project tests/Clet.ConfigTests --no-build
 	dotnet run --project tests/Clet.IntegrationTests --no-build
 	dotnet run --project tests/Clet.SmokeTests --no-build
 

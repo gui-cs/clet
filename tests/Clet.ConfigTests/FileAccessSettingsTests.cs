@@ -1,17 +1,15 @@
 using Terminal.Gui.Configuration;
 using Xunit;
 
-namespace Clet.UnitTests;
+namespace Clet.ConfigTests;
 
 /// <summary>
 /// Tests for <see cref="FileAccessSettings"/> and
 /// <see cref="FileAccessPolicy.MergeWithConfigPaths"/>.
-/// All three classes in this file touch <see cref="FileAccessSettings.AllowedPaths"/>,
-/// which is a CM-discovered static property. They must all run in the
-/// <see cref="ConfigurationManagerCollection"/> to avoid races with
-/// <see cref="EditorSettingsTests"/> and with each other.
+/// All classes in this file touch <see cref="FileAccessSettings.AllowedPaths"/>,
+/// which is a CM-discovered static property. They live in this non-parallel
+/// assembly to avoid races with other test projects.
 /// </summary>
-[Collection (nameof (ConfigurationManagerCollection))]
 public class FileAccessSettingsTests : IDisposable
 {
     private readonly List<string> _originalPaths;
@@ -181,10 +179,7 @@ public class FileAccessSettingsTests : IDisposable
 /// <summary>
 /// Verifies that <see cref="ConfigurationManager"/> discovers
 /// <see cref="FileAccessSettings.AllowedPaths"/> via its assembly scan.
-/// In the <see cref="ConfigurationManagerCollection"/> so it runs serially
-/// with other CM-touching tests.
 /// </summary>
-[Collection (nameof (ConfigurationManagerCollection))]
 public class FileAccessSettingsCmDiscoveryTests
 {
     [Fact]
@@ -200,10 +195,8 @@ public class FileAccessSettingsCmDiscoveryTests
 
 /// <summary>
 /// Tests for <see cref="FileAccessSettings.AddToConfig(string, string)"/>.
-/// In the <see cref="ConfigurationManagerCollection"/> because it mutates
-/// <see cref="FileAccessSettings.AllowedPaths"/>, a CM-discovered static property.
+/// Mutates <see cref="FileAccessSettings.AllowedPaths"/>, a CM-discovered static property.
 /// </summary>
-[Collection (nameof (ConfigurationManagerCollection))]
 public class FileAccessSettingsAddToConfigTests : IDisposable
 {
     private readonly string _tempDir;
