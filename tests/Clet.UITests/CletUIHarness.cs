@@ -183,14 +183,7 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
             sb.Append ('\n');
         }
 
-        string text = sb.ToString ();
-
-        if (!string.IsNullOrWhiteSpace (text))
-        {
-            return text;
-        }
-
-        return text;
+        return sb.ToString ();
     }
 
     /// <summary>Snapshot the screen as ANSI, including styling.</summary>
