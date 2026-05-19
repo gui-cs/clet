@@ -1,49 +1,43 @@
-using System.Drawing;
 using System.Text;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Drawing;
-using Terminal.Gui.Input;
-using Terminal.Gui.Testing;
 using Xunit;
 
 namespace Clet.UITests;
 
 /// <summary>
-///     Frame-stepped, in-process UI test harness for clets.
+///     In-process UI render harness for clets.
 ///     See <c>tests/SPEC.md</c> §2.3 and §3.2 for design.
 /// </summary>
 /// <remarks>
-///     <para>
-///         The harness runs a clet's <c>RunAsync</c> on a thread-pool task and lets the test thread
-///         drive input + capture snapshots cooperatively via the <see cref="IApplication.Iteration"/>
-///         event. There is no background semaphore-driven loop, no <c>Task.Delay</c>, and no
-///         wall-clock waits — the test thread owns the clock.
-///     </para>
-///     <para>
-///         Each <see cref="PressAsync"/> / <see cref="ClickAsync"/> call injects the event and then
-///         awaits one full iteration before returning, so the next snapshot reflects the post-input,
-///         post-redraw state.
-///     </para>
+///     The harness runs a clet on the test thread, captures text and ANSI snapshots during
+///     <see cref="IApplication.Iteration"/>, then requests stop after a few draw cycles so rendering
+///     assertions are deterministic without a background loop.
 /// </remarks>
 internal sealed class CletUIHarness<T> : IAsyncDisposable
 {
     private readonly IApplication _app;
     private readonly CancellationTokenSource _cts;
     private readonly Task<CletRunResult<T>> _cletTask;
+    private readonly string? _initialAnsiSnapshot;
+    private readonly string? _initialTextSnapshot;
 
-    // TCS swapped in by callers that want to await the next iteration. The Iteration handler
-    // takes whatever's there at fire-time and completes it. Null between awaits.
-    private TaskCompletionSource? _nextIteration;
-
-    private CletUIHarness (IApplication app, CancellationTokenSource cts, Task<CletRunResult<T>> cletTask)
+    private CletUIHarness (
+        IApplication app,
+        CancellationTokenSource cts,
+        Task<CletRunResult<T>> cletTask,
+        string? initialAnsiSnapshot,
+        string? initialTextSnapshot)
     {
         _app = app;
         _cts = cts;
         _cletTask = cletTask;
+        _initialAnsiSnapshot = initialAnsiSnapshot;
+        _initialTextSnapshot = initialTextSnapshot;
     }
 
-    /// <summary>Start a harness for the given input clet. Returns once the first iteration has rendered.</summary>
+    /// <summary>Start a harness for the given input clet. Returns after the initial render has been captured.</summary>
     public static Task<CletUIHarness<T>> StartAsync (
         IClet<T> clet,
         string? initial = null,
@@ -100,43 +94,28 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         app.Driver?.SetScreenSize (width, height);
 
         CancellationTokenSource cts = new ();
-
-        // Iteration event handler — completes whatever TCS is currently set in `pending`.
-        TaskCompletionSource? pending = null;
-        EventHandler<EventArgs<IApplication?>>? handler = (_, _) =>
-        {
-            TaskCompletionSource? tcs = Interlocked.Exchange (ref pending, null);
-            tcs?.TrySetResult ();
-        };
-        app.Iteration += handler;
-
-        // Run the clet on a background task — its app.RunAsync owns the loop thread.
-        Task<CletRunResult<T>> task = Task.Run (async () => await run (app, cts.Token));
-
-        // Wait until the rendered contents are *stable* across consecutive iterations.
-        // "Stable" = same hash for two iterations in a row, after at least one non-empty
-        // frame. A simple "first non-empty" check trips on partial layout — the StatusBar
-        // is drawn before the Markdown body, so we'd capture mid-render. Stability is the
-        // signal that the View finished its layout/draw cascade.
-        const int maxStartupIterations = 50;
+        string? ansiSnapshot = null;
+        string? textSnapshot = null;
+        int iterations = 0;
         int previousHash = 0;
         bool sawNonEmpty = false;
         int stableCount = 0;
         const int stableThreshold = 2;
-
-        for (int i = 0; i < maxStartupIterations; i++)
+        const int maxIterations = 50;
+        TextWriter originalOut = Console.Out;
+        StringWriter capturedOut = new ();
+        EventHandler<EventArgs<IApplication?>> handler = (_, _) =>
         {
-            TaskCompletionSource tcs = new (TaskCreationOptions.RunContinuationsAsynchronously);
-            Volatile.Write (ref pending, tcs);
+            iterations++;
 
-            // Race against task completion (e.g. pre-cancelled token returns immediately).
-            await Task.WhenAny (tcs.Task, task);
+            // Capture latest snapshot every iteration so we always have the most recent.
+            ansiSnapshot = CanonicalizeAnsi (app.Driver?.ToAnsi ());
+            textSnapshot = BuildTextSnapshot (app.Driver?.Contents);
 
-            if (task.IsCompleted)
-            {
-                break;
-            }
-
+            // Wait until contents are *stable* across consecutive iterations before stopping.
+            // "Stable" = same hash for two iterations in a row, after at least one non-empty
+            // frame. Views that do async filesystem population or post additional layout work
+            // (file picker, Markdown/editor viewers) need more than a fixed count of iterations.
             (int hash, bool nonEmpty) = HashContents (app.Driver?.Contents);
 
             if (!sawNonEmpty)
@@ -147,7 +126,7 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
                     previousHash = hash;
                     stableCount = 1;
                 }
-                continue;
+                return;
             }
 
             if (hash == previousHash)
@@ -155,7 +134,7 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
                 stableCount++;
                 if (stableCount >= stableThreshold)
                 {
-                    break;
+                    app.RequestStop ();
                 }
             }
             else
@@ -163,21 +142,92 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
                 previousHash = hash;
                 stableCount = 1;
             }
+
+            // Hard cap to prevent infinite loops if content never stabilizes (e.g. cursor blink).
+            if (iterations >= maxIterations)
+            {
+                app.RequestStop ();
+            }
+        };
+
+        app.Iteration += handler;
+        Task<CletRunResult<T>> task;
+        Console.SetOut (capturedOut);
+
+        try
+        {
+            task = run (app, cts.Token);
+            await task;
+
+            string capturedAnsi = CanonicalizeAnsi (capturedOut.ToString ());
+            if (!string.IsNullOrEmpty (capturedAnsi))
+            {
+                ansiSnapshot = capturedAnsi;
+            }
+        }
+        finally
+        {
+            Console.SetOut (originalOut);
+            app.Iteration -= handler;
+            capturedOut.Dispose ();
         }
 
-        CletUIHarness<T> harness = new (app, cts, task);
+        return new (app, cts, task, ansiSnapshot, textSnapshot);
+    }
 
-        // Re-wire the handler to flow into the harness's _nextIteration field for subsequent waits.
-        app.Iteration -= handler;
-        app.Iteration += harness.OnIteration;
+    /// <summary>The IApplication driving the clet. Use sparingly — prefer the harness API where possible.</summary>
+    public IApplication App => _app;
 
-        return harness;
+    /// <summary>
+    ///     Snapshot the current screen as plain text, one line per row, trailing whitespace trimmed
+    ///     per row. Source: <c>app.Driver.Contents</c> (pre-clipping).
+    /// </summary>
+    public string SnapshotText ()
+    {
+        if (_initialTextSnapshot is not null)
+        {
+            return _initialTextSnapshot;
+        }
+
+        return BuildTextSnapshot (_app.Driver?.Contents);
+    }
+
+    private static string BuildTextSnapshot (Cell[,]? contents)
+    {
+        if (contents is null)
+        {
+            return string.Empty;
+        }
+
+        int rows = contents.GetLength (0);
+        int cols = contents.GetLength (1);
+        StringBuilder sb = new (rows * (cols + 1));
+
+        for (int r = 0; r < rows; r++)
+        {
+            int lineStart = sb.Length;
+            for (int c = 0; c < cols; c++)
+            {
+                string g = contents[r, c].Grapheme;
+                sb.Append (string.IsNullOrEmpty (g) ? " " : g);
+            }
+
+            // Trim trailing whitespace from this row.
+            int end = sb.Length;
+            while (end > lineStart && char.IsWhiteSpace (sb[end - 1]))
+            {
+                end--;
+            }
+            sb.Length = end;
+            sb.Append ('\n');
+        }
+
+        return sb.ToString ();
     }
 
     /// <summary>
     ///     Returns a content-hash for the cell grid plus a flag indicating whether the grid
-    ///     has any non-space glyphs. Used by the startup-stability detector and not part of
-    ///     the public API.
+    ///     has any non-space glyphs. Used by the startup-stability detector.
     /// </summary>
     private static (int Hash, bool NonEmpty) HashContents (Cell[,]? contents)
     {
@@ -208,115 +258,10 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         return (hash, nonEmpty);
     }
 
-    private void OnIteration (object? sender, EventArgs<IApplication?> _)
+    /// <summary>Snapshot the screen as ANSI, including styling.</summary>
+    public string SnapshotAnsi ()
     {
-        TaskCompletionSource? tcs = Interlocked.Exchange (ref _nextIteration, null);
-        tcs?.TrySetResult ();
-    }
-
-    private Task WaitForNextIterationAsync ()
-    {
-        TaskCompletionSource tcs = new (TaskCreationOptions.RunContinuationsAsynchronously);
-        Volatile.Write (ref _nextIteration, tcs);
-        return tcs.Task;
-    }
-
-    /// <summary>
-    ///     Wait for either the next iteration or the clet to complete (whichever comes first).
-    ///     Critical: keys that accept/cancel the clet make the loop exit, so no further iterations
-    ///     fire — awaiting the iteration alone would deadlock. The race against <c>_cletTask</c>
-    ///     unblocks the awaiter cleanly when that happens.
-    /// </summary>
-    private async Task WaitForIterationOrCompletionAsync ()
-    {
-        Task next = WaitForNextIterationAsync ();
-        Task completed = await Task.WhenAny (next, _cletTask);
-
-        if (completed == _cletTask)
-        {
-            // Loop exited; the pending TCS will never resolve naturally. Drain it.
-            TaskCompletionSource? tcs = Interlocked.Exchange (ref _nextIteration, null);
-            tcs?.TrySetResult ();
-        }
-    }
-
-    /// <summary>Inject a key, then wait one iteration (or for the clet to complete).</summary>
-    public async Task PressAsync (Key key)
-    {
-        _app.InjectKey (key);
-        await WaitForIterationOrCompletionAsync ();
-    }
-
-    /// <summary>Inject a left click at the given screen position, then wait one iteration.</summary>
-    public async Task ClickAsync (int x, int y)
-    {
-        _app.InjectMouse (new Mouse
-        {
-            ScreenPosition = new Point (x, y),
-            Position = new Point (x, y),
-            Flags = MouseFlags.LeftButtonClicked,
-        });
-        await WaitForIterationOrCompletionAsync ();
-    }
-
-    /// <summary>Pump iterations until <paramref name="predicate"/> is true, or the clet completes, with a hard cap.</summary>
-    public async Task WaitForAsync (Func<IApplication, bool> predicate, int maxIterations = 50)
-    {
-        for (int i = 0; i < maxIterations; i++)
-        {
-            if (predicate (_app) || _cletTask.IsCompleted)
-            {
-                return;
-            }
-            await WaitForIterationOrCompletionAsync ();
-        }
-
-        if (!predicate (_app) && !_cletTask.IsCompleted)
-        {
-            throw new TimeoutException ($"WaitForAsync exceeded {maxIterations} iterations.");
-        }
-    }
-
-    /// <summary>The IApplication driving the clet. Use sparingly — prefer the harness API where possible.</summary>
-    public IApplication App => _app;
-
-    /// <summary>
-    ///     Snapshot the current screen as plain text, one line per row, trailing whitespace trimmed
-    ///     per row. Source: <c>app.Driver.Contents</c> (pre-clipping).
-    /// </summary>
-    public string SnapshotText ()
-    {
-        Cell[,]? contents = _app.Driver?.Contents;
-
-        if (contents is null)
-        {
-            return string.Empty;
-        }
-
-        int rows = contents.GetLength (0);
-        int cols = contents.GetLength (1);
-        StringBuilder sb = new (rows * (cols + 1));
-
-        for (int r = 0; r < rows; r++)
-        {
-            int lineStart = sb.Length;
-            for (int c = 0; c < cols; c++)
-            {
-                string g = contents[r, c].Grapheme;
-                sb.Append (string.IsNullOrEmpty (g) ? " " : g);
-            }
-
-            // Trim trailing whitespace from this row.
-            int end = sb.Length;
-            while (end > lineStart && char.IsWhiteSpace (sb[end - 1]))
-            {
-                end--;
-            }
-            sb.Length = end;
-            sb.Append ('\n');
-        }
-
-        return sb.ToString ();
+        return _initialAnsiSnapshot ?? CanonicalizeAnsi (_app.Driver?.ToAnsi ());
     }
 
     /// <summary>Snapshot the screen as raw <c>Cell[,]</c> for tests that need attribute/style assertions.</summary>
@@ -381,6 +326,57 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         Assert.Equal (expected, actual);
     }
 
+    /// <summary>
+    ///     Compare the current ANSI snapshot against a stored golden file under
+    ///     <c>tests/Clet.UITests/Goldens/&lt;name&gt;</c>. Set <c>CLET_REGEN_GOLDENS=1</c> or
+    ///     <c>UPDATE_SNAPSHOTS=1</c> to rewrite mismatched goldens in place.
+    /// </summary>
+    public void AssertMatchesAnsiGolden (string fileName)
+    {
+        string actual = SnapshotAnsi ();
+        string path = ResolveGoldenPath (fileName);
+        bool regen = ShouldRegenerateGoldens ();
+
+        if (!File.Exists (path))
+        {
+            if (regen)
+            {
+                WriteAnsiGolden (path, actual);
+                Assert.Fail ($"ANSI golden created at {path}. Re-run without regeneration enabled to verify.");
+            }
+
+            Assert.Fail ($"ANSI golden not found: {path}. Run with CLET_REGEN_GOLDENS=1 to create it.");
+        }
+
+        string expected = CanonicalizeAnsi (File.ReadAllText (path));
+
+        if (expected == actual)
+        {
+            return;
+        }
+
+        string actualPath = path + ".actual";
+        WriteAnsiGolden (actualPath, actual);
+
+        if (regen)
+        {
+            WriteAnsiGolden (path, actual);
+            Assert.Fail ($"ANSI golden updated at {path}. Re-run without regeneration enabled to verify.");
+        }
+
+        Assert.Fail ($"""
+            ANSI golden '{fileName}' does not match {path}.
+
+            Plain-text render of the actual screen:
+            ----------------------------------------------------------------------
+            {SnapshotText ()}
+            ----------------------------------------------------------------------
+
+            Exact look (with colors/styles): cat '{actualPath}'
+            Expected look:                   cat '{path}'
+            """);
+    }
+
     private static string ResolveGoldenPath (string fileName)
     {
         // For reads, the bin directory works (CopyToOutputDirectory ships goldens with the
@@ -388,7 +384,7 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         // so the regenerated file actually shows up in `git status`. The csproj bakes the
         // source path in via `<AssemblyMetadata Include="GoldensSourcePath" />` and we read
         // it back with AssemblyMetadataAttribute.
-        bool regen = Environment.GetEnvironmentVariable ("CLET_REGEN_GOLDENS") == "1";
+        bool regen = ShouldRegenerateGoldens ();
 
         if (regen)
         {
@@ -406,6 +402,19 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
 
         string assemblyDir = Path.GetDirectoryName (typeof (CletUIHarness<T>).Assembly.Location)!;
         return Path.Combine (assemblyDir, "Goldens", fileName);
+    }
+
+    private static bool ShouldRegenerateGoldens ()
+        => Environment.GetEnvironmentVariable ("CLET_REGEN_GOLDENS") == "1"
+           || Environment.GetEnvironmentVariable ("UPDATE_SNAPSHOTS") is "1" or "true";
+
+    private static string CanonicalizeAnsi (string? ansi)
+        => (ansi ?? string.Empty).Replace ("\r\n", "\n").Replace ("\r", "\n");
+
+    private static void WriteAnsiGolden (string path, string ansi)
+    {
+        Directory.CreateDirectory (Path.GetDirectoryName (path)!);
+        File.WriteAllText (path, ansi, new UTF8Encoding (false));
     }
 
     /// <summary>Cancel the clet's run and return its final result.</summary>
@@ -447,7 +456,6 @@ internal sealed class CletUIHarness<T> : IAsyncDisposable
         }
         finally
         {
-            _app.Iteration -= OnIteration;
             _cts.Dispose ();
             _app.Dispose ();
         }

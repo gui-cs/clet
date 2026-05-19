@@ -307,6 +307,12 @@ internal sealed class ConfigClet : IViewerClet
     /// <summary>Returns the path to <c>~/.tui/clet.config.json</c>.</summary>
     internal static string GetConfigPath ()
     {
+        if (!OperatingSystem.IsWindows ()
+            && Environment.GetEnvironmentVariable ("HOME") is { Length: > 0 } homeOverride)
+        {
+            return Path.Combine (homeOverride, ".tui", ConfigFileName);
+        }
+
         string home = Environment.GetFolderPath (Environment.SpecialFolder.UserProfile);
 
         return Path.Combine (home, ".tui", ConfigFileName);
