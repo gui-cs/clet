@@ -8,6 +8,7 @@ using Terminal.Gui.Drawing;
 using Terminal.Gui.Editor;
 using Terminal.Gui.Highlighting;
 using Terminal.Gui.Input;
+using Terminal.Gui.Resources;
 using Terminal.Gui.Text.Indentation;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -18,6 +19,12 @@ namespace Clet;
 
 internal sealed class EditorClet : IViewerClet
 {
+    // Match ted: small files load fully before first paint; larger files stream after the UI appears.
+    private const long SynchronousLoadMaxBytes = 1024 * 1024;
+
+    private const long StreamingStatusInterval = 256 * 1024;
+    private const int StreamingStatusMilliseconds = 100;
+
     public string PrimaryAlias => "edit";
     public IReadOnlyList<string> Aliases => ["edit", "editor"];
     public string Description => "Edit text files with menus, undo/redo, find/replace, and glob support.";
@@ -132,7 +139,10 @@ internal sealed class EditorClet : IViewerClet
             IndentationSize = EditorSettings.IndentSize,
             WordWrap = EditorSettings.WordWrap,
             ShowTabs = EditorSettings.ShowTabs,
-            ViewportSettings = ViewportSettingsFlags.HasScrollBars,
+            CompletionProvider = EditorSettings.AutoComplete ? new WordCompletionProvider () : null,
+            ViewportSettings = EditorSettings.Scrollbars
+                ? ViewportSettingsFlags.HasScrollBars
+                : ViewportSettingsFlags.None,
         };
 
         // Apply gutter options from settings
@@ -372,6 +382,24 @@ internal sealed class EditorClet : IViewerClet
         { Title = "Ln 1, Col 1", MouseHighlightStates = MouseState.None, Enabled = false };
         Shortcut languageShortcut = new ()
         { Title = "Plain Text", MouseHighlightStates = MouseState.None, Enabled = false };
+        SpinnerView loadStatusSpinner = new ()
+        {
+            Style = new SpinnerStyle.Aesthetic (),
+            Width = 8,
+            AutoSpin = false,
+            Visible = false,
+        };
+        Shortcut loadSpinnerShortcut = new ()
+        {
+            CommandView = loadStatusSpinner,
+            Title = string.Empty,
+            MouseHighlightStates = MouseState.None,
+        };
+        object streamingStatusLock = new ();
+        long lastStreamingStatusUnits = 0;
+        DateTime lastStreamingStatusUpdate = DateTime.MinValue;
+        long streamingStatusOperationId = 0;
+        CancellationTokenSource? progressiveLoadCts = null;
 
         // Filename shortcut for MenuBar — full path, dialog scheme
         Shortcut filenameShortcut = new ()
@@ -426,34 +454,13 @@ internal sealed class EditorClet : IViewerClet
 
         // --- File operations ---
 
-        void LoadFile (string path)
+        void ApplyLoadedFileState (string fullPath)
         {
-            string fullPath = Path.GetFullPath (path);
-
-            if (!File.Exists (fullPath))
-            {
-                filePath = fullPath;
-                fileName = Path.GetFileName (fullPath);
-                lastDirectory = Path.GetDirectoryName (fullPath);
-                savedText = string.Empty;
-                editor.Document = new TextDocument ();
-                UpdateSyntaxLanguage (fullPath);
-                InstallFolding ();
-                UpdateModifiedIndicator ();
-                filenameShortcut.Title = fullPath;
-                isMarkdownFile = Path.GetExtension (fullPath).Equals (".md", StringComparison.OrdinalIgnoreCase);
-                UpdatePreviewEnabled ();
-
-                return;
-            }
-
-            string text = File.ReadAllText (fullPath);
             filePath = fullPath;
             fileName = Path.GetFileName (fullPath);
             lastDirectory = Path.GetDirectoryName (fullPath);
-            savedText = text;
+            savedText = editor.Document?.Text ?? string.Empty;
             editor.ClearSelection ();
-            editor.Document = new TextDocument (text);
             editor.CaretOffset = 0;
             UpdateSyntaxLanguage (fullPath);
             InstallFolding ();
@@ -461,6 +468,316 @@ internal sealed class EditorClet : IViewerClet
             filenameShortcut.Title = fullPath;
             isMarkdownFile = Path.GetExtension (fullPath).Equals (".md", StringComparison.OrdinalIgnoreCase);
             UpdatePreviewEnabled ();
+            UpdateLanguageShortcut ();
+            editor.SetFocus ();
+        }
+
+        void OpenMissingFile (string fullPath)
+        {
+            filePath = fullPath;
+            fileName = Path.GetFileName (fullPath);
+            lastDirectory = Path.GetDirectoryName (fullPath);
+            savedText = string.Empty;
+            editor.ClearSelection ();
+            editor.Document = new TextDocument ();
+            editor.Document.UndoStack.DiscardOriginalFileMarker ();
+            editor.CaretOffset = 0;
+            UpdateSyntaxLanguage (fullPath);
+            InstallFolding ();
+            UpdateModifiedIndicator ();
+            filenameShortcut.Title = fullPath;
+            isMarkdownFile = Path.GetExtension (fullPath).Equals (".md", StringComparison.OrdinalIgnoreCase);
+            UpdatePreviewEnabled ();
+            UpdateLanguageShortcut ();
+            editor.SetFocus ();
+        }
+
+        bool OpenFileSynchronously (string fullPath)
+        {
+            try
+            {
+                using FileStream stream = File.OpenRead (fullPath);
+                editor.ClearSelection ();
+                editor.LoadAsync (stream, cancellationToken: cancellationToken).GetAwaiter ().GetResult ();
+                ApplyLoadedFileState (fullPath);
+
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                CompleteAnyStreamingStatus ("Load canceled");
+
+                return false;
+            }
+            catch (Exception ex) when (IsFileOperationException (ex))
+            {
+                CompleteAnyStreamingStatus ("Load failed");
+
+                return false;
+            }
+        }
+
+        void LoadFile (string path)
+        {
+            string fullPath = Path.GetFullPath (path);
+            FileInfo file = new (fullPath);
+
+            // Cancel any in-flight progressive load so it cannot overwrite state.
+            progressiveLoadCts?.Cancel ();
+            progressiveLoadCts = null;
+
+            if (!file.Exists)
+            {
+                OpenMissingFile (fullPath);
+
+                return;
+            }
+
+            if (file.Length <= SynchronousLoadMaxBytes)
+            {
+                OpenFileSynchronously (fullPath);
+
+                return;
+            }
+
+            progressiveLoadCts = CancellationTokenSource.CreateLinkedTokenSource (cancellationToken);
+            CancellationTokenSource currentCts = progressiveLoadCts;
+            app.Invoke (() => _ = BeginProgressiveLoadAsync (fullPath, currentCts));
+        }
+
+        async Task<bool> BeginProgressiveLoadAsync (string fullPath, CancellationTokenSource loadCts)
+        {
+            long? statusOperationId = null;
+            CancellationToken loadToken = loadCts.Token;
+
+            try
+            {
+                await using FileStream stream = File.OpenRead (fullPath);
+                long fileSize = stream.Length;
+                long startedStatusOperationId = BeginStreamingStatus (FormatStartingProgress ("Loading", fileSize));
+                statusOperationId = startedStatusOperationId;
+
+                IProgress<TextDocumentProgress> progress =
+                    CreateStreamingProgress (progress => ReportLoadProgress (startedStatusOperationId, progress));
+
+                editor.ClearSelection ();
+
+                await editor.LoadAsync (
+                    stream,
+                    progress: progress,
+                    cancellationToken: loadToken,
+                    marshal: action => InvokeOnAppAsync (app, action));
+
+                // If cancelled between LoadAsync completing and here, don't apply state.
+                loadToken.ThrowIfCancellationRequested ();
+
+                await InvokeOnAppAsync (app, () =>
+                {
+                    // Final guard: if another load started while we were awaiting the marshal,
+                    // this CTS will have been cancelled — bail out.
+                    if (loadToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    ApplyLoadedFileState (fullPath);
+                    CompleteStreamingStatus (
+                        startedStatusOperationId,
+                        FormatCompletedProgress ("Loaded", fileSize));
+                });
+
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                if (statusOperationId is { } startedStatusOperationId)
+                {
+                    CompleteStreamingStatus (startedStatusOperationId, "Load canceled");
+                }
+                else
+                {
+                    CompleteAnyStreamingStatus ("Load canceled");
+                }
+
+                return false;
+            }
+            catch (Exception ex) when (IsFileOperationException (ex))
+            {
+                if (statusOperationId is { } startedStatusOperationId)
+                {
+                    CompleteStreamingStatus (startedStatusOperationId, "Load failed");
+                }
+                else
+                {
+                    CompleteAnyStreamingStatus ("Load failed");
+                }
+
+                return false;
+            }
+        }
+
+        void ReportLoadProgress (long statusOperationId, TextDocumentProgress progress)
+        {
+            if (!ShouldReportStreamingProgress (statusOperationId, progress))
+            {
+                return;
+            }
+
+            SetLoadStatus (FormatProgress ("Loading", progress), true, statusOperationId);
+        }
+
+        IProgress<TextDocumentProgress> CreateStreamingProgress (Action<TextDocumentProgress> handler)
+        {
+            return new Progress<TextDocumentProgress> (handler);
+        }
+
+        long BeginStreamingStatus (string status)
+        {
+            long statusOperationId = Interlocked.Increment (ref streamingStatusOperationId);
+            ResetStreamingStatusThrottle ();
+            SetLoadStatus (status, true, statusOperationId);
+
+            return statusOperationId;
+        }
+
+        void CompleteStreamingStatus (long statusOperationId, string status)
+        {
+            long completionOperationId = statusOperationId + 1;
+
+            if (Interlocked.CompareExchange (
+                    ref streamingStatusOperationId,
+                    completionOperationId,
+                    statusOperationId)
+                != statusOperationId)
+            {
+                return;
+            }
+
+            SetLoadStatus (status, false, completionOperationId);
+        }
+
+        void CompleteAnyStreamingStatus (string status)
+        {
+            long completionOperationId = Interlocked.Increment (ref streamingStatusOperationId);
+            SetLoadStatus (status, false, completionOperationId);
+        }
+
+        void SetLoadStatus (string status, bool showSpinner, long statusOperationId)
+        {
+            void Update ()
+            {
+                if (Interlocked.Read (ref streamingStatusOperationId) != statusOperationId)
+                {
+                    return;
+                }
+
+                loadStatusSpinner.Visible = showSpinner;
+                loadStatusSpinner.AutoSpin = showSpinner;
+                loadSpinnerShortcut.Title = status;
+                loadSpinnerShortcut.HelpText = status;
+                loadStatusSpinner.SetNeedsDraw ();
+                loadSpinnerShortcut.SetNeedsDraw ();
+            }
+
+            app.Invoke (Update);
+        }
+
+        void ResetStreamingStatusThrottle ()
+        {
+            lock (streamingStatusLock)
+            {
+                lastStreamingStatusUpdate = DateTime.MinValue;
+                lastStreamingStatusUnits = 0;
+            }
+        }
+
+        bool ShouldReportStreamingProgress (long statusOperationId, TextDocumentProgress progress)
+        {
+            if (Interlocked.Read (ref streamingStatusOperationId) != statusOperationId)
+            {
+                return false;
+            }
+
+            long processedUnits = progress.BytesProcessed ?? progress.CharactersProcessed;
+            long? totalUnits = progress.TotalBytes ?? progress.TotalCharacters;
+
+            if (totalUnits == processedUnits)
+            {
+                return true;
+            }
+
+            lock (streamingStatusLock)
+            {
+                DateTime now = DateTime.UtcNow;
+
+                if (processedUnits - lastStreamingStatusUnits < StreamingStatusInterval
+                    && now - lastStreamingStatusUpdate < TimeSpan.FromMilliseconds (StreamingStatusMilliseconds))
+                {
+                    return false;
+                }
+
+                lastStreamingStatusUnits = processedUnits;
+                lastStreamingStatusUpdate = now;
+            }
+
+            return true;
+        }
+
+        static string FormatProgress (string verb, TextDocumentProgress progress)
+        {
+            string processed = progress.BytesProcessed is { } bytesProcessed
+                ? FormatByteCount (bytesProcessed)
+                : $"{progress.CharactersProcessed:N0} chars";
+
+            string? total = progress.TotalBytes is { } totalBytes
+                ? FormatByteCount (totalBytes)
+                : progress.TotalCharacters is { } totalCharacters
+                    ? $"{totalCharacters:N0} chars"
+                    : null;
+
+            if (total is null)
+            {
+                return $"{verb} {processed}";
+            }
+
+            if (progress.Fraction is { } fraction)
+            {
+                return $"{verb} {processed} of {total} ({fraction:P0})";
+            }
+
+            return $"{verb} {processed} of {total}";
+        }
+
+        static string FormatStartingProgress (string verb, long totalBytes)
+        {
+            return $"{verb} 0 B of {FormatByteCount (totalBytes)}";
+        }
+
+        static string FormatCompletedProgress (string verb, long totalBytes)
+        {
+            return $"{verb} {FormatByteCount (totalBytes)}";
+        }
+
+        static string FormatByteCount (long bytes)
+        {
+            string[] units = ["B", "KiB", "MiB", "GiB", "TiB"];
+            double value = bytes;
+            int unitIndex = 0;
+
+            while (value >= 1024 && unitIndex < units.Length - 1)
+            {
+                value /= 1024;
+                unitIndex++;
+            }
+
+            string format = unitIndex == 0 ? "N0" : "N1";
+
+            return $"{value.ToString (format)} {units[unitIndex]}";
+        }
+
+        static bool IsFileOperationException (Exception ex)
+        {
+            return ex is IOException or UnauthorizedAccessException;
         }
 
         bool SaveFile ()
@@ -725,6 +1042,7 @@ internal sealed class EditorClet : IViewerClet
             if (dlg.WasAccepted)
             {
                 dlg.ApplyTo (editor);
+                SyncViewMenuStateFromEditor ();
                 SaveViewSettings ();
             }
 
@@ -737,6 +1055,7 @@ internal sealed class EditorClet : IViewerClet
         bool optFoldIndicators = EditorSettings.FoldIndicators;
         bool optWordWrap = EditorSettings.WordWrap;
         bool optShowTabs = EditorSettings.ShowTabs;
+        bool optScrollbars = EditorSettings.Scrollbars;
 
         void UpdateGutterOptions ()
         {
@@ -787,15 +1106,25 @@ internal sealed class EditorClet : IViewerClet
         MenuItem viewFoldIndicatorsItem = new () { Title = ToggleTitle (optFoldIndicators, "_Fold Indicators") };
         MenuItem viewWordWrapItem = new () { Title = ToggleTitle (optWordWrap, "_Word Wrap") };
         MenuItem viewShowTabsItem = new () { Title = ToggleTitle (optShowTabs, "Show _Tabs") };
+        MenuItem viewScrollbarsItem = new () { Title = ToggleTitle (optScrollbars, "_Scrollbars") };
+
+        void SyncViewMenuStateFromEditor ()
+        {
+            optScrollbars = editor.ViewportSettings.HasFlag (ViewportSettingsFlags.HasScrollBars);
+            viewScrollbarsItem.Title = ToggleTitle (optScrollbars, "_Scrollbars");
+        }
+
         void SaveViewSettings ()
         {
             EditorSettings.LineNumbers = optLineNumbers;
             EditorSettings.FoldIndicators = optFoldIndicators;
             EditorSettings.WordWrap = optWordWrap;
             EditorSettings.ShowTabs = optShowTabs;
+            EditorSettings.Scrollbars = editor.ViewportSettings.HasFlag (ViewportSettingsFlags.HasScrollBars);
             EditorSettings.IndentSize = editor.IndentationSize;
             EditorSettings.ConvertTabsToSpaces = editor.ConvertTabsToSpaces;
             EditorSettings.AutoIndent = editor.IndentationStrategy is not null;
+            EditorSettings.AutoComplete = editor.CompletionProvider is not null;
             EditorSettings.Save ();
         }
 
@@ -831,6 +1160,17 @@ internal sealed class EditorClet : IViewerClet
             SaveViewSettings ();
         };
 
+        viewScrollbarsItem.Action = () =>
+        {
+            optScrollbars = !optScrollbars;
+            viewScrollbarsItem.Title = ToggleTitle (optScrollbars, "_Scrollbars");
+            editor.ViewportSettings = optScrollbars
+                ? editor.ViewportSettings | ViewportSettingsFlags.HasScrollBars
+                : editor.ViewportSettings & ~ViewportSettingsFlags.HasScrollBars;
+            editor.SetNeedsDraw ();
+            SaveViewSettings ();
+        };
+
         previewMarkdownItem.Action = () =>
         {
             if (isMarkdownFile)
@@ -845,6 +1185,7 @@ internal sealed class EditorClet : IViewerClet
             viewFoldIndicatorsItem,
             viewWordWrapItem,
             viewShowTabsItem,
+            viewScrollbarsItem,
             null!,
             previewMarkdownItem,
         ]));
@@ -925,6 +1266,7 @@ internal sealed class EditorClet : IViewerClet
             new Shortcut (Key.F3, "Save", () => SaveFile ()),
             cursorPositionShortcut,
             languageShortcut,
+            loadSpinnerShortcut,
             new Shortcut { Title = "Theme", CommandView = themeDropDown },
         ];
 
@@ -1055,16 +1397,9 @@ internal sealed class EditorClet : IViewerClet
             }
 
             // ── Normal (or post-allow) content load ──────────────────────────
-            if (filePath is not null && File.Exists (filePath))
+            if (filePath is not null)
             {
                 LoadFile (filePath);
-            }
-            else if (filePath is not null)
-            {
-                savedText = string.Empty;
-                editor.Document = new TextDocument ();
-                InstallFolding ();
-                UpdateModifiedIndicator ();
             }
             else if (content is not null)
             {
@@ -1095,5 +1430,24 @@ internal sealed class EditorClet : IViewerClet
         }
 
         return new () { Status = CletRunStatus.Ok };
+    }
+
+    private static Task InvokeOnAppAsync (IApplication app, Action action)
+    {
+        TaskCompletionSource completion = new ();
+        app.Invoke (() =>
+        {
+            try
+            {
+                action ();
+                completion.SetResult ();
+            }
+            catch (Exception ex)
+            {
+                completion.SetException (ex);
+            }
+        });
+
+        return completion.Task;
     }
 }

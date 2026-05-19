@@ -69,10 +69,12 @@ public class EditorSettingsTests : IDisposable
         Assert.Contains ("EditorSettings.FoldIndicators", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.WordWrap", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.ShowTabs", EditorSettings.ManagedKeys);
+        Assert.Contains ("EditorSettings.Scrollbars", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.IndentSize", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.ConvertTabsToSpaces", EditorSettings.ManagedKeys);
         Assert.Contains ("EditorSettings.AutoIndent", EditorSettings.ManagedKeys);
-        Assert.Equal (7, EditorSettings.ManagedKeys.Count);
+        Assert.Contains ("EditorSettings.AutoComplete", EditorSettings.ManagedKeys);
+        Assert.Equal (9, EditorSettings.ManagedKeys.Count);
     }
 
     [Fact]
@@ -96,9 +98,11 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.FoldIndicators = false;
         EditorSettings.WordWrap = true;
         EditorSettings.ShowTabs = true;
+        EditorSettings.Scrollbars = false;
         EditorSettings.IndentSize = 2;
         EditorSettings.ConvertTabsToSpaces = false;
         EditorSettings.AutoIndent = true;
+        EditorSettings.AutoComplete = true;
 
         // Write a minimal config file so Save can insert into it
         File.WriteAllText (_configPath, "{}");
@@ -124,9 +128,11 @@ public class EditorSettingsTests : IDisposable
         Assert.False ((bool)obj["EditorSettings.FoldIndicators"]!);
         Assert.True ((bool)obj["EditorSettings.WordWrap"]!);
         Assert.True ((bool)obj["EditorSettings.ShowTabs"]!);
+        Assert.False ((bool)obj["EditorSettings.Scrollbars"]!);
         Assert.Equal (2, (int)obj["EditorSettings.IndentSize"]!);
         Assert.False ((bool)obj["EditorSettings.ConvertTabsToSpaces"]!);
         Assert.True ((bool)obj["EditorSettings.AutoIndent"]!);
+        Assert.True ((bool)obj["EditorSettings.AutoComplete"]!);
     }
 
     [Fact]
@@ -293,7 +299,9 @@ public class EditorSettingsTests : IDisposable
               "EditorSettings.LineNumbers": false,
               "EditorSettings.IndentSize": 8,
               "EditorSettings.WordWrap": true,
-              "EditorSettings.AutoIndent": true
+              "EditorSettings.AutoIndent": true,
+              "EditorSettings.Scrollbars": false,
+              "EditorSettings.AutoComplete": true
             }
             """;
 
@@ -302,6 +310,8 @@ public class EditorSettingsTests : IDisposable
         EditorSettings.IndentSize = 4;
         EditorSettings.WordWrap = false;
         EditorSettings.AutoIndent = false;
+        EditorSettings.Scrollbars = true;
+        EditorSettings.AutoComplete = false;
 
         // Act — load via RuntimeConfig (cross-platform; avoids ~ resolution
         // issues on Windows where GetFolderPath ignores env var changes).
@@ -313,6 +323,8 @@ public class EditorSettingsTests : IDisposable
         Assert.Equal (8, EditorSettings.IndentSize);
         Assert.True (EditorSettings.WordWrap);
         Assert.True (EditorSettings.AutoIndent);
+        Assert.False (EditorSettings.Scrollbars);
+        Assert.True (EditorSettings.AutoComplete);
     }
 
     [Fact]
@@ -389,9 +401,11 @@ public class EditorSettingsTests : IDisposable
         Assert.True (EditorSettings.FoldIndicators);
         Assert.False (EditorSettings.WordWrap);
         Assert.False (EditorSettings.ShowTabs);
+        Assert.True (EditorSettings.Scrollbars);
         Assert.Equal (4, EditorSettings.IndentSize);
         Assert.True (EditorSettings.ConvertTabsToSpaces);
         Assert.False (EditorSettings.AutoIndent);
+        Assert.False (EditorSettings.AutoComplete);
     }
 
     [Fact]

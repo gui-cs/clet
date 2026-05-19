@@ -26,6 +26,9 @@ internal static class EditorSettings
     [ConfigurationProperty (Scope = typeof (SettingsScope))]
     public static bool ShowTabs { get; set; }
 
+    [ConfigurationProperty (Scope = typeof (SettingsScope))]
+    public static bool Scrollbars { get; set; } = true;
+
     // --- Tab settings ---
 
     [ConfigurationProperty (Scope = typeof (SettingsScope))]
@@ -37,6 +40,9 @@ internal static class EditorSettings
     [ConfigurationProperty (Scope = typeof (SettingsScope))]
     public static bool AutoIndent { get; set; }
 
+    [ConfigurationProperty (Scope = typeof (SettingsScope))]
+    public static bool AutoComplete { get; set; }
+
     /// <summary>
     /// All keys managed by this class. Used for selective persistence.
     /// </summary>
@@ -46,9 +52,11 @@ internal static class EditorSettings
         "EditorSettings.FoldIndicators",
         "EditorSettings.WordWrap",
         "EditorSettings.ShowTabs",
+        "EditorSettings.Scrollbars",
         "EditorSettings.IndentSize",
         "EditorSettings.ConvertTabsToSpaces",
         "EditorSettings.AutoIndent",
+        "EditorSettings.AutoComplete",
     ];
 
     /// <summary>
@@ -78,9 +86,11 @@ internal static class EditorSettings
                 ["EditorSettings.FoldIndicators"] = ToJson (FoldIndicators),
                 ["EditorSettings.WordWrap"] = ToJson (WordWrap),
                 ["EditorSettings.ShowTabs"] = ToJson (ShowTabs),
+                ["EditorSettings.Scrollbars"] = ToJson (Scrollbars),
                 ["EditorSettings.IndentSize"] = IndentSize.ToString (),
                 ["EditorSettings.ConvertTabsToSpaces"] = ToJson (ConvertTabsToSpaces),
                 ["EditorSettings.AutoIndent"] = ToJson (AutoIndent),
+                ["EditorSettings.AutoComplete"] = ToJson (AutoComplete),
             };
 
             List<string> toInsert = [];
