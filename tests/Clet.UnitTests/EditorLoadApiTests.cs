@@ -17,11 +17,11 @@ public class EditorLoadApiTests
                 m.Name == nameof (Editor.LoadAsync)
                 && m.GetParameters () is
                 [
-                    { ParameterType: { } streamType },
-                    { ParameterType: { } encodingType },
-                    { ParameterType: { } progressType },
-                    { ParameterType: { } cancellationTokenType },
-                    { ParameterType: { } marshalType },
+                { ParameterType: { } streamType },
+                { ParameterType: { } encodingType },
+                { ParameterType: { } progressType },
+                { ParameterType: { } cancellationTokenType },
+                { ParameterType: { } marshalType },
                 ]
                 && streamType == typeof (Stream)
                 && encodingType == typeof (Encoding)

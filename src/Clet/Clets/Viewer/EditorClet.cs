@@ -399,6 +399,7 @@ internal sealed class EditorClet : IViewerClet
         long lastStreamingStatusUnits = 0;
         DateTime lastStreamingStatusUpdate = DateTime.MinValue;
         long streamingStatusOperationId = 0;
+        CancellationTokenSource? progressiveLoadCts = null;
 
         // Filename shortcut for MenuBar — full path, dialog scheme
         Shortcut filenameShortcut = new ()
@@ -521,6 +522,10 @@ internal sealed class EditorClet : IViewerClet
             string fullPath = Path.GetFullPath (path);
             FileInfo file = new (fullPath);
 
+            // Cancel any in-flight progressive load so it cannot overwrite state.
+            progressiveLoadCts?.Cancel ();
+            progressiveLoadCts = null;
+
             if (!file.Exists)
             {
                 OpenMissingFile (fullPath);
@@ -535,12 +540,15 @@ internal sealed class EditorClet : IViewerClet
                 return;
             }
 
-            app.Invoke (() => _ = BeginProgressiveLoadAsync (fullPath));
+            progressiveLoadCts = CancellationTokenSource.CreateLinkedTokenSource (cancellationToken);
+            CancellationTokenSource currentCts = progressiveLoadCts;
+            app.Invoke (() => _ = BeginProgressiveLoadAsync (fullPath, currentCts));
         }
 
-        async Task<bool> BeginProgressiveLoadAsync (string fullPath)
+        async Task<bool> BeginProgressiveLoadAsync (string fullPath, CancellationTokenSource loadCts)
         {
             long? statusOperationId = null;
+            CancellationToken loadToken = loadCts.Token;
 
             try
             {
@@ -557,11 +565,21 @@ internal sealed class EditorClet : IViewerClet
                 await editor.LoadAsync (
                     stream,
                     progress: progress,
-                    cancellationToken: cancellationToken,
+                    cancellationToken: loadToken,
                     marshal: action => InvokeOnAppAsync (app, action));
+
+                // If cancelled between LoadAsync completing and here, don't apply state.
+                loadToken.ThrowIfCancellationRequested ();
 
                 await InvokeOnAppAsync (app, () =>
                 {
+                    // Final guard: if another load started while we were awaiting the marshal,
+                    // this CTS will have been cancelled — bail out.
+                    if (loadToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
                     ApplyLoadedFileState (fullPath);
                     CompleteStreamingStatus (
                         startedStatusOperationId,
